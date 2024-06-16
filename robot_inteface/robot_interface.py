@@ -1,9 +1,9 @@
 from rtde_control import RTDEControlInterface as rtdectrl
 from rtde_receive import RTDEReceiveInterface as rtdercv
 from rtde_io import RTDEIOInterface as rtdeio
-from twofg7_gripper import TwoFG7
-import numpy as np
+from robot_inteface.twofg7_gripper import TwoFG7
 from numpy import pi
+import time
 
 
 home_config = [0, -pi/2, 0, -pi/2, 0, 0]
@@ -26,10 +26,12 @@ class RobotInterfaceWithGripper(RobotInterface):
 
     def set_gripper(self, width, force, speed):
         self.gripper.twofg_grip_external(width, force, speed)
+        time.sleep(1)
 
     def grasp(self):
         min_width = self.gripper.twofg_get_min_external_width()
         self.gripper.twofg_grip_external(min_width, 40, 100)
+        time.sleep(1)
 
     def release_grasp(self):
         max_width = self.gripper.twofg_get_max_external_width()
