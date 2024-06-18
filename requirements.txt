@@ -1,0 +1,10 @@
+Klampt==0.9.1.post4
+numpy==1.26.4
+opencv-python==4.10.0.82
+pycurl==7.45.3
+PyOpenGL==3.1.7
+PyQt5==5.15.10
+PyQt5-Qt5==5.15.2
+PyQt5-sip==12.13.0
+pyrealsense2==2.55.1.6486
+ur_rtde==1.5.8
