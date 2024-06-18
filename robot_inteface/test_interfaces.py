@@ -4,8 +4,8 @@ from numpy import pi
 import time
 
 
-robot1 = RobotInterfaceWithGripper("192.168.0.10", 500)
-robot2 = RobotInterfaceWithGripper("192.168.0.11", 500)
+robot1 = RobotInterfaceWithGripper("192.168.0.10", 125)
+robot2 = RobotInterfaceWithGripper("192.168.0.11", 125)
 
 robots = [robot1, robot2]
 
@@ -24,6 +24,8 @@ for robot in robots:
                 [*target2, vel, acc, blend],
                 [*target3, vel, acc, blend]]
         robot.moveJ(path, asynchronous=True)
+time.sleep(0.3)
+
 
 while True:
         robots_vel_norm = [numpy.linalg.norm(robot.getActualQd()) for robot in robots]

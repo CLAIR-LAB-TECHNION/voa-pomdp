@@ -12,7 +12,9 @@ import os
 
 
 class MotionPlanner:
-    def __init__(self, eps=1e-2):
+    default_attachments = {"u5e_1": ["camera", "gripper"], "u5e_2": ["gripper"]}
+
+    def __init__(self, eps=1e-2, attachments=default_attachments):
         """
         parameters:
         eps: epsilon gap for collision checking along the line in configuration space. Too high value may lead to
@@ -21,8 +23,9 @@ class MotionPlanner:
         self.eps = eps
 
         self.world = WorldModel()
-        dir = os.path.dirname(os.path.realpath(__file__))
-        world_path = os.path.join(dir, "klampt_world.xml")
+        # dir = os.path.dirname(os.path.realpath(__file__))
+        # world_path = os.path.join(dir, "klampt_world.xml")
+        world_path = "klampt_world.xml"
         self.world.readFile(world_path)
 
 
@@ -47,7 +50,7 @@ class MotionPlanner:
         # set camera position:
         viewport = vis.getViewport()
         viewport.camera.tgt = [0, 0, 0.7]
-        viewport.camera.rot = [0, -0.7, 2]
+        viewport.camera.rot = [0, -0.7, 0]
 
         vis.show()
 
