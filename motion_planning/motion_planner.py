@@ -218,6 +218,9 @@ class MotionPlanner:
         """
         Transform a pose from world frame to robot frame.
         """
+        if robot_name == "ur5e_1":
+            return world_pose_6d
+
         robot = self.robot_name_mapping[robot_name]
 
         # Get the transform from robot to world (rotation matrix and translation vector)
