@@ -16,7 +16,7 @@ class RobotInterface(rtdectrl, rtdeio, rtdercv):
         rtdeio.__init__(self, robot_ip, freq)
 
     def move_home(self, speed=0.2, acceleration=0.2):
-        self.moveJ(q=home_config, speed=0.2, acceleration=0.2)
+        self.moveJ(q=home_config, speed=0.5, acceleration=0.5)
 
 
 class RobotInterfaceWithGripper(RobotInterface):

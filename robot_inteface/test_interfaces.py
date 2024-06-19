@@ -6,6 +6,7 @@ import time
 
 robot1 = RobotInterfaceWithGripper("192.168.0.10", 125)
 robot2 = RobotInterfaceWithGripper("192.168.0.11", 125)
+time.sleep(0.5)
 
 robots = [robot1, robot2]
 
@@ -36,6 +37,7 @@ while True:
 for robot in robots:
         robot.stopJ()
         pose = robot.getActualTCPPose()
+        pose[2] -= 0.1
         robot.moveJ_IK(pose, speed=0.5, acceleration=0.5)
         robot.grasp()
 
