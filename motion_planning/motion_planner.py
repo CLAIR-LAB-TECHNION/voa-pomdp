@@ -86,6 +86,7 @@ class MotionPlanner:
         # trajectory = RobotTrajectory(robot, range(len(path)), path)
         vis.add("path", path)
         vis.setColor("path", 1, 1, 1, 0.5)
+        vis.setAttribute("path", "robot", robot_name)
 
     def show_point_vis(self, point):
         vis.add("point", point)
@@ -253,16 +254,16 @@ if __name__ == "__main__":
     planner = MotionPlanner()
     planner.visualize()
 
-    path = planner.plan_from_start_to_goal_config("ur5e_1",
-                                           [pi/2 , 0, 0, 0, 0, 0],
-                                           [0, -pi/2, 0, -pi/2, 0, 0])
-    planner.show_path_vis("ur5e_1", path)
+    # path = planner.plan_from_start_to_goal_config("ur5e_1",
+    #                                        [pi/2 , 0, 0, 0, 0, 0],
+    #                                        [0, -pi/2, 0, -pi/2, 0, 0])
+    # planner.show_path_vis("ur5e_1", path)
 
     # will visualize the path on robot1
-    # path = planner.plan_from_start_to_goal_config("ur5e_2",
-    #                                        [-pi/2 , 0, 0, 0, 0, 0],
-    #                                        [0, -pi/2, 0, -pi/2, 0, 0])
-    # planner.show_path_vis("ur5e_2", path)
+    path = planner.plan_from_start_to_goal_config("ur5e_2",
+                                           [0, 0, 0, 0, 0, 0],
+                                           [0, -pi/2, 0, -pi/2, 0, 0])
+    planner.show_path_vis("ur5e_2", path)
 
 
     time.sleep(300)
