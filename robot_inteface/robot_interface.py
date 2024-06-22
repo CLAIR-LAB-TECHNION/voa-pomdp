@@ -20,9 +20,9 @@ class RobotInterface(rtdectrl, rtdeio, rtdercv):
 
 
 class RobotInterfaceWithGripper(RobotInterface):
-    def __init__(self, robot_ip, freq=125, gripper_ip=0):
+    def __init__(self, robot_ip, freq=125, gripper_id=0):
         super().__init__(robot_ip, freq)
-        self.gripper = TwoFG7(robot_ip, gripper_ip)
+        self.gripper = TwoFG7(robot_ip, gripper_id)
 
     def set_gripper(self, width, force, speed):
         self.gripper.twofg_grip_external(width, force, speed)

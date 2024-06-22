@@ -1,14 +1,11 @@
 import time
 from frozendict import frozendict
 import numpy as np
-from klampt.model.trajectory import RobotTrajectory
 from numpy import pi
 from klampt import WorldModel, Geometry3D, RobotModel
 from klampt.model.geometry import box
 from klampt import vis
 from klampt.plan.cspace import MotionPlan
-from klampt.plan.robotcspace import RobotCSpace
-from klampt.model.collide import WorldCollider
 from klampt.plan import robotplanning
 from klampt.model import ik
 from klampt.math import se3, so3
@@ -215,44 +212,12 @@ class MotionPlanner:
 
         robot.link("ee_link").geometry().set(all_attachments_geom)
 
-    def transform_world_to_robot(self, robot_name, world_pose_6d):
-        """
-        Transform a pose from world frame to robot frame.
-        """
-        if robot_name == "ur5e_1":
-            return world_pose_6d
-
-        robot = self.robot_name_mapping[robot_name]
-
-        # Get the transform from robot to world (rotation matrix and translation vector)
-        robot_to_world_transform = robot.link("base_link").getTransform()
-        world_to_robot_transform = se3.inv(robot_to_world_transform)
-
-        # Separate the input pose into position and orientation
-        world_position = world_pose_6d[:3]
-        world_rotation_euler = world_pose_6d[3:]
-
-        # Convert position from world to robot
-        robot_position = se3.apply(world_to_robot_transform, world_position)
-
-        # Convert rotation vector to rotation matrix
-        world_rotation_matrix = so3.from_rpy(world_rotation_euler)
-
-        # Convert rotation from world to robot
-        robot_rotation_matrix = so3.mul(world_to_robot_transform[0], world_rotation_matrix)
-        robot_rotation_euler = so3.rpy(robot_rotation_matrix)
-
-        # Combine the local position and rotation vector
-        robot_pose_6d = np.concatenate((robot_position, robot_rotation_euler))
-
-        return robot_pose_6d
-
-
-
 
 if __name__ == "__main__":
     planner = MotionPlanner()
     planner.visualize()
+
+    print(planner.transform_world_to_robot("ur5e_1", [-1, -1, 0, 0, pi, 0]))
 
     # path = planner.plan_from_start_to_goal_config("ur5e_1",
     #                                        [pi/2 , 0, 0, 0, 0, 0],
@@ -264,6 +229,5 @@ if __name__ == "__main__":
                                            [0, 0, 0, 0, 0, 0],
                                            [0, -pi/2, 0, -pi/2, 0, 0])
     planner.show_path_vis("ur5e_2", path)
-
 
     time.sleep(300)
