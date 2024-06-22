@@ -18,6 +18,15 @@ class RobotInterface(rtdectrl, rtdeio, rtdercv):
     def move_home(self, speed=0.2, acceleration=0.2, asynchronous=False):
         self.moveJ(q=home_config, speed=speed, acceleration=acceleration, asynchronous=asynchronous)
 
+    def move_path(self, path, speed=0.5, acceleration=0.5, blend_radius=0.05, asynchronous=False):
+        path_with_params = [[*target_config, speed, acceleration, blend_radius] for target_config in path]
+        self.moveJ(path_with_params, asynchronous=asynchronous)
+
+    def moveL_relative(self, relative_position, speed=0.5, acceleration=0.5, asynchronous=False):
+        target_pose = self.getActualTCPPose()
+        for i in range(3):
+            target_pose[i] += relative_position[i]
+        self.moveL(target_pose, speed, acceleration, asynchronous)
 
 class RobotInterfaceWithGripper(RobotInterface):
     def __init__(self, robot_ip, freq=125, gripper_id=0):
