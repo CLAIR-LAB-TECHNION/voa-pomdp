@@ -18,6 +18,10 @@ class MotionPlanner:
                                     "type": "rrt*",
                                     "bidirectional": False,
                                     "connectionThreshold": 30.0,
+                                    # "perturbationRadius": 0.1,
+                                    # "suboptimalityFactor": 1.01,  # only for rrt* and prm*.
+                                    # Don't use suboptimalityFactor as it's unclear how that parameter works...
+                                    # seems like it's ignored even in rrt*
                                     # "shortcut": True, # only for rrt
                                   })
 
@@ -69,7 +73,23 @@ class MotionPlanner:
 
         vis.show()
 
-    def show_path_vis(self, robot_name, path_):
+    def vis_config(self, robot_name, config_):
+        """
+        Show visualization of the robot in a config
+        :param robot_name:
+        :param config_:
+        :return:
+        """
+        config = config_.copy()
+        if len(config) == 6:
+            config = self.config6d_to_klampt(config)
+        config = [config]  # There's a bug in visualize config so we just visualize a path of length 1
+
+        vis.add("robot_config", config)
+        vis.setColor("robot_config", 0, 1, 0, 0.5)
+        vis.setAttribute("robot_config", "robot", robot_name)
+
+    def vis_path(self, robot_name, path_):
         """
         show the path in the visualization
         """
@@ -79,6 +99,7 @@ class MotionPlanner:
 
         robot = self.robot_name_mapping[robot_name]
         robot.setConfig(path[0])
+        robot_id = robot.id
 
         # trajectory = RobotTrajectory(robot, range(len(path)), path)
         vis.add("path", path)
@@ -90,7 +111,7 @@ class MotionPlanner:
         vis.setColor("point", 1, 0, 0, 0.5)
 
     def plan_from_start_to_goal_config(self, robot_name: str, start_config, goal_config, max_time=15,
-                                       max_length_to_distance_ratio=2):
+                                       max_length_to_distance_ratio=10):
         """
         plan from a start and a goal that are given in 6d configuration space
         """
@@ -103,7 +124,7 @@ class MotionPlanner:
         return self.path_klampt_to_config6d(path)
 
     def _plan_from_start_to_goal_config_klampt(self, robot, start_config, goal_config, max_time=15,
-                                               max_length_to_distance_ratio=2):
+                                               max_length_to_distance_ratio=10):
         """
         plan from a start and a goal that are given in klampt 8d configuration space
         """
@@ -116,7 +137,7 @@ class MotionPlanner:
         planner.space.eps = self.eps
         return self._plan(planner, max_time, max_length_to_distance_ratio=max_length_to_distance_ratio)
 
-    def _plan(self, planner: MotionPlan, max_time=15, steps_per_iter=150, max_length_to_distance_ratio=2):
+    def _plan(self, planner: MotionPlan, max_time=15, steps_per_iter=1000, max_length_to_distance_ratio=10):
         """
         find path given a prepared planner, with endpoints already set
         @param planner: MotionPlan object, endpoints already set
@@ -128,11 +149,13 @@ class MotionPlanner:
         """
         start_time = time.time()
         path = None
+        print("planning motion...", end="")
         while (path is None or self.compute_path_length_to_distance_ratio(path) > max_length_to_distance_ratio) \
                 and time.time() - start_time < max_time:
-            print("planning motion...")
+            print(".", end="")
             planner.planMore(steps_per_iter)
             path = planner.getPath()
+        print("")
         if path is None:
             print("no path found")
         return path
@@ -200,7 +223,7 @@ class MotionPlanner:
         all_attachments_geom.setGroup()
 
         if "gripper" in attachments:
-            gripper_obj = box(0.15, 0.07, 0.07, center=[+0.05, 0, 0.00])
+            gripper_obj = box(0.09, 0.08, 0.08, center=[+0.04, 0, 0.00])
             gripper_geom = Geometry3D()
             gripper_geom.set(gripper_obj)
             all_attachments_geom.setElement(0, gripper_geom)
@@ -228,6 +251,6 @@ if __name__ == "__main__":
     path = planner.plan_from_start_to_goal_config("ur5e_2",
                                            [0, 0, 0, 0, 0, 0],
                                            [0, -pi/2, 0, -pi/2, 0, 0])
-    planner.show_path_vis("ur5e_2", path)
+    planner.vis_path("ur5e_2", path)
 
     time.sleep(300)

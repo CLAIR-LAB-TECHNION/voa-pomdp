@@ -1,6 +1,7 @@
 from robot_inteface.robot_interface import RobotInterfaceWithGripper
 from motion_planning.motion_planner import MotionPlanner
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
+import time
 
 
 class ManipulationController(RobotInterfaceWithGripper):
@@ -14,7 +15,16 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.motion_planner = motion_palnner
         self.gt = geomtry_and_transofms
 
-    def plan_and_move_to(self, x, y, z, rz, speed=0.5, acceleration=0.5, visualise=False):
+        motion_palnner.visualize()
+        time.sleep(0.2)
+
+    @classmethod
+    def build_from_robot_name_and_ip(cls, robot_ip, robot_name):
+        motion_planner = MotionPlanner()
+        geomtry_and_transofms = GeometryAndTransforms(motion_planner.robot_name_mapping)
+        return cls(robot_ip, robot_name, motion_planner, geomtry_and_transofms)
+
+    def plan_and_move_to(self, x, y, z, rz, speed=0.5, acceleration=0.5, visualise=True):
         """
         Plan and move to a position in the world coordinate system, with gripper
         facing downwards rotated by rz.
@@ -24,11 +34,15 @@ class ManipulationController(RobotInterfaceWithGripper):
         goal_config = self.getInverseKinematics(target_pose_robot)
         start_config = self.getActualQ()
 
+        if visualise:
+            self.motion_planner.vis_config(self.robot_name, goal_config)
+
         path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
                                                                   start_config,
-                                                                  goal_config)
+                                                                  goal_config,
+                                                                  max_length_to_distance_ratio=10)
         if visualise:
-            self.motion_planner.show_path_vis(self.robot_name, path)
+            self.motion_planner.vis_path(self.robot_name, path)
 
         self.move_path(path, speed, acceleration)
 
@@ -47,7 +61,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         above_pickup_config = self.getActualQ()
 
         # move down until contact:
-        self.moveUntilContact(speed=[0, 0, -0.1, 0, 0, 0],)
+        self.moveUntilContact(xd=[0, 0, -0.1, 0, 0, 0],)
         # retract one more centimeter to avoid gripper scratching the surface:
         self.moveL_relative([0, 0, 0.01])
         # close gripper:
@@ -71,7 +85,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         above_drop_config = self.getActualQ()
 
         # move down until contact:
-        self.moveUntilContact(speed=[0, 0, -0.1, 0, 0, 0],)
+        self.moveUntilContact(xd=[0, 0, -0.1, 0, 0, 0],)
         # release grasp:
         self.release_grasp()
         # back up 10 cm in a straight line :
