@@ -10,6 +10,18 @@ class ManipulationController(RobotInterfaceWithGripper):
     """
     Extension for the RobotInterfaceWithGripper to higher level manipulation actions
     """
+    # those are angular in radians:
+    speed = 1.0
+    acceleration = 1.0
+
+    # and this is linear, ratio that makes sense:
+    @property
+    def linear_speed(self):
+        return self.speed * 0.1
+    @property
+    def linear_acceleration(self):
+        return self.acceleration * 0.1
+
     def __init__(self, robot_ip, robot_name, motion_palnner: MotionPlanner,
                  geomtry_and_transofms: GeometryAndTransforms, freq=125, gripper_id=0):
         super().__init__(robot_ip, freq, gripper_id)
@@ -26,7 +38,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         geomtry_and_transofms = GeometryAndTransforms(motion_planner.robot_name_mapping)
         return cls(robot_ip, robot_name, motion_planner, geomtry_and_transofms)
 
-    def plan_and_move_to(self, x, y, z, rz, speed=0.5, acceleration=0.5, visualise=True):
+    def plan_and_move_to(self, x, y, z, rz, speed=1.0, acceleration=1.0, visualise=True):
         """
         Plan and move to a position in the world coordinate system, with gripper
         facing downwards rotated by rz.
@@ -51,7 +63,8 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.move_path(path, speed, acceleration)
         # print("error from target:", np.array(self.getActualTCPPose() - target_pose_robot))
 
-    def pick_up(self, x, y, rz, start_height=0.3):
+
+    def pick_up(self, x, y, rz, start_height=0.2):
         """
         TODO
         :param x:
@@ -60,24 +73,29 @@ class ManipulationController(RobotInterfaceWithGripper):
         :param start_height:
         :return:
         """
+        self.release_grasp()
 
         # move above pickup location:
-        self.release_grasp()
-        self.plan_and_move_to(x, y, start_height, rz)
+        self.plan_and_move_to(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
         above_pickup_config = self.getActualQ()
 
-        # move down until contact:
-        self.moveUntilContact(xd=[0, 0, -0.1, 0, 0, 0],)
+        # move down until contact, here we move a little bit slower than drop and sense
+        # because the gripper rubber may damage from the object at contact:
+        lin_speed = min(self.linear_speed/2, 0.05)
+        self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0],)
+
         # retract one more centimeter to avoid gripper scratching the surface:
-        self.moveL_relative([0, 0, 0.01])
+        self.moveL_relative([0, 0, 0.01],
+                            speed=0.1,
+                            acceleration=0.1)
         # close gripper:
         self.grasp()
         # move up:
-        self.moveJ(above_pickup_config)
+        self.moveJ(above_pickup_config, speed=self.speed, acceleration=self.acceleration)
 
         # TODO measure weight and return if successful or not
 
-    def put_down(self, x, y, rz, start_height=0.3):
+    def put_down(self, x, y, rz, start_height=0.2):
         """
         TODO
         :param x:
@@ -87,19 +105,19 @@ class ManipulationController(RobotInterfaceWithGripper):
         :return:
         """
         # move above dropping location:
-        self.plan_and_move_to(x, y, start_height, rz)
+        self.plan_and_move_to(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
         above_drop_config = self.getActualQ()
 
         # move down until contact:
-        self.moveUntilContact(xd=[0, 0, -0.1, 0, 0, 0],)
+        self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0],)
         # release grasp:
         self.release_grasp()
         # back up 10 cm in a straight line :
-        self.moveL_relative([0, 0, 0.1])
+        self.moveL_relative([0, 0, 0.1], speed=self.linear_speed, acceleration=self.linear_acceleration)
         # move to above dropping location:
-        self.moveJ(above_drop_config)
+        self.moveJ(above_drop_config, speed=self.speed, acceleration=self.acceleration)
 
-    def sense_height(self, x, y, start_height=0.3):
+    def sense_height(self, x, y, start_height=0.2):
         """
         TODO
         :param x:
@@ -108,14 +126,14 @@ class ManipulationController(RobotInterfaceWithGripper):
         :return:
         """
         # move above sensing location:
-        self.plan_and_move_to(x, y, start_height, 0)
+        self.plan_and_move_to(x, y, start_height, 0, speed=self.speed, acceleration=self.acceleration)
         above_sensing_config = self.getActualQ()
 
         # move down until contact:
-        self.moveUntilContact(speed=[0, 0, -0.1, 0, 0, 0],)
+        self.moveUntilContact(speed=[0, 0, -self.linear_speed, 0, 0, 0],)
         # measure height:
         height = self.getActualTCPPose()[2]
         # move up:
-        self.moveJ(above_sensing_config)
+        self.moveJ(above_sensing_config, speed=self.speed, acceleration=self.acceleration)
 
         return height

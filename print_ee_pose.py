@@ -8,9 +8,7 @@ from motion_planning.geometry_and_transforms import GeometryAndTransforms
 app = typer.Typer()
 
 
-@app.command(
-    context_settings={"ignore_unknown_options": True}
-)
+@app.command()
 def main(robot_name="ur5e_2"):
     if robot_name == "ur5e_1":
         robot_data = ur5e_1
