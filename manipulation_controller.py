@@ -1,3 +1,5 @@
+import numpy as np
+
 from robot_inteface.robot_interface import RobotInterfaceWithGripper
 from motion_planning.motion_planner import MotionPlanner
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
@@ -37,14 +39,17 @@ class ManipulationController(RobotInterfaceWithGripper):
         if visualise:
             self.motion_planner.vis_config(self.robot_name, goal_config)
 
+        # plan until the ratio between length and distance is lower than 3, but stop if 4 seconds have passed
         path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
                                                                   start_config,
                                                                   goal_config,
-                                                                  max_length_to_distance_ratio=10)
+                                                                  max_time=4,
+                                                                  max_length_to_distance_ratio=2)
         if visualise:
             self.motion_planner.vis_path(self.robot_name, path)
 
         self.move_path(path, speed, acceleration)
+        # print("error from target:", np.array(self.getActualTCPPose() - target_pose_robot))
 
     def pick_up(self, x, y, rz, start_height=0.3):
         """

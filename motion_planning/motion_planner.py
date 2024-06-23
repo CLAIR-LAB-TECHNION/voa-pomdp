@@ -18,14 +18,14 @@ class MotionPlanner:
                                     "type": "rrt*",
                                     "bidirectional": False,
                                     "connectionThreshold": 30.0,
-                                    # "perturbationRadius": 0.1,
+                                    "perturbationRadius": 0.1,
                                     # "suboptimalityFactor": 1.01,  # only for rrt* and prm*.
                                     # Don't use suboptimalityFactor as it's unclear how that parameter works...
                                     # seems like it's ignored even in rrt*
                                     # "shortcut": True, # only for rrt
                                   })
 
-    def __init__(self, eps=1e-2, attachments=default_attachments, settings=default_settings):
+    def __init__(self, eps=1e-1, attachments=default_attachments, settings=default_settings):
         """
         parameters:
         eps: epsilon gap for collision checking along the line in configuration space. Too high value may lead to
@@ -63,13 +63,14 @@ class MotionPlanner:
         vis.init(beckend)
 
         vis.add("world", self.world)
-        vis.setColor(('world', 'ur5e_1'), 0, 1, 1)
-        vis.setColor(('world', 'ur5e_2'), 0, 0, 0.5)
+        # vis.setColor(('world', 'ur5e_1'), 0, 1, 1)
+        # vis.setColor(('world', 'ur5e_2'), 0, 0, 0.5)
 
         # set camera position:
         viewport = vis.getViewport()
-        viewport.camera.tgt = [0, 0, 0]
-        viewport.camera.rot = [0, -0.5, 0]
+        viewport.camera.tgt = [0, -0.6, 0.5]
+        viewport.camera.rot = [0, -0.75, 1]
+        viewport.camera.dist = 5
 
         vis.show()
 
@@ -117,6 +118,7 @@ class MotionPlanner:
         """
         start_config_klampt = self.config6d_to_klampt(start_config)
         goal_config_klampt = self.config6d_to_klampt(goal_config)
+
         robot = self.robot_name_mapping[robot_name]
         path = self._plan_from_start_to_goal_config_klampt(robot, start_config_klampt, goal_config_klampt,
                                                            max_time, max_length_to_distance_ratio)
@@ -135,9 +137,14 @@ class MotionPlanner:
                                                # extraConstraints=
                                                **self.settings)
         planner.space.eps = self.eps
+
+        # before planning, check if a direct path is possible, then no need to plan
+        if self._is_direct_path_possible(planner, start_config, goal_config):
+            return [goal_config]
+
         return self._plan(planner, max_time, max_length_to_distance_ratio=max_length_to_distance_ratio)
 
-    def _plan(self, planner: MotionPlan, max_time=15, steps_per_iter=1000, max_length_to_distance_ratio=10):
+    def _plan(self, planner: MotionPlan, max_time=15, steps_per_iter=15000, max_length_to_distance_ratio=10):
         """
         find path given a prepared planner, with endpoints already set
         @param planner: MotionPlan object, endpoints already set
@@ -156,6 +163,7 @@ class MotionPlanner:
             planner.planMore(steps_per_iter)
             path = planner.getPath()
         print("")
+        print("planning took ", time.time() - start_time, " seconds.")
         if path is None:
             print("no path found")
         return path
@@ -234,6 +242,12 @@ class MotionPlanner:
             all_attachments_geom.setElement(1, camera_geom)
 
         robot.link("ee_link").geometry().set(all_attachments_geom)
+
+    def _is_direct_path_possible(self, planner, start_config_, goal_config_):
+        # EmbeddedRobotCspace only works with the active joints:
+        start_config = self.klampt_to_config6d(start_config_)
+        goal_config = self.klampt_to_config6d(goal_config_)
+        return planner.space.isVisible(start_config, goal_config)
 
 
 if __name__ == "__main__":
