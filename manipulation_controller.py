@@ -62,6 +62,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         """
 
         # move above pickup location:
+        self.release_grasp()
         self.plan_and_move_to(x, y, start_height, rz)
         above_pickup_config = self.getActualQ()
 

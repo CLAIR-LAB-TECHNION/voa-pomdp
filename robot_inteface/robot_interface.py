@@ -39,11 +39,12 @@ class RobotInterfaceWithGripper(RobotInterface):
         self.gripper.twofg_grip_external(width, force, speed)
         time.sleep(1)
 
-    def grasp(self):
+    def grasp(self, wait_time=0.5):
         min_width = self.gripper.twofg_get_min_external_width()
         self.gripper.twofg_grip_external(min_width, 40, 100)
-        time.sleep(1)
+        time.sleep(wait_time)
 
-    def release_grasp(self):
+    def release_grasp(self, wait_time=0.5):
         max_width = self.gripper.twofg_get_max_external_width()
         self.gripper.twofg_grip_external(max_width, 40, 100)
+        time.sleep(wait_time)

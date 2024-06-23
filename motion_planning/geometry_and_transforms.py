@@ -8,6 +8,8 @@ from klampt import RobotModel
 import numpy as np
 from numpy import pi
 
+from motion_planning.motion_planner import MotionPlanner
+
 
 class GeometryAndTransforms:
     def __init__(self, robot_name_mapping):
@@ -16,6 +18,11 @@ class GeometryAndTransforms:
     @classmethod
     def from_motion_planner(cls, motion_planner):
         return cls(motion_planner.robot_name_mapping)
+
+    @classmethod
+    def build(cls):
+        mp = MotionPlanner()
+        return cls(mp.robot_name_mapping)
 
     def point_world_to_robot(self, robot_name, point_world):
         """
