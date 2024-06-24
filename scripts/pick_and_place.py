@@ -1,7 +1,6 @@
-from typing import List
 import typer
-from manipulation_controller import ManipulationController
-from robot_inteface.robots_metadata import ur5e_1, ur5e_2
+from manipulation.manipulation_controller import ManipulationController
+from robot_inteface.robots_metadata import ur5e_2
 
 
 app = typer.Typer()
