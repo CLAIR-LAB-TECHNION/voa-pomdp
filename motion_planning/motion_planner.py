@@ -46,15 +46,6 @@ class MotionPlanner:
 
         self.settings = frozendict(self.default_settings)
 
-        # self._build_world()
-
-        # self.robot = self.world.robot(0)
-        # self.ee_link = self.robot.link("ee_link")
-
-        # values are imported from configuration
-        # self.robot.setJointLimits(limits_l, limits_h)
-        # self.planning_config = default_config
-
     def visualize(self):
         """
         open visualization window
