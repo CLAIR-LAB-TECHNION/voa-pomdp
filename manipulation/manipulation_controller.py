@@ -38,7 +38,28 @@ class ManipulationController(RobotInterfaceWithGripper):
         geomtry_and_transofms = GeometryAndTransforms(motion_planner.robot_name_mapping)
         return cls(robot_ip, robot_name, motion_planner, geomtry_and_transofms)
 
-    def plan_and_move_to(self, x, y, z, rz, speed=1.0, acceleration=1.0, visualise=True):
+    def plan_and_moveJ(self, q, speed=1.0, acceleration=1.0, visualise=True):
+        """
+        Plan and move to a joint configuration.
+        """
+        start_config = self.getActualQ()
+
+        if visualise:
+            self.motion_planner.vis_config(self.robot_name, q, (0, 1, 0, 0.5))
+            self.motion_planner.vis_config(self.robot_name, start_config, (1, 0, 0, 0.5))
+
+        # plan until the ratio between length and distance is lower than 3, but stop if 4 seconds have passed
+        path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
+                                                                  start_config,
+                                                                  q,
+                                                                  max_time=4,
+                                                                  max_length_to_distance_ratio=2)
+        if visualise:
+            self.motion_planner.vis_path(self.robot_name, path)
+
+        self.move_path(path, speed, acceleration)
+
+    def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=1.0, acceleration=1.0, visualise=True):
         """
         Plan and move to a position in the world coordinate system, with gripper
         facing downwards rotated by rz.
@@ -46,23 +67,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         target_pose_robot = self.gt.get_gripper_facing_downwards_6d_pose_robot_frame(self.robot_name, [x, y, z], rz)
 
         goal_config = self.getInverseKinematics(target_pose_robot)
-        start_config = self.getActualQ()
-
-        if visualise:
-            self.motion_planner.vis_config(self.robot_name, goal_config)
-
-        # plan until the ratio between length and distance is lower than 3, but stop if 4 seconds have passed
-        path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
-                                                                  start_config,
-                                                                  goal_config,
-                                                                  max_time=4,
-                                                                  max_length_to_distance_ratio=2)
-        if visualise:
-            self.motion_planner.vis_path(self.robot_name, path)
-
-        self.move_path(path, speed, acceleration)
-        # print("error from target:", np.array(self.getActualTCPPose() - target_pose_robot))
-
+        self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
 
     def pick_up(self, x, y, rz, start_height=0.2):
         """
@@ -76,7 +81,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.release_grasp()
 
         # move above pickup location:
-        self.plan_and_move_to(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+        self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
         above_pickup_config = self.getActualQ()
 
         # move down until contact, here we move a little bit slower than drop and sense
@@ -105,7 +110,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         :return:
         """
         # move above dropping location:
-        self.plan_and_move_to(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+        self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
         above_drop_config = self.getActualQ()
 
         # move down until contact:
@@ -126,7 +131,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         :return:
         """
         # move above sensing location:
-        self.plan_and_move_to(x, y, start_height, 0, speed=self.speed, acceleration=self.acceleration)
+        self.plan_and_move_to_xyzrz(x, y, start_height, 0, speed=self.speed, acceleration=self.acceleration)
         above_sensing_config = self.getActualQ()
 
         # move down until contact:
