@@ -8,7 +8,7 @@ import time
 
 class ManipulationController(RobotInterfaceWithGripper):
     """
-    Extension for the RobotInterfaceWithGripper to higher level manipulation actions
+    Extension for the RobotInterfaceWithGripper to higher level manipulation actions and motion planning.
     """
     # those are angular in radians:
     speed = 1.0
@@ -38,7 +38,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         geomtry_and_transofms = GeometryAndTransforms(motion_planner.robot_name_mapping)
         return cls(robot_ip, robot_name, motion_planner, geomtry_and_transofms)
 
-    def plan_and_moveJ(self, q, speed=1.0, acceleration=1.0, visualise=True):
+    def plan_and_moveJ(self, q, speed=speed, acceleration=acceleration, visualise=True):
         """
         Plan and move to a joint configuration.
         """
@@ -59,7 +59,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         self.move_path(path, speed, acceleration)
 
-    def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=1.0, acceleration=1.0, visualise=True):
+    def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=speed, acceleration=acceleration, visualise=True):
         """
         Plan and move to a position in the world coordinate system, with gripper
         facing downwards rotated by rz.
@@ -81,7 +81,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.release_grasp()
 
         # move above pickup location:
-        self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+        self.plan_and_move_to_xyzrz(x, y, start_height, rz)
         above_pickup_config = self.getActualQ()
 
         # move down until contact, here we move a little bit slower than drop and sense

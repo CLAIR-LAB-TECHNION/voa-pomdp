@@ -246,8 +246,6 @@ if __name__ == "__main__":
     planner = MotionPlanner()
     planner.visualize()
 
-    print(planner.transform_world_to_robot("ur5e_1", [-1, -1, 0, 0, pi, 0]))
-
     # path = planner.plan_from_start_to_goal_config("ur5e_1",
     #                                        [pi/2 , 0, 0, 0, 0, 0],
     #                                        [0, -pi/2, 0, -pi/2, 0, 0])
