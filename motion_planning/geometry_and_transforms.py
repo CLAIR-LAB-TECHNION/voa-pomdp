@@ -3,10 +3,11 @@ Transformations between different coordinate systems, where the world coordinate
 the one in the motion planner (aligned with UR5e_1)
 """
 
-from klampt.math import se3,so3
+from klampt.math import se3, so3
 from klampt import RobotModel
 import numpy as np
 from numpy import pi
+from scipy.spatial.transform import Rotation as R
 
 from motion_planning.motion_planner import MotionPlanner
 
@@ -45,13 +46,21 @@ class GeometryAndTransforms:
         Returns a pose in the robot frame where the gripper is facing downwards.
         """
         point_robot = self.point_world_to_robot(robot_name, point_world)
-        return np.concatenate([point_robot, [0, pi, rz]])
+
+        rotation_down = R.from_euler('xyz', [np.pi, 0, 0])
+        rotation_z = R.from_euler('z', rz)
+        combined_rotation = rotation_z * rotation_down
+        # after spending half day on it, It turns out that UR works with rotvec :(
+        r = combined_rotation.as_rotvec(degrees=False)
+
+        return np.concatenate([point_robot, r])
 
     def orientation_world_to_robot(self, robot_name, orientation_world):
         """
         Transforms an orientation from the world coordinate system to the robot's coordinate system.
         """
-        raise NotImplementedError("Not tested yet! It should, and you can remove this line, but be careful!")
+        raise NotImplementedError("Not tested yet! It should, and you can remove this line, but be careful!"
+                                  "Turns out need to work with rotvec. fix this!")
         robot = self.robot_name_mapping[robot_name]
         world_to_robot = se3.inv(robot.link(0).getTransform())
         return so3.mul(world_to_robot[0], orientation_world)
@@ -60,7 +69,8 @@ class GeometryAndTransforms:
         """
         Transforms an orientation from the robot's coordinate system to the world coordinate system.
         """
-        raise NotImplementedError("Not tested yet! It should, and you can remove this line, but be careful!")
+        raise NotImplementedError("Not tested yet! It should, and you can remove this line, but be careful!"
+                                  "Turns out need to work with rotvec. fix this!")
         robot = self.robot_name_mapping[robot_name]
         world_to_robot = robot.link(0).getTransform()
         return so3.mul(world_to_robot[0], orientation_robot)

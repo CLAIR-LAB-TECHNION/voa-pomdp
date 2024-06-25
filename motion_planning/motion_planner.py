@@ -103,6 +103,12 @@ class MotionPlanner:
         vis.add("point", point)
         vis.setColor("point", 1, 0, 0, 0.5)
 
+    def update_robot_config(self, robot_name, config):
+        if len(config) == 6:
+            config = self.config6d_to_klampt(config)
+        robot = self.robot_name_mapping[robot_name]
+        robot.setConfig(config)
+
     def plan_from_start_to_goal_config(self, robot_name: str, start_config, goal_config, max_time=15,
                                        max_length_to_distance_ratio=10):
         """
@@ -228,7 +234,7 @@ class MotionPlanner:
             gripper_geom.set(gripper_obj)
             all_attachments_geom.setElement(0, gripper_geom)
         if "camera" in attachments:
-            camera_obj = box(0.06, 0.17, 0.1, center=[0.01, 0, 0.07])
+            camera_obj = box(0.06, 0.18, 0.11, center=[0.01, 0, 0.05])
             camera_geom = Geometry3D()
             camera_geom.set(camera_obj)
             all_attachments_geom.setElement(1, camera_geom)

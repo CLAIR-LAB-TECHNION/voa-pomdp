@@ -9,11 +9,12 @@ import time
 home_config = [0, -pi/2, 0, -pi/2, 0, 0]
 
 
-class RobotInterface(rtdectrl, rtdeio, rtdercv):
-    def __init__(self, robot_ip, freq=125):
+# class RobotInterface(rtdectrl, rtdeio, rtdercv):
+class RobotInterface(rtdectrl, rtdercv):
+    def __init__(self, robot_ip, freq=50):
         rtdectrl.__init__(self, robot_ip, freq)
         rtdercv.__init__(self, robot_ip, freq)
-        rtdeio.__init__(self, robot_ip, freq)
+        # rtdeio.__init__(self, robot_ip, freq)
 
     def move_home(self, speed=0.2, acceleration=0.2, asynchronous=False):
         self.moveJ(q=home_config, speed=speed, acceleration=acceleration, asynchronous=asynchronous)
@@ -31,7 +32,7 @@ class RobotInterface(rtdectrl, rtdeio, rtdercv):
         self.moveL(target_pose, speed, acceleration, asynchronous)
 
 class RobotInterfaceWithGripper(RobotInterface):
-    def __init__(self, robot_ip, freq=125, gripper_id=0):
+    def __init__(self, robot_ip, freq=50, gripper_id=0):
         super().__init__(robot_ip, freq)
         self.gripper = TwoFG7(robot_ip, gripper_id)
 

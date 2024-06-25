@@ -2,13 +2,13 @@ from typing import List
 import typer
 from motion_planning.motion_planner import MotionPlanner
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
-from manipulation_controller import ManipulationController
+from manipulation.manipulation_controller import ManipulationController
 from robot_inteface.robots_metadata import ur5e_1, ur5e_2
 
 r1_clearance_config = [0.7600, -1.8429, 0.8419, -1.3752, -1.5739, -2.3080]
 r2_clearance_config = [0.7600, -1.8429, 0.8419, -1.3752, -1.5739, -2.3080]
 joint_pick_and_drop_position = [-0.49844, -0.69935]
-robot_1_pick_and_drop_position = [-0.4, -0.2]
+robot_1_pick_and_drop_position = [0.45, -0.3]
 robot_2_default_pick_and_drop_position = [-0.54105, -0.95301]
 
 app = typer.Typer()
@@ -38,17 +38,14 @@ def main(robot_1_pickup_x: float = robot_2_default_pick_and_drop_position[0],
     r2_controller.put_down(joint_pick_and_drop_position[0], joint_pick_and_drop_position[1], 0)
 
     r2_controller.moveJ(r2_clearance_config, speed=1., acceleration=1.)
-    #TODO: need to implement that in a better way:
-    motion_planner.ur5e_2.setConfig([0, *r2_clearance_config, 0])
+    r2_controller.update_mp_with_current_config()
 
     # robot 1 picks up from joint position and drops at robot's1 position:
     r1_controller.pick_up(joint_pick_and_drop_position[0], joint_pick_and_drop_position[1], 0)
     r1_controller.put_down(robot_1_pick_and_drop_position[0], robot_1_pick_and_drop_position[1], 0)
 
     r1_controller.moveJ(r1_clearance_config, speed=1., acceleration=1.)
-    #TODO: need to implement that in a better way:
-    motion_planner.ur5e_1.setConfig([0, *r1_clearance_config, 0])
-
+    r1_controller.update_mp_with_current_config()
 
 if __name__ == "__main__":
     app()
