@@ -41,10 +41,15 @@ class ManipulationController(RobotInterfaceWithGripper):
     def update_mp_with_current_config(self):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
 
-    def plan_and_moveJ(self, q, speed=speed, acceleration=acceleration, visualise=True):
+    def plan_and_moveJ(self, q, speed=None, acceleration=None, visualise=True):
         """
         Plan and move to a joint configuration.
         """
+        if speed is None:
+            speed = self.speed
+        if acceleration is None:
+            acceleration = self.acceleration
+
         start_config = self.getActualQ()
 
         if visualise:
@@ -64,11 +69,16 @@ class ManipulationController(RobotInterfaceWithGripper):
         # update the motion planner with the new configuration:
         self.update_mp_with_current_config()
 
-    def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=speed, acceleration=acceleration, visualise=True):
+    def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=None, acceleration=None, visualise=True):
         """
         Plan and move to a position in the world coordinate system, with gripper
         facing downwards rotated by rz.
         """
+        if speed is None:
+            speed = self.speed
+        if acceleration is None:
+            acceleration = self.acceleration
+
         target_pose_robot = self.gt.get_gripper_facing_downwards_6d_pose_robot_frame(self.robot_name,
                                                                                      [x, y, z],
                                                                                      rz)
@@ -138,15 +148,53 @@ class ManipulationController(RobotInterfaceWithGripper):
         :param start_height:
         :return:
         """
+        self.grasp()
+
         # move above sensing location:
         self.plan_and_move_to_xyzrz(x, y, start_height, 0, speed=self.speed, acceleration=self.acceleration)
         above_sensing_config = self.getActualQ()
 
         # move down until contact:
-        self.moveUntilContact(speed=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
+        self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # measure height:
         height = self.getActualTCPPose()[2]
         # move up:
         self.moveJ(above_sensing_config, speed=self.speed, acceleration=self.acceleration)
 
         return height
+
+    def sense_height_tilted(self, x, y, start_height=0.2):
+        """
+        TODO
+        :param x:
+        :param y:
+        :param rz:
+        :param start_height:
+        :return:
+        """
+        self.grasp()
+
+        # set end effector to be the tip of the finger
+        self.setTcp([0.020, 0.012, 0.160, 0, 0, 0])
+
+        # move above point with the tip tilted:
+        pose = self.gt.get_tilted_pose_6d_for_sensing(self.robot_name, [x, y, start_height])
+        goal_config = self.getInverseKinematics(pose)
+        self.plan_and_moveJ(goal_config)
+
+        above_sensing_config = self.getActualQ()
+
+        # move down until contact:
+        self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
+        # measure height:
+        height = self.getActualTCPPose()[2]
+        # move up:
+        self.moveJ(above_sensing_config, speed=self.speed, acceleration=self.acceleration)
+
+        # set back tcp:
+        self.setTcp([0, 0, 0.150, 0, 0, 0])
+
+        return height
+
+
+

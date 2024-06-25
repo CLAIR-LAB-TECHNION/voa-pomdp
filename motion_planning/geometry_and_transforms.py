@@ -55,6 +55,17 @@ class GeometryAndTransforms:
 
         return np.concatenate([point_robot, r])
 
+    def get_tilted_pose_6d_for_sensing(self, robot_name, point_world):
+        """
+        Returns a pose in the robot frame where the gripper is tilted for sensing
+        """
+        point_robot = self.point_world_to_robot(robot_name, point_world)
+
+        rotation_euler = R.from_euler('xyz', [1.2 * pi, 0.15*pi, 0])
+        r = rotation_euler.as_rotvec(degrees=False)
+
+        return np.concatenate([point_robot, r])
+
     def orientation_world_to_robot(self, robot_name, orientation_world):
         """
         Transforms an orientation from the world coordinate system to the robot's coordinate system.
