@@ -228,7 +228,7 @@ class MotionPlanner:
             gripper_geom.set(gripper_obj)
             all_attachments_geom.setElement(0, gripper_geom)
         if "camera" in attachments:
-            camera_obj = box(0.07, 0.15, 0.1, center=[-0.05, 0, 0.05])
+            camera_obj = box(0.06, 0.17, 0.1, center=[0.01, 0, 0.07])
             camera_geom = Geometry3D()
             camera_geom.set(camera_obj)
             all_attachments_geom.setElement(1, camera_geom)
