@@ -4,6 +4,7 @@ from motion_planning.motion_planner import MotionPlanner
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
 from utils import logging_util
 import time
+import logging
 
 
 class ManipulationController(RobotInterfaceWithGripper):
@@ -43,6 +44,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
     def update_mp_with_current_config(self):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
+        logging.info(f"{self.robot_name} Updated motion planner with current configuration {self.getActualQ()}")
 
     def find_ik_solution(self, pose, max_tries=10):
         # try to find the one that is closest to the current configuration:
@@ -50,11 +52,17 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         trial = 1
         while self.motion_planner.is_config_feasible(self.robot_name, solution) is False and trial < max_tries:
-            print("trial", trial, "failed")
             trial += 1
             # try to find another solution, starting from other random configurations:
             qnear = np.random.uniform(-np.pi, np.pi, 6)
-            solution = self.getInverseKinematics(pose)
+            solution = self.getInverseKinematics(pose, qnear=qnear)
+
+        if trial == max_tries:
+            logging.error(f"{self.robot_name} Could not find a feasible IK solution after {max_tries} tries")
+        elif trial > 1:
+            logging.info(f"{self.robot_name} Found IK solution after {trial} tries")
+        else:
+            logging.info(f"{self.robot_name} Found IK solution in first try")
 
         return solution
 
@@ -69,6 +77,8 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         start_config = self.getActualQ()
 
+        logging.info(f"{self.robot_name} planning and movingJ to {q} from {start_config}")
+
         if visualise:
             self.motion_planner.vis_config(self.robot_name, q, vis_name="goal_config",
                                            rgba=(0, 1, 0, 0.5))
@@ -81,6 +91,11 @@ class ManipulationController(RobotInterfaceWithGripper):
                                                                   q,
                                                                   max_time=4,
                                                                   max_length_to_distance_ratio=2)
+
+        if path is None:
+            logging.error(f"{self.robot_name} Could not find a path")
+        logging.info(f"{self.robot_name} Found path with {len(path)} waypoints, moving...")
+
         if visualise:
             self.motion_planner.vis_path(self.robot_name, path)
 
@@ -101,7 +116,8 @@ class ManipulationController(RobotInterfaceWithGripper):
         target_pose_robot = self.gt.get_gripper_facing_downwards_6d_pose_robot_frame(self.robot_name,
                                                                                      [x, y, z],
                                                                                      rz)
-
+        logging.info(f"{self.robot_name} planning and moving to xyzrz={x}{y}{z}{rz}. "
+                     f"pose in robot frame:{target_pose_robot}")
         goal_config = self.find_ik_solution(target_pose_robot, max_tries=50)
         self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
         # motion planner is automatically updated after movement
@@ -115,6 +131,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         :param start_height:
         :return:
         """
+        logging.info(f"{self.robot_name} picking up at {x}{y}{rz} with start height {start_height}")
         self.release_grasp()
 
         # move above pickup location:
@@ -123,6 +140,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         # move down until contact, here we move a little bit slower than drop and sense
         # because the gripper rubber may damage from the object at contact:
+        logging.debug(f"{self.robot_name} moving down until contact")
         lin_speed = min(self.linear_speed/2, 0.05)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
 
@@ -130,6 +148,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.moveL_relative([0, 0, 0.01],
                             speed=0.1,
                             acceleration=0.1)
+        logging.debug(f"{self.robot_name} grasping and picking up")
         # close gripper:
         self.grasp()
         # move up:
@@ -146,10 +165,12 @@ class ManipulationController(RobotInterfaceWithGripper):
         :param start_height:
         :return:
         """
+        logging.info(f"{self.robot_name} putting down at {x}{y}{rz} with start height {start_height}")
         # move above dropping location:
         self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
         above_drop_config = self.getActualQ()
 
+        logging.debug(f"{self.robot_name} moving down until contact to put down")
         # move down until contact:
         self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # release grasp:
@@ -167,6 +188,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         :param start_height:
         :return:
         """
+        logging.info(f"{self.robot_name} sensing height not tilted! at {x}{y} with start height {start_height}")
         self.grasp()
 
         # move above sensing location:
@@ -191,10 +213,13 @@ class ManipulationController(RobotInterfaceWithGripper):
         :param start_height:
         :return:
         """
+        logging.info(f"{self.robot_name} sensing height tilted at {x}{y} with start height {start_height}")
         self.grasp()
 
         # set end effector to be the tip of the finger
         self.setTcp([0.020, 0.012, 0.160, 0, 0, 0])
+
+        logging.debug(f"moving above sensing point with TCP set to tip of the finger")
 
         # move above point with the tip tilted:
         pose = self.gt.get_tilted_pose_6d_for_sensing(self.robot_name, [x, y, start_height])
@@ -203,15 +228,20 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         above_sensing_config = self.getActualQ()
 
+        logging.debug(f"moving down until contact with TCP set to tip of the finger")
+
         # move down until contact:
         self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # measure height:
-        height = self.getActualTCPPose()[2]
+        pose = self.getActualTCPPose()
+        height = pose[2]
         # move up:
         self.moveJ(above_sensing_config, speed=self.speed, acceleration=self.acceleration)
 
         # set back tcp:
         self.setTcp([0, 0, 0.150, 0, 0, 0])
+
+        logging.debug(f"height measured: {height}, TCP pose at contact: {pose}")
 
         return height
 
