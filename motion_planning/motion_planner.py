@@ -9,6 +9,7 @@ from klampt.plan.cspace import MotionPlan
 from klampt.plan import robotplanning
 from klampt.model import ik
 from klampt.math import se3, so3
+from klampt.model import collide
 import os
 
 
@@ -43,6 +44,8 @@ class MotionPlanner:
         self.robot_name_mapping = {"ur5e_1": self.ur5e_1, "ur5e_2": self.ur5e_2}
         self._add_attachments(self.ur5e_1, attachments["ur5e_1"])
         self._add_attachments(self.ur5e_2, attachments["ur5e_2"])
+
+        self.world_collider = collide.WorldCollider(self.world)
 
         self.settings = frozendict(self.default_settings)
 
@@ -249,22 +252,36 @@ class MotionPlanner:
 
     def is_config_feasible(self, robot_name, config):
         """
-        check if the config is feasible
+        check if the config is feasible (not within collision)
         """
         if len(config) == 6:
             config_klampt = self.config6d_to_klampt(config)
 
         robot = self.robot_name_mapping[robot_name]
-        # create a planner for that, not really necessary but it's a quick solution I will fix later
-        planner = robotplanning.plan_to_config(self.world, robot, config_klampt, **self.settings)
-        if planner is None:
-            return False
+        current_config = robot.getConfig()
+        robot.setConfig(config_klampt)
+
+        # we have to get all collisions since there is no method for robot-robot collisions-+--
+        all_collisions = list(self.world_collider.collisions())
+
+        robot.setConfig(current_config)  # return to original motion planner state
+
+        # all collisions is a list of pairs of colliding geometries. Filter only those that contains a name that
+        # ends with "link" and belongs to the robot, and it's not the base link that always collides with the table.
+        for g1, g2 in all_collisions:
+            if g1.getName().endswith("link") and g1.getName() != "base_link" and g1.robot().getName() == robot_name:
+                return False
+            if g2.getName().endswith("link") and g2.getName() != "base_link" and g2.robot().getName() == robot_name:
+                return False
+
         return True
 
 
 if __name__ == "__main__":
     planner = MotionPlanner()
     planner.visualize()
+
+    planner.is_config_feasible("ur5e_1", [0, 0, 0, 0, 0, 0])
 
     # path = planner.plan_from_start_to_goal_config("ur5e_1",
     #                                        [pi/2 , 0, 0, 0, 0, 0],
