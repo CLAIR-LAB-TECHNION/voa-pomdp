@@ -40,7 +40,6 @@ def main(x: float = point[0],
     print("Mass:", mass)
 
 
-
 if __name__ == "__main__":
     app()
 

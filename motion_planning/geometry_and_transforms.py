@@ -66,6 +66,9 @@ class GeometryAndTransforms:
 
         return np.concatenate([point_robot, r])
 
+    def rotvec_to_so3(self, rotvec):
+        return so3.from_rotation_vector(rotvec)
+
     def orientation_world_to_robot(self, robot_name, orientation_world):
         """
         Transforms an orientation from the world coordinate system to the robot's coordinate system.

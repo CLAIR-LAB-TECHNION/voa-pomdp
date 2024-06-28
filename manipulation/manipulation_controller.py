@@ -41,6 +41,20 @@ class ManipulationController(RobotInterfaceWithGripper):
     def update_mp_with_current_config(self):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
 
+    def find_ik_solution(self, pose, max_tries):
+        # try to find the one that is closest to the current configuration:
+        solution = self.getInverseKinematics(pose)
+
+        # trial = 1
+        # while self.motion_planner.is_config_feasible(self.robot_name, solution) is False and trial < max_tries:
+        #     print("trial", trial, "failed")
+        #     trial += 1
+        #     # try to find another solution, starting from other random configurations:
+        #     qnear = np.random.uniform(-np.pi, np.pi, 6)
+        #     solution = self.getInverseKinematics(pose)
+
+        return solution
+
     def plan_and_moveJ(self, q, speed=None, acceleration=None, visualise=True):
         """
         Plan and move to a joint configuration.
@@ -83,7 +97,7 @@ class ManipulationController(RobotInterfaceWithGripper):
                                                                                      [x, y, z],
                                                                                      rz)
 
-        goal_config = self.getInverseKinematics(target_pose_robot)
+        goal_config = self.find_ik_solution(target_pose_robot, max_tries=50)
         self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
         # motion planner is automatically updated after movement
 
@@ -179,7 +193,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         # move above point with the tip tilted:
         pose = self.gt.get_tilted_pose_6d_for_sensing(self.robot_name, [x, y, start_height])
-        goal_config = self.getInverseKinematics(pose)
+        goal_config = self.find_ik_solution(pose, max_tries=50)
         self.plan_and_moveJ(goal_config)
 
         above_sensing_config = self.getActualQ()

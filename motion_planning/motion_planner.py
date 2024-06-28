@@ -247,6 +247,20 @@ class MotionPlanner:
         goal_config = self.klampt_to_config6d(goal_config_)
         return planner.space.isVisible(start_config, goal_config)
 
+    def is_config_feasible(self, robot_name, config):
+        """
+        check if the config is feasible
+        """
+        if len(config) == 6:
+            config_klampt = self.config6d_to_klampt(config)
+
+        robot = self.robot_name_mapping[robot_name]
+        # create a planner for that, not really necessary but it's a quick solution I will fix later
+        planner = robotplanning.plan_to_config(self.world, robot, config_klampt, **self.settings)
+        if planner is None:
+            return False
+        return True
+
 
 if __name__ == "__main__":
     planner = MotionPlanner()
