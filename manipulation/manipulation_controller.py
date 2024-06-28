@@ -41,17 +41,17 @@ class ManipulationController(RobotInterfaceWithGripper):
     def update_mp_with_current_config(self):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
 
-    def find_ik_solution(self, pose, max_tries):
+    def find_ik_solution(self, pose, max_tries=10):
         # try to find the one that is closest to the current configuration:
         solution = self.getInverseKinematics(pose)
 
-        # trial = 1
-        # while self.motion_planner.is_config_feasible(self.robot_name, solution) is False and trial < max_tries:
-        #     print("trial", trial, "failed")
-        #     trial += 1
-        #     # try to find another solution, starting from other random configurations:
-        #     qnear = np.random.uniform(-np.pi, np.pi, 6)
-        #     solution = self.getInverseKinematics(pose)
+        trial = 1
+        while self.motion_planner.is_config_feasible(self.robot_name, solution) is False and trial < max_tries:
+            print("trial", trial, "failed")
+            trial += 1
+            # try to find another solution, starting from other random configurations:
+            qnear = np.random.uniform(-np.pi, np.pi, 6)
+            solution = self.getInverseKinematics(pose)
 
         return solution
 
