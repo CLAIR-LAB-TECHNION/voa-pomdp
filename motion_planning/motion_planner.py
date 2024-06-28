@@ -68,7 +68,7 @@ class MotionPlanner:
 
         vis.show()
 
-    def vis_config(self, robot_name, config_, rgba = (0, 0, 1, 0.5)):
+    def vis_config(self, robot_name, config_, vis_name="robot_config", rgba = (0, 0, 1, 0.5)):
         """
         Show visualization of the robot in a config
         :param robot_name:
@@ -81,9 +81,9 @@ class MotionPlanner:
             config = self.config6d_to_klampt(config)
         config = [config]  # There's a bug in visualize config so we just visualize a path of length 1
 
-        vis.add("robot_config", config)
-        vis.setColor("robot_config", *rgba)
-        vis.setAttribute("robot_config", "robot", robot_name)
+        vis.add(vis_name, config)
+        vis.setColor(vis_name, *rgba)
+        vis.setAttribute(vis_name, "robot", robot_name)
 
     def vis_path(self, robot_name, path_):
         """

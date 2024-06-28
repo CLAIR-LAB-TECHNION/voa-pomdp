@@ -67,8 +67,10 @@ class ManipulationController(RobotInterfaceWithGripper):
         start_config = self.getActualQ()
 
         if visualise:
-            self.motion_planner.vis_config(self.robot_name, q, (0, 1, 0, 0.5))
-            self.motion_planner.vis_config(self.robot_name, start_config, (1, 0, 0, 0.5))
+            self.motion_planner.vis_config(self.robot_name, q, vis_name="goal_config",
+                                           rgba=(0, 1, 0, 0.5))
+            self.motion_planner.vis_config(self.robot_name, start_config,
+                                           vis_name="start_config", rgba=(1, 0, 0, 0.5))
 
         # plan until the ratio between length and distance is lower than 3, but stop if 4 seconds have passed
         path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
