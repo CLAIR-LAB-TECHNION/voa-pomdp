@@ -1,8 +1,8 @@
 import numpy as np
-
 from robot_inteface.robot_interface import RobotInterfaceWithGripper
 from motion_planning.motion_planner import MotionPlanner
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
+from utils import logging_util
 import time
 
 
@@ -25,6 +25,9 @@ class ManipulationController(RobotInterfaceWithGripper):
     def __init__(self, robot_ip, robot_name, motion_palnner: MotionPlanner,
                  geomtry_and_transofms: GeometryAndTransforms, freq=50, gripper_id=0):
         super().__init__(robot_ip, freq, gripper_id)
+
+        logging_util.setup_logging()
+
         self.robot_name = robot_name
         self.motion_planner = motion_palnner
         self.gt = geomtry_and_transofms
