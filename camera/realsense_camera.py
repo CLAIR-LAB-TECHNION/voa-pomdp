@@ -1,6 +1,7 @@
 import cv2
 import pyrealsense2 as rs
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class RealsenseCamera:
@@ -28,6 +29,21 @@ class RealsenseCamera:
 
     # TODO: Visualize depth utility, visualize both, align
 
+    def plotable_depth(self, depth_image, max_depth=3):
+        depth_image = np.clip(depth_image, 0, max_depth)
+        depth_image = (depth_image / max_depth * 255).astype(np.uint8)
+        depth_image = cv2.applyColorMap(depth_image, cv2.COLORMAP_JET)
+        return depth_image
+
+    def plot_depth(self, depth_image, max_depth=3):
+        plotable_depth = self.plotable_depth(depth_image, max_depth)
+        plt.imshow(plotable_depth)
+        plt.show()
+
+    def plot_rgb(self, rgb_image):
+        rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
+        plt.imshow(rgb_image)
+        plt.show()
 
 if __name__ == "__main__":
     camera = RealsenseCamera()

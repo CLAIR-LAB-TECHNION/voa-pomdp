@@ -20,18 +20,25 @@ def main(robot_name="ur5e_1"):
     gt = GeometryAndTransforms.build()
 
     robot = RobotInterface(robot_data["ip"])
+    robot.freedriveMode()
 
+    # save robot config everytime enter is pressed and end with 'E'
+    configs = []
     while True:
-        pose = robot.getActualTCPPose()
-        position_world = gt.point_robot_to_world(robot_data["name"], pose[:3])
+        input("Press enter to save current config")
         config = robot.getActualQ()
-
-        print("--------------------------------------------")
-        print("robot_name: ", robot_data["name"], "ip: ", robot_data["ip"])
-        print("robot frame pose: ", pose)
-        print("world frame position:", position_world)
+        configs.append(config)
         print("config: ", config)
-        print("--------------------------------------------")
+        print("Press 'E' to exit")
+        if input() == 'E':
+            break
+
+    robot.endFreedriveMode()
+
+    print("--------------------")
+    print("all configs: ",)
+    for config in configs:
+        print(config)
 
 
 if __name__ == "__main__":

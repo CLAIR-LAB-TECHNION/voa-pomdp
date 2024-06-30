@@ -19,6 +19,7 @@ class ManipulationController(RobotInterfaceWithGripper):
     @property
     def linear_speed(self):
         return self.speed * 0.1
+
     @property
     def linear_acceleration(self):
         return self.acceleration * 0.1
@@ -46,15 +47,30 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
         logging.info(f"{self.robot_name} Updated motion planner with current configuration {self.getActualQ()}")
 
-    def find_ik_solution(self, pose, max_tries=10):
+    def find_ik_solution(self, pose, max_tries=10, for_down_movement=True):
+        """
+        if for_down_movement is True, there will be a heuristic check that tha shoulder is not facing down, so when
+        movel will be called it won't collide with the table when movingL down.
+        """
         # try to find the one that is closest to the current configuration:
         solution = self.getInverseKinematics(pose)
+        if solution == []:
+            logging.error(f"{self.robot_name} no inverse kinematic solution found at all "
+                          f"for pose {pose}")
+
+        def valid_shoulder_angle(q):
+            if for_down_movement:
+                return 0.9 * np.pi > q[1] > -0.9 * np.pi
+            else:
+                return True
 
         trial = 1
-        while self.motion_planner.is_config_feasible(self.robot_name, solution) is False and trial < max_tries:
+        while ((self.motion_planner.is_config_feasible(self.robot_name, solution) is False or
+               valid_shoulder_angle(solution) is False)
+               and trial < max_tries):
             trial += 1
             # try to find another solution, starting from other random configurations:
-            qnear = np.random.uniform(-np.pi, np.pi, 6)
+            qnear = np.random.uniform(-np.pi / 2, np.pi / 2, 6)
             solution = self.getInverseKinematics(pose, qnear=qnear)
 
         if trial == max_tries:
@@ -94,7 +110,8 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         if path is None:
             logging.error(f"{self.robot_name} Could not find a path")
-        logging.info(f"{self.robot_name} Found path with {len(path)} waypoints, moving...")
+        else:
+            logging.info(f"{self.robot_name} Found path with {len(path)} waypoints, moving...")
 
         if visualise:
             self.motion_planner.vis_path(self.robot_name, path)
@@ -103,8 +120,11 @@ class ManipulationController(RobotInterfaceWithGripper):
         # update the motion planner with the new configuration:
         self.update_mp_with_current_config()
 
-    def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=None, acceleration=None, visualise=True):
+    def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=None, acceleration=None, visualise=True,
+                               for_down_movement=True):
         """
+        if for_down_movement is True, there will be a heuristic check that tha shoulder is not facing down, so when
+        movel will be called it won't collide with the table when movingL down.
         Plan and move to a position in the world coordinate system, with gripper
         facing downwards rotated by rz.
         """
@@ -141,7 +161,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         # move down until contact, here we move a little bit slower than drop and sense
         # because the gripper rubber may damage from the object at contact:
         logging.debug(f"{self.robot_name} moving down until contact")
-        lin_speed = min(self.linear_speed/2, 0.05)
+        lin_speed = min(self.linear_speed / 2, 0.05)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
 
         # retract one more centimeter to avoid gripper scratching the surface:
@@ -153,6 +173,8 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.grasp()
         # move up:
         self.moveJ(above_pickup_config, speed=self.speed, acceleration=self.acceleration)
+        # update the motion planner with the new configuration:
+        self.update_mp_with_current_config()
 
         # TODO measure weight and return if successful or not
 
@@ -172,13 +194,16 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         logging.debug(f"{self.robot_name} moving down until contact to put down")
         # move down until contact:
-        self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
+        lin_speed = min(self.linear_speed, 0.1)
+        self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # release grasp:
         self.release_grasp()
         # back up 10 cm in a straight line :
         self.moveL_relative([0, 0, 0.1], speed=self.linear_speed, acceleration=self.linear_acceleration)
         # move to above dropping location:
         self.moveJ(above_drop_config, speed=self.speed, acceleration=self.acceleration)
+        # update the motion planner with the new configuration:
+        self.update_mp_with_current_config()
 
     def sense_height(self, x, y, start_height=0.2):
         """
@@ -195,12 +220,16 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.plan_and_move_to_xyzrz(x, y, start_height, 0, speed=self.speed, acceleration=self.acceleration)
         above_sensing_config = self.getActualQ()
 
+        lin_speed = min(self.linear_speed, 0.1)
         # move down until contact:
-        self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
+        self.moveUntilContact(xd=[0, 0, lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # measure height:
         height = self.getActualTCPPose()[2]
         # move up:
         self.moveJ(above_sensing_config, speed=self.speed, acceleration=self.acceleration)
+
+        # update the motion planner with the new configuration:
+        self.update_mp_with_current_config()
 
         return height
 
@@ -240,10 +269,9 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         # set back tcp:
         self.setTcp([0, 0, 0.150, 0, 0, 0])
+        # update the motion planner with the new configuration:
+        self.update_mp_with_current_config()
 
         logging.debug(f"height measured: {height}, TCP pose at contact: {pose}")
 
         return height
-
-
-

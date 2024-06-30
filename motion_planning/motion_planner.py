@@ -19,7 +19,7 @@ class MotionPlanner:
                                     "type": "rrt*",
                                     "bidirectional": False,
                                     "connectionThreshold": 30.0,
-                                    "perturbationRadius": 0.1,
+                                    "perturbationRadius": 0.2,
                                     # "suboptimalityFactor": 1.01,  # only for rrt* and prm*.
                                     # Don't use suboptimalityFactor as it's unclear how that parameter works...
                                     # seems like it's ignored even in rrt*
@@ -49,11 +49,10 @@ class MotionPlanner:
 
         self.settings = frozendict(self.default_settings)
 
-    def visualize(self):
+    def visualize(self, beckend="GLUT"):
         """
         open visualization window
         """
-        beckend = "PyQt"
         vis.init(beckend)
 
         vis.add("world", self.world)
@@ -145,7 +144,7 @@ class MotionPlanner:
 
         return self._plan(planner, max_time, max_length_to_distance_ratio=max_length_to_distance_ratio)
 
-    def _plan(self, planner: MotionPlan, max_time=15, steps_per_iter=15000, max_length_to_distance_ratio=10):
+    def _plan(self, planner: MotionPlan, max_time=15, steps_per_iter=1000, max_length_to_distance_ratio=10):
         """
         find path given a prepared planner, with endpoints already set
         @param planner: MotionPlan object, endpoints already set
@@ -256,6 +255,8 @@ class MotionPlanner:
         """
         if len(config) == 6:
             config_klampt = self.config6d_to_klampt(config)
+        else:
+            config_klampt = config.copy()
 
         robot = self.robot_name_mapping[robot_name]
         current_config = robot.getConfig()
@@ -281,7 +282,14 @@ if __name__ == "__main__":
     planner = MotionPlanner()
     planner.visualize()
 
-    planner.is_config_feasible("ur5e_1", [0, 0, 0, 0, 0, 0])
+    goal = [-0.8740484961773456, -3.3909244585978566, 1.7558543551269423, 0.06422682706544691, -1.5727725921241804, 0.6933249607164145]
+    start = [-0.8200677076922815, -1.8008271656432093, 1.9969385305987757, -1.766794343987936, -1.5663750807391565, 0.7505642771720886]
+
+    planner.vis_config("ur5e_2", start, "start_config", (0, 1, 0, 0.5))
+    planner.vis_config("ur5e_2", goal, "goal_config", (1, 0, 0, 0.5))
+
+    path = planner.plan_from_start_to_goal_config("ur5e_2", start, goal, max_time=100)
+    # planner.is_config_feasible("ur5e_1", [0, 0, 0, 0, 0, 0])
 
     # path = planner.plan_from_start_to_goal_config("ur5e_1",
     #                                        [pi/2 , 0, 0, 0, 0, 0],
@@ -289,9 +297,9 @@ if __name__ == "__main__":
     # planner.show_path_vis("ur5e_1", path)
 
     # will visualize the path on robot1
-    path = planner.plan_from_start_to_goal_config("ur5e_2",
-                                           [0, 0, 0, 0, 0, 0],
-                                           [0, -pi/2, 0, -pi/2, 0, 0])
-    planner.vis_path("ur5e_2", path)
+    # path = planner.plan_from_start_to_goal_config("ur5e_2",
+    #                                        [0, 0, 0, 0, 0, 0],
+    #                                        [0, -pi/2, 0, -pi/2, 0, 0])
+    # planner.vis_path("ur5e_2", path)
 
     time.sleep(300)
