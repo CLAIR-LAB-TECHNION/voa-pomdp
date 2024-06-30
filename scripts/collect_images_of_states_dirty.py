@@ -17,10 +17,10 @@ from PIL import Image
 stack_position_r2frame = [-0.3614, 0.1927]
 
 workspace_x_lims = [-0.9, -0.54 ]
-workspace_y_lims = [-1.0, -0.5]
+workspace_y_lims = [-1.0, -0.55]
 
-sensor_configs = [[-2.04893, -2.50817, -0.00758, -1.96019, 1.51035, 1.0796],
-                    [-1.87959, -2.83369, -0.53395, -0.96173, 1.14309, 0.9852],
+sensing_configs = [[-2.04893, -2.50817, -0.00758, -1.96019, 1.51035, 1.0796],
+                    [-1.8152335325824183, -2.732894559899801, -0.5337811708450317, -1.1349691313556214, 1.0154942274093628, 1.1909868717193604],
                     [-2.29237, -2.50413, -0.76933, -1.37775, 1.53721, -0.74012],
                     [-1.54191, -1.8467, -2.39349, 0.27255, 0.80462, 0.63606],
                     [-1.51508, -2.15687, -1.61078, -0.84643, 0.68978, 1.52553],
@@ -56,8 +56,8 @@ def sample_block_positions(n_blocks, workspace_x_lims, workspace_y_lims):
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 4,
-         repeat: int = 2):
+def main(n_blocks: int = 5,
+         repeat: int = 5):
     camera = RealsenseCamera()
 
     motion_planner = MotionPlanner()
@@ -65,10 +65,10 @@ def main(n_blocks: int = 4,
 
     r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
-    r1_controller.speed = 0.5
-    r1_controller.acceleration = 0.5
-    r2_controller.speed = 0.5
-    r2_controller.acceleration = 0.5
+    r1_controller.speed = 0.75
+    r1_controller.acceleration = 0.75
+    r2_controller.speed = 1.5
+    r2_controller.acceleration = 1.5
 
     stack_position = gt.point_robot_to_world(ur5e_2["name"], (*stack_position_r2frame, 0.2))
 
@@ -88,7 +88,7 @@ def main(n_blocks: int = 4,
 
         # create dir for this run
         datetime = time.strftime("%Y%m%d-%H%M%S")
-        run_dir = f"collected_images/{datetime}/"
+        run_dir = f"collected_images/{n_blocks}blocks_{datetime}/"
         os.makedirs(run_dir, exist_ok=True)
 
         # Save block positions
