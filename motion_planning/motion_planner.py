@@ -14,6 +14,7 @@ import os
 
 
 class MotionPlanner:
+    ee_offset = 0.15  # end effector offset forward
     default_attachments = frozendict(ur5e_1=["camera", "gripper"], ur5e_2=["gripper"])
     default_settings = frozendict({# "type": "lazyrrg*",
                                     "type": "rrt*",
@@ -42,6 +43,8 @@ class MotionPlanner:
         self.ur5e_1 = self.world.robot("ur5e_1")
         self.ur5e_2 = self.world.robot("ur5e_2")
         self.robot_name_mapping = {"ur5e_1": self.ur5e_1, "ur5e_2": self.ur5e_2}
+        for robot in self.robot_name_mapping.values():
+            self._set_ee_offset(robot)
         self._add_attachments(self.ur5e_1, attachments["ur5e_1"])
         self._add_attachments(self.ur5e_2, attachments["ur5e_2"])
 
@@ -104,6 +107,14 @@ class MotionPlanner:
     def show_point_vis(self, point):
         vis.add("point", point)
         vis.setColor("point", 1, 0, 0, 0.5)
+
+    def show_ee_poses_vis(self):
+        """
+        show the end effector poses of all robots in the
+        """
+        for robot in self.robot_name_mapping.values():
+            ee_transform = robot.link("ee_link").getTransform()
+            vis.add(f"ee_pose_{robot.getName()}", ee_transform)
 
     def update_robot_config(self, robot_name, config):
         if len(config) == 6:
@@ -230,23 +241,21 @@ class MotionPlanner:
         all_attachments_geom.setGroup()
 
         if "gripper" in attachments:
-            gripper_obj = box(0.09, 0.08, 0.08, center=[+0.04, 0, 0.00])
+            gripper_obj = box(0.08, 0.08, 0.09, center=[0, 0, 0.04])
             gripper_geom = Geometry3D()
             gripper_geom.set(gripper_obj)
             all_attachments_geom.setElement(0, gripper_geom)
         if "camera" in attachments:
-            camera_obj = box(0.06, 0.18, 0.11, center=[0.01, 0, 0.05])
+            camera_obj = box(0.18, 0.11, 0.06, center=[0, -0.05, 0.01])
             camera_geom = Geometry3D()
             camera_geom.set(camera_obj)
             all_attachments_geom.setElement(1, camera_geom)
 
-        ee_offset_old = 0.0823  # The one I had when measured sizes of tools, corresponding to above box sizes
-        ee_offset_new = 0.15  # Like in the real robots
-        # move everything to the new end effector offset
+        # the positions of tools were measured for ee_offset = 0. move them back by ee_offset
         for i in range(all_attachments_geom.numElements()):
             element = all_attachments_geom.getElement(i)
             # x is forward in ff frame. nothing makes sense anymore...
-            element.transform(so3.identity(), [-(ee_offset_new - ee_offset_old), 0, 0])
+            element.transform(so3.identity(), [0, 0, -self.ee_offset])
             all_attachments_geom.setElement(i, element)
 
         robot.link("ee_link").geometry().set(all_attachments_geom)
@@ -285,20 +294,32 @@ class MotionPlanner:
 
         return True
 
-    # def get_forward_kinematics(self, robot_name, config):
-    #     """
-    #     get the forward kinematics of the robot
-    #     """
-    #     if len(config) == 6:
-    #         config_klampt = self.config6d_to_klampt(config)
-    #     else:
-    #         config_klampt = config.copy()
-    #
-    #     robot = self.robot_name_mapping[robot_name]
-    #
-    #     previous_config = robot.getConfig()
-    #     robot.setConfig(config_klampt)
-    #     link = robot.link("ee_link")
+    def get_forward_kinematics(self, robot_name, config):
+        """
+        get the forward kinematics of the robot
+        """
+        if len(config) == 6:
+            config_klampt = self.config6d_to_klampt(config)
+        else:
+            config_klampt = config.copy()
+
+        robot = self.robot_name_mapping[robot_name]
+
+        previous_config = robot.getConfig()
+        robot.setConfig(config_klampt)
+        link = robot.link("ee_link")
+        ee_transform = link.getTransform()
+        robot.setConfig(previous_config)
+
+        return ee_transform
+
+    def _set_ee_offset(self, robot):
+        ee_transform = robot.link("ee_link").getParentTransform()
+        ee_transform = se3.mul(ee_transform, (so3.identity(), (0, 0, self.ee_offset)))
+        robot.link("ee_link").setParentTransform(*ee_transform)
+        # reset the robot config to update:
+        robot.setConfig(robot.getConfig())
+
 
 
 if __name__ == "__main__":
