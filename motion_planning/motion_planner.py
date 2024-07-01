@@ -296,7 +296,7 @@ class MotionPlanner:
 
     def get_forward_kinematics(self, robot_name, config):
         """
-        get the forward kinematics of the robot
+        get the forward kinematics of the robot, this already returns the transform to world!
         """
         if len(config) == 6:
             config_klampt = self.config6d_to_klampt(config)
