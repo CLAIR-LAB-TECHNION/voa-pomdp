@@ -226,7 +226,6 @@ class MotionPlanner:
         """
         add attachments to the robot. This is very abstract geometry that should be improved later.
         """
-        # TODO: measure and improve
         all_attachments_geom = Geometry3D()
         all_attachments_geom.setGroup()
 
@@ -240,6 +239,15 @@ class MotionPlanner:
             camera_geom = Geometry3D()
             camera_geom.set(camera_obj)
             all_attachments_geom.setElement(1, camera_geom)
+
+        ee_offset_old = 0.0823  # The one I had when measured sizes of tools, corresponding to above box sizes
+        ee_offset_new = 0.15  # Like in the real robots
+        # move everything to the new end effector offset
+        for i in range(all_attachments_geom.numElements()):
+            element = all_attachments_geom.getElement(i)
+            # x is forward in ff frame. nothing makes sense anymore...
+            element.transform(so3.identity(), [-(ee_offset_new - ee_offset_old), 0, 0])
+            all_attachments_geom.setElement(i, element)
 
         robot.link("ee_link").geometry().set(all_attachments_geom)
 
@@ -277,10 +285,25 @@ class MotionPlanner:
 
         return True
 
+    # def get_forward_kinematics(self, robot_name, config):
+    #     """
+    #     get the forward kinematics of the robot
+    #     """
+    #     if len(config) == 6:
+    #         config_klampt = self.config6d_to_klampt(config)
+    #     else:
+    #         config_klampt = config.copy()
+    #
+    #     robot = self.robot_name_mapping[robot_name]
+    #
+    #     previous_config = robot.getConfig()
+    #     robot.setConfig(config_klampt)
+    #     link = robot.link("ee_link")
+
 
 if __name__ == "__main__":
     planner = MotionPlanner()
-    planner.visualize()
+    planner.visualize(beckend="PyQt5")
 
     goal = [-0.8740484961773456, -3.3909244585978566, 1.7558543551269423, 0.06422682706544691, -1.5727725921241804, 0.6933249607164145]
     start = [-0.8200677076922815, -1.8008271656432093, 1.9969385305987757, -1.766794343987936, -1.5663750807391565, 0.7505642771720886]
