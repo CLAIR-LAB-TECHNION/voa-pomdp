@@ -326,13 +326,12 @@ if __name__ == "__main__":
     planner = MotionPlanner()
     planner.visualize(beckend="PyQt5")
 
-    goal = [-0.8740484961773456, -3.3909244585978566, 1.7558543551269423, 0.06422682706544691, -1.5727725921241804, 0.6933249607164145]
-    start = [-0.8200677076922815, -1.8008271656432093, 1.9969385305987757, -1.766794343987936, -1.5663750807391565, 0.7505642771720886]
+    point = [0, 0, 1]
+    transform = planner.get_forward_kinematics("ur5e_1", planner.ur5e_1.getConfig()[1:7])
 
-    planner.vis_config("ur5e_2", start, "start_config", (0, 1, 0, 0.5))
-    planner.vis_config("ur5e_2", goal, "goal_config", (1, 0, 0, 0.5))
-
-    path = planner.plan_from_start_to_goal_config("ur5e_2", start, goal, max_time=100)
+    point_transofrmed = se3.apply(transform, point)
+    planner.show_point_vis(point_transofrmed)
+    print("point transformed: ", point_transofrmed)
     # planner.is_config_feasible("ur5e_1", [0, 0, 0, 0, 0, 0])
 
     # path = planner.plan_from_start_to_goal_config("ur5e_1",

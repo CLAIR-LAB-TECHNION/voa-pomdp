@@ -11,19 +11,25 @@ from scipy.spatial.transform import Rotation as R
 
 from motion_planning.motion_planner import MotionPlanner
 
+# TODO: refactor, this has beccome a mess
+
+
+camera_in_ee = [-0.0075, -0.105, 0.0395]
+
 
 class GeometryAndTransforms:
-    def __init__(self, robot_name_mapping):
-        self.robot_name_mapping = robot_name_mapping
+    def __init__(self, motion_planner: MotionPlanner):
+        self.motion_planner = motion_planner
+        self.robot_name_mapping = motion_planner.robot_name_mapping
 
     @classmethod
     def from_motion_planner(cls, motion_planner):
-        return cls(motion_planner.robot_name_mapping)
+        return cls(motion_planner)
 
     @classmethod
     def build(cls):
         mp = MotionPlanner()
-        return cls(mp.robot_name_mapping)
+        return cls(mp)
 
     def point_world_to_robot(self, robot_name, point_world):
         """
@@ -40,6 +46,33 @@ class GeometryAndTransforms:
         robot = self.robot_name_mapping[robot_name]
         world_to_robot = robot.link(0).getTransform()
         return se3.apply(world_to_robot, point_robot)
+
+    def world_to_robot_ee_transform(self, robot_name, config):
+        """
+        Returns the transformation from the world coordinate system to the end effector of the robot.
+        """
+        return self.motion_planner.get_forward_kinematics(robot_name, config)
+
+    def robot_ee_to_world_transform(self, robot_name):
+        """
+        Returns the transformation from the world coordinate system to the end effector of the robot.
+        """
+        w_to_ee = self.robot_name_mapping[robot_name].link(7).getTransform()
+        return se3.inv(w_to_ee)
+
+    def camera_to_ee_transform(self,):
+        """
+        Returns the transformation from the end effector to the camera.
+        """
+        # TODO fix that, camera axes are different (y up, x right, z forward)
+        raise NotImplementedError("Not tested yet! It should, and you can remove this line, but be careful!")
+        return se3.from_translation(camera_in_ee)
+
+    def ee_to_camera_transform(self, ):
+        """
+        Returns the transformation from the camera to the end effector.
+        """
+        return se3.from_translation(-np.array(camera_in_ee))
 
     def get_gripper_facing_downwards_6d_pose_robot_frame(self, robot_name, point_world, rz):
         """
