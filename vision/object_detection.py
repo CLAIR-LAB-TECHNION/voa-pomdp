@@ -40,10 +40,9 @@ class ObjectDetection:
 
 if __name__ == "__main__":
     detector = ObjectDetection()
+
     image_indices = list(range(1, 35))
-
     loaded_images = []
-
     for idx in image_indices:
         image_path = os.path.join("images_data_merged/images", f'image_{idx}.npy')
         if os.path.exists(image_path):
