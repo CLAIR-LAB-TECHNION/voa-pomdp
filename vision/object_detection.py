@@ -22,17 +22,20 @@ class ObjectDetection:
         '''
 
         :param im_arr: b x w x h x 3 numpy array
-        :return: a list of tuples for each object detected in the image. The tuple is bboxes, confidences, result object
+        :return: a tuple of 3 lists: bboxes, confidences, results
+            bboxes and confidences for each image is als oa list, since there may be multiple detections
         '''
         results = self.yolo.predict(im_arr, conf=self.min_confidence)
 
-        ret = []
-        for r in results:
-            bboxes = r.boxes.xyxy
-            confidences = r.boxes.conf
-            ret.append((bboxes, confidences, r))
+        bbox_list = []
+        confidence_list = []
+        for result in results:
+            bboxes = result.boxes.xyxy
+            confidences = result.boxes.conf
+            bbox_list.append(bboxes)
+            confidence_list.append(confidences)
 
-        return ret
+        return bbox_list, confidence_list, results
 
     def get_annotated_images(self, result):
         return result.plot()
