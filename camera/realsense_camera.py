@@ -3,6 +3,11 @@ import pyrealsense2 as rs
 import numpy as np
 import matplotlib.pyplot as plt
 
+# after calibration:
+intrinsic_matrix = [[905.1584499, 0., 645.70375818],
+                    [0., 901.85131577, 365.23101325],
+                    [0., 0., 1.]]
+
 
 class RealsenseCamera:
     def __init__(self):
@@ -44,6 +49,7 @@ class RealsenseCamera:
         rgb_image = cv2.cvtColor(rgb_image, cv2.COLOR_BGR2RGB)
         plt.imshow(rgb_image)
         plt.show()
+
 
 if __name__ == "__main__":
     camera = RealsenseCamera()
