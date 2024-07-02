@@ -40,7 +40,7 @@ class ManipulationController(RobotInterfaceWithGripper):
     @classmethod
     def build_from_robot_name_and_ip(cls, robot_ip, robot_name):
         motion_planner = MotionPlanner()
-        geomtry_and_transofms = GeometryAndTransforms(motion_planner.robot_name_mapping)
+        geomtry_and_transofms = GeometryAndTransforms(motion_planner)
         return cls(robot_ip, robot_name, motion_planner, geomtry_and_transofms)
 
     def update_mp_with_current_config(self):

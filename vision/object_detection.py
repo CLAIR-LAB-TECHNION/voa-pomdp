@@ -6,9 +6,9 @@ import os
 
 
 default_classes = (
-    'wooden box', 'box', 'top view of wooden box',
-    'wooden block', 'block', 'top view of wooden block',
-    'wooden cube', 'cube', 'top view of wooden cube',
+    'wooden box', 'box',
+    'wooden block', 'block',
+    'wooden cube', 'cube',
 )
 
 class ObjectDetection:
