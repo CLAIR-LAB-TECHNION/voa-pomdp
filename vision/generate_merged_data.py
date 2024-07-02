@@ -4,7 +4,7 @@ import shutil
 
 # Define the root directory where your "collected_images" directory is located
 root_dir = '../scripts/collected_images'
-merged_data_dir = 'images_data_merged'
+merged_data_dir = 'images_data_merged_hires'
 
 # Ensure the merged_data directory exists
 if not os.path.exists(merged_data_dir):
@@ -26,7 +26,7 @@ depth_counter = 1
 
 # Iterate through all directories in the root directory
 for experiment_dir in os.listdir(root_dir):
-    if experiment_dir.startswith("5blocks"):
+    if experiment_dir.startswith("5blocks_hires"):
         experiment_path = os.path.join(root_dir, experiment_dir)
         metadata_file = os.path.join(experiment_path, 'metadata.json')
 

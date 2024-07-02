@@ -41,10 +41,10 @@ class ObjectDetection:
 if __name__ == "__main__":
     detector = ObjectDetection()
 
-    image_indices = list(range(1, 35))
+    image_indices = list(range(1, 8))
     loaded_images = []
     for idx in image_indices:
-        image_path = os.path.join("images_data_merged/images", f'image_{idx}.npy')
+        image_path = os.path.join("images_data_merged_hires/images", f'image_{idx}.npy')
         if os.path.exists(image_path):
             image_array = np.load(image_path)
             loaded_images.append(image_array)
@@ -56,3 +56,4 @@ if __name__ == "__main__":
         plt.imshow(im_annotated)
         plt.show()
         ##### TODO: better methods for different types of outputs
+    pass

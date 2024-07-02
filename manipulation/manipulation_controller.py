@@ -60,7 +60,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         def valid_shoulder_angle(q):
             if for_down_movement:
-                return -0.1 > q[1] > -np.pi + 0.1
+                return -0.15 > q[1] > -np.pi + 0.15
             else:
                 return True
 

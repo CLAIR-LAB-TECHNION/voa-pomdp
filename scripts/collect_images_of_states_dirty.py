@@ -57,7 +57,7 @@ def sample_block_positions(n_blocks, workspace_x_lims, workspace_y_lims):
 @app.command(
     context_settings={"ignore_unknown_options": True})
 def main(n_blocks: int = 5,
-         repeat: int = 4):
+         repeat: int = 1):
     camera = RealsenseCamera()
 
     motion_planner = MotionPlanner()
@@ -88,7 +88,7 @@ def main(n_blocks: int = 5,
 
         # create dir for this run
         datetime = time.strftime("%Y%m%d-%H%M%S")
-        run_dir = f"collected_images/{n_blocks}blocks_{datetime}/"
+        run_dir = f"collected_images/{n_blocks}blocks_hires_{datetime}/"
         os.makedirs(run_dir, exist_ok=True)
 
         # Save block positions
@@ -124,7 +124,7 @@ def main(n_blocks: int = 5,
             metadata["images_depth"].append(depth_filename_npy)
 
         # Save metadata to JSON
-        metadata_path = os.path.join(run_dir, "_metadata.json")
+        metadata_path = os.path.join(run_dir, "metadata.json")
         with open(metadata_path, 'w') as f:
             json.dump(metadata, f, indent=4)
 
