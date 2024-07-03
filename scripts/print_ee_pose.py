@@ -9,7 +9,7 @@ app = typer.Typer()
 
 
 @app.command()
-def main(robot_name="ur5e_2"):
+def main(robot_name="ur5e_1"):
     if robot_name == "ur5e_1":
         robot_data = ur5e_1
     elif robot_name == "ur5e_2":
@@ -20,6 +20,7 @@ def main(robot_name="ur5e_2"):
     gt = GeometryAndTransforms.build()
 
     robot = RobotInterface(robot_data["ip"])
+    robot.freedriveMode()
 
     while True:
         pose = robot.getActualTCPPose()

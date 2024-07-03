@@ -44,19 +44,28 @@ class ObjectDetection:
 if __name__ == "__main__":
     detector = ObjectDetection()
 
-    image_indices = list(range(1, 8))
-    loaded_images = []
-    for idx in image_indices:
-        image_path = os.path.join("images_data_merged_hires/images", f'image_{idx}.npy')
-        if os.path.exists(image_path):
-            image_array = np.load(image_path)
-            loaded_images.append(image_array)
-        else:
-            print(f"Image {image_path} does not exist.")
+    # image_indices = list(range(1, 8))
+    # loaded_images = []
+    # for idx in image_indices:
+    #     image_path = os.path.join("images_data_merged_hires/images", f'image_{idx}.npy')
+    #     if os.path.exists(image_path):
+    #         image_array = np.load(image_path)
+    #         loaded_images.append(image_array)
+    #     else:
+    #         print(f"Image {image_path} does not exist.")
+    #
+    # for r in detector.detect_objects(loaded_images):
+    #     im_annotated = detector.get_annotated_images(r[2])
+    #     plt.imshow(im_annotated)
+    #     plt.show()
+    #     ##### TODO: better methods for different types of outputs
+    # pass
 
-    for r in detector.detect_objects(loaded_images):
-        im_annotated = detector.get_annotated_images(r[2])
-        plt.imshow(im_annotated)
-        plt.show()
-        ##### TODO: better methods for different types of outputs
-    pass
+    # load cropped_im.png:
+    im = cv2.imread("cropped_im.png")
+    im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+    # plot od for it
+    bboxes, _, results = detector.detect_objects(im)
+    results = results[0]
+    plt.imshow(results.plot())
+    plt.show()

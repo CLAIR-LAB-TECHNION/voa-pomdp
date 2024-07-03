@@ -46,6 +46,9 @@ plt.imshow(depth_clipped)
 plt.scatter(boxes_center[:, 0], boxes_center[:, 1], c='g', s=5)
 plt.show()
 
+# TODO: no depth above 0.5 m. use plane projection, and later figure out if 0.5m is close enough
+#  one option may be to crop image to region of interest and then call od?
+
 pass
 
 

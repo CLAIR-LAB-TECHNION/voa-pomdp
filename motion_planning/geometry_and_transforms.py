@@ -13,7 +13,9 @@ from motion_planning.motion_planner import MotionPlanner
 
 # TODO: refactor, this has beccome a mess
 
-camera_in_ee = [-0.0075, -0.105, 0.0395]
+camera_in_ee_orig = np.array([0, -0.105, 0.0395 - 0.15])
+camera_in_ee_experimental_correction = np.array([-0.035, -0.005, -0.00])
+camera_in_ee = camera_in_ee_orig + camera_in_ee_experimental_correction
 
 
 class GeometryAndTransforms:
@@ -50,14 +52,14 @@ class GeometryAndTransforms:
         """
         Returns the transformation from the world coordinate system to the end effector of the robot.
         """
-        return self.motion_planner.get_forward_kinematics(robot_name, config)
+        ree_2_w = self.robot_ee_to_world_transform(robot_name, config)
+        return se3.inv(ree_2_w)
 
     def robot_ee_to_world_transform(self, robot_name, config):
         """
         Returns the transformation from the world coordinate system to the end effector of the robot.
         """
-        w_to_ee = self.world_to_robot_ee_transform(robot_name, config)
-        return se3.inv(w_to_ee)
+        return self.motion_planner.get_forward_kinematics(robot_name, config)
 
     def camera_to_ee_transform(self,):
         """
@@ -65,7 +67,7 @@ class GeometryAndTransforms:
         """
         # we assume camera is z forward, x right, y down (like in the image). this is already the ee frame orientation,
         # so we just need to translate it
-        return se3.from_translation(camera_in_ee)
+        return se3.from_translation(np.array(camera_in_ee))
 
     def ee_to_camera_transform(self, ):
         """
@@ -75,11 +77,23 @@ class GeometryAndTransforms:
         # so we just need to translate it
         return se3.from_translation(-np.array(camera_in_ee))
 
-    def point_world_to_camera(self, point_world, robot_name, config):
+    def point_world_to_camera(self, point_world, robot_name, config, robot_controller):
         """
         Transforms a point from the world coordinate system to the camera coordinate system.
         """
         transform_w_to_ee = self.world_to_robot_ee_transform(robot_name, config)
+        ### debug:
+        point_ee = se3.apply(transform_w_to_ee, point_world)
+        # print("point_ee_frame:", point_ee)
+        ###
+        ### temp fix:
+        fk_xyzrotvec = robot_controller.getForwardKinematics()
+        fk_trans = fk_xyzrotvec[:3]
+        fk_rotvec = fk_xyzrotvec[3:]
+        fk_so3_rot = so3.from_rotation_vector(fk_rotvec)
+        fk_se3 = (fk_so3_rot, fk_trans)
+        transform_w_to_ee = se3.inv(fk_se3)
+        # ###
         transform_ee_to_camera = self.ee_to_camera_transform()
         transform_w_to_camera = se3.mul(transform_ee_to_camera, transform_w_to_ee)
         return se3.apply(transform_w_to_camera, point_world)
