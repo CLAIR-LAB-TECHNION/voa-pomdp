@@ -241,7 +241,7 @@ class MotionPlanner:
         all_attachments_geom.setGroup()
 
         if "gripper" in attachments:
-            gripper_obj = box(0.08, 0.08, 0.09, center=[0, 0, 0.04])
+            gripper_obj = box(0.08, 0.08, 0.15, center=[0, 0, 0.07])
             gripper_geom = Geometry3D()
             gripper_geom.set(gripper_obj)
             all_attachments_geom.setElement(0, gripper_geom)
