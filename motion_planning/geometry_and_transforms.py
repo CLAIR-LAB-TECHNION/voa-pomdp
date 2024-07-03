@@ -87,12 +87,12 @@ class GeometryAndTransforms:
         # print("point_ee_frame:", point_ee)
         ###
         ### temp fix:
-        fk_xyzrotvec = robot_controller.getForwardKinematics()
-        fk_trans = fk_xyzrotvec[:3]
-        fk_rotvec = fk_xyzrotvec[3:]
-        fk_so3_rot = so3.from_rotation_vector(fk_rotvec)
-        fk_se3 = (fk_so3_rot, fk_trans)
-        transform_w_to_ee = se3.inv(fk_se3)
+        # fk_xyzrotvec = robot_controller.getForwardKinematics()
+        # fk_trans = fk_xyzrotvec[:3]
+        # fk_rotvec = fk_xyzrotvec[3:]
+        # fk_so3_rot = so3.from_rotation_vector(fk_rotvec)
+        # fk_se3 = (fk_so3_rot, fk_trans)
+        # transform_w_to_ee = se3.inv(fk_se3)
         # ###
         transform_ee_to_camera = self.ee_to_camera_transform()
         transform_w_to_camera = se3.mul(transform_ee_to_camera, transform_w_to_ee)
