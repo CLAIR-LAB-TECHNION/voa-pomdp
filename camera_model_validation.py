@@ -59,9 +59,9 @@ if __name__ == "__main__":
         point_camera = gt.point_world_to_camera(point_world, "ur5e_1", r1_controller.getActualQ(), r1_controller)
         print("point_camera:", point_camera)
 
-        from camera.realsense_camera import intrinsic_matrix
+        from camera.configurations_and_params import color_camera_intrinsic_matrix
 
-        point_image_homogenous = np.array(intrinsic_matrix) @ point_camera
+        point_image_homogenous = color_camera_intrinsic_matrix @ point_camera
         point_image = point_image_homogenous / point_image_homogenous[2]
         print("point_image:", point_image)
 

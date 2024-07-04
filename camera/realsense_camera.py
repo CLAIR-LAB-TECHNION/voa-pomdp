@@ -2,15 +2,30 @@ import cv2
 import pyrealsense2 as rs
 import numpy as np
 import matplotlib.pyplot as plt
+from camera.configurations_and_params import depth_fx, depth_fy, depth_ppx, depth_ppy, color_fx, color_fy, color_ppx, \
+    color_ppy, depth_to_color_translation
+from camera.utils import get_mean_depth
 
-# after calibration:
-intrinsic_matrix = [[905.1584499, 0., 645.70375818],
-                    [0., 901.85131577, 365.23101325],
-                    [0., 0., 1.]]
 
-# intrinsic_matrix = [[885.77, 0., 640.70375818],
-#                     [0., 888.06, 360.23101325],
-#                     [0., 0., 1.]]
+def project_color_pixel_to_depth_pixel(color_image_point, depth_image):
+    # the projection depends on depth of the point which we don't know yet.
+    # we will take the mean depth of the region around the pixel without projection
+
+    mean_depth = get_mean_depth(depth_image, color_image_point, window_size=20)
+    if mean_depth == -1:
+        return (-1, -1)  # no depth around that point, cannot project
+
+    x_color = (color_image_point[0] - color_ppx) / color_fx
+    y_color = (color_image_point[1] - color_ppy) / color_fy
+
+    color_frame_point = np.array([x_color * mean_depth, y_color * mean_depth, mean_depth])
+
+    depth_frame_point = color_frame_point - depth_to_color_translation
+
+    depth_image_point = [(depth_frame_point[0] * depth_fx / depth_frame_point[2]) + depth_ppx,
+                         (depth_frame_point[1] * depth_fy / depth_frame_point[2]) + depth_ppy]
+
+    return depth_image_point
 
 
 class RealsenseCamera:
@@ -36,8 +51,6 @@ class RealsenseCamera:
         depth_image = depth_image * self.depth_scale
         return color_image, depth_image
 
-    # TODO: Visualize depth utility, visualize both, align
-
     def plotable_depth(self, depth_image, max_depth=3):
         depth_image = np.clip(depth_image, 0, max_depth)
         depth_image = (depth_image / max_depth * 255).astype(np.uint8)
@@ -56,17 +69,5 @@ class RealsenseCamera:
 
 
 if __name__ == "__main__":
-    camera = RealsenseCamera()
-    max_depth = 5  # actual is 16
-    while True:
-        rgb, depth = camera.get_frame()
-        depth = np.clip(depth, 0, max_depth)
-        if rgb is not None and depth is not None:
-            # scale just for cv2:
-            depth = depth / max_depth
-            depth = (depth * 255).astype(np.uint8)
-            depth = cv2.applyColorMap(depth, cv2.COLORMAP_JET)
+    pass
 
-            cv2.imshow('image', rgb)
-            cv2.imshow('depth', depth)
-            cv2.waitKey(1)
