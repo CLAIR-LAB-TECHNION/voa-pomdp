@@ -16,7 +16,7 @@ from PIL import Image
 
 stack_position_r2frame = [-0.3614, 0.1927]
 
-workspace_x_lims = [-0.9, -0.54 ]
+workspace_x_lims = [-0.9, -0.54]
 workspace_y_lims = [-1.0, -0.55]
 
 sensing_configs = [[-2.04893, -2.50817, -0.00758, -1.96019, 1.51035, 1.0796],
