@@ -4,7 +4,7 @@ import os
 
 # extrinsic camera parameters, relative to ee, no rotation just translation
 camera_in_ee_orig = np.array([0, -0.105, 0.0395 - 0.15])
-camera_in_ee_experimental_correction = np.array([-0.035, -0.005, -0.00])
+camera_in_ee_experimental_correction = np.array([-0.04, -0.01, -0.01])
 camera_in_ee = camera_in_ee_orig + camera_in_ee_experimental_correction
 
 

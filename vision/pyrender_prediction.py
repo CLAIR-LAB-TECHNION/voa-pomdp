@@ -91,7 +91,7 @@ plane_position = [-0.805, -0.615, 0]
 if __name__ == "__main__":
     robot_configs, images, depth_images, actual_block_positions = load_data()
 
-    box_3d_positons = [(p[0], p[1], 0.02) for p in actual_block_positions]
+    box_3d_positons = [(p[0], p[1], 0.01) for p in actual_block_positions]
 
     r = PyrenderRenderer()
     r.set_boxes_positions(box_3d_positons)
