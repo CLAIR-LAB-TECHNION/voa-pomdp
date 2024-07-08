@@ -40,19 +40,26 @@ if __name__ == "__main__":
     print("Loaded data, beginning prediction.")
     position_estimator = ImageBlockPositionEstimator(workspace_limits_x, workspace_limits_y, gt)
 
-    block_positions = position_estimator.get_block_positions_depth(images, depth_images, robot_configs)
+    block_positions, annotations = position_estimator.get_block_positions_depth(images, depth_images, robot_configs)
 
     actual_block_positions = np.array(actual_block_positions)
-    for pred in block_positions:
+
+
+    for pred, annotations in zip(block_positions, annotations):
+        # create plot with four subplots, 3 for the given annotations and one for the predicted block positions as below
+        fig, axs = plt.subplots(2, 2)
+        axs[0, 0].imshow(annotations[0])
+        axs[0, 1].imshow(annotations[1])
+        axs[1, 0].imshow(annotations[2])
 
         pred = np.array(pred)
-        plt.scatter(actual_block_positions[:, 0], actual_block_positions[:, 1], c='r', s=10)
-        plt.scatter(pred[:, 0], pred[:, 1], c='b', s=10)
-
+        axs[1, 1].scatter(actual_block_positions[:, 0], actual_block_positions[:, 1], c='b', s=10)
+        axs[1, 1].scatter(pred[:, 0], pred[:, 1], c='r', s=10)
         for i in range(pred.shape[0]):
-            plt.text(pred[i, 0], pred[i, 1], f'{pred[i, 2]:.3f}', fontsize=9, color='blue')
+            axs[1, 1].text(pred[i, 0], pred[i, 1], f'{pred[i, 2]:.3f}', fontsize=9, color='red')
+        axs[1, 1].set_xlim(workspace_limits_x)
+        axs[1, 1].set_ylim(workspace_limits_y)
 
-        plt.xlim(workspace_limits_x)
-        plt.ylim(workspace_limits_y)
+        fig.tight_layout()
+
         plt.show()
-

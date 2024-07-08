@@ -1,3 +1,5 @@
+import cv2
+
 from vision.utils import crop_workspace
 from vision.object_detection import ObjectDetection
 import json
@@ -50,11 +52,12 @@ class ImageBlockPositionEstimator:
         :param depth_image:
         :param windows_sizes:
         :return: mean depth in windows around points, -1 if no depth around the point or invalid points
+            and also the xyxy of the windows used for depth computation in the depth image
         """
         points_in_depth = [project_color_pixel_to_depth_pixel(point, depth_image) for point in points_color_image_xy]
 
-
         depths = []
+        windows_xyxy = []
         for point, win_size in zip(points_in_depth, windows_sizes):
             if point[0] < 0 or point[1] < 0 or point[0] >= depth_image.shape[1] or point[1] >= depth_image.shape[0]:
                 depths.append(-1)
@@ -67,6 +70,7 @@ class ImageBlockPositionEstimator:
             y_max = min(depth_image.shape[0], point[1] + win_size[1])
 
             x_min, x_max, y_min, y_max = int(x_min), int(x_max), int(y_min), int(y_max)
+            windows_xyxy.append((x_min, x_max, y_min, y_max))
 
             window = depth_image[y_min:y_max, x_min:x_max]
             if np.all(window <= 0):
@@ -75,25 +79,38 @@ class ImageBlockPositionEstimator:
 
             depths.append(np.mean(window[window > 0]))
 
-        return depths
+        return depths, windows_xyxy
 
 
-    def get_block_positions_depth(self, images, depths, robot_configurations, z_offset=0.02, detect_on_cropped=True):
+    def get_block_positions_depth(self, images, depths, robot_configurations, return_annotations=True,
+                                  z_offset=0.02, detect_on_cropped=True):
         """
         Get block positions from images and depth images. can be single image or batch of images
         :param images: ims to get block positions from
         :param depths: depths to get block positions from
         :param robot_configurations: robot configurations for each image
+        :param return_annotations: whether to return annotated images
         :param z_offset: offset from the detected depth to the block position, this is the length of the block,
             since depth is measured to face and we want to get the center of the block
         :param detect_on_cropped: if True, detect objects on cropped images, if False, detect on full images
         :return: list of detected block positions in world coordinates for each image
             (or single list if single image is given)
+            if return_annotations is True, another or list of tuples of images will be returned.
+            The tuple contains (annotated_cropped, annotated, depth_with_windows)
+            annotated cropped is the image that was used for od with detections, classes and probabilities,
+            annotated is the original image with just detections and center points,
+            depth_with_windows is the depth image with windows around the center points that contains all the pixels
+                that was used for depth computation
         """
         if len(np.array(images).shape) == 3:
             images = [images]
             robot_configurations = [robot_configurations]
             depths = [depths]
+
+        # we will only fill these if return_annotations is True
+        annotated_cropped = []
+        annotated = []
+        depth_with_windows = []
 
         if detect_on_cropped:
             cropped_images = []
@@ -113,8 +130,16 @@ class ImageBlockPositionEstimator:
         bboxes_centers = [(bbox[:, :2] + bbox[:, 2:]) / 2 for bbox in bboxes]
         bbox_sizes = [(bbox[:, 2:] - bbox[:, :2]) for bbox in bboxes]
 
+        if return_annotations:
+            for res, bboxes_centers_curr, bboxes_curr_im, im in zip(results, bboxes_centers, bboxes, images):
+                annotated_cropped.append(res.plot())
+                annotated_image = im.copy()
+                for bbox_center in bboxes_centers_curr:
+                    annotated_image = cv2.circle(annotated_image, tuple(bbox_center.astype(int)), 6, (256, 0, 0), -1)
+                annotated.append(annotated_image)
+
         estimated_z_depths = []
-        for bbox_center, bbox_sizes_curr, depth_im in zip(bboxes_centers, bbox_sizes, depths):
+        for bbox_centers_curr, bbox_sizes_curr, depth_im in zip(bboxes_centers, bbox_sizes, depths):
             # take at least 3x3 pixels, at most 10x10 pixels, and as default half of the bbox size,
             # separately for x and y
             bbox_sizes_curr = np.array(bbox_sizes_curr)
@@ -122,15 +147,24 @@ class ImageBlockPositionEstimator:
             win_sizes_y = np.clip(np.ceil(bbox_sizes_curr[:, 1] / 2), 3, 10)
             windows_sizes = np.vstack((win_sizes_x, win_sizes_y)).T
 
-            estimated_z_depths_curr = self.get_z_depth_mean(bbox_center, depth_im, windows_sizes)
+            estimated_z_depths_curr, windows_xyxy = self.get_z_depth_mean(bbox_centers_curr, depth_im, windows_sizes)
             estimated_z_depths_curr = np.array(estimated_z_depths_curr) + z_offset
             estimated_z_depths.append(estimated_z_depths_curr)
 
-        # TODO: plot bbox, center, center in depth
+            if return_annotations:
+                max_depth_for_plot = 3
+                depth_with_windows_curr = depth_im.copy()
+                depth_with_windows_curr = np.clip(depth_with_windows_curr, 0, max_depth_for_plot)
+                depth_with_windows_curr = ((depth_with_windows_curr / max_depth_for_plot) * 255).astype(np.uint8)
+                depth_with_windows_curr = cv2.cvtColor(depth_with_windows_curr, cv2.COLOR_GRAY2RGB)
+                for win_xyxy in windows_xyxy:
+                    depth_with_windows_curr = cv2.rectangle(depth_with_windows_curr, (win_xyxy[0], win_xyxy[2]),
+                                                            (win_xyxy[1], win_xyxy[3]), (0, 255, 0), 1)
+                depth_with_windows.append(depth_with_windows_curr)
 
         block_positions_camera_frame = []
-        for bbox_center, depth in zip(bboxes_centers, estimated_z_depths):
-            block_positions_camera_frame.append(self.points_image_to_camera_frame(bbox_center, depth))
+        for bbox_centers_curr, depth in zip(bboxes_centers, estimated_z_depths):
+            block_positions_camera_frame.append(self.points_image_to_camera_frame(bbox_centers_curr, depth))
 
         block_positions_world = []
         for block_positions_camera_frame_curr, robot_config in zip(block_positions_camera_frame, robot_configurations):
@@ -140,7 +174,14 @@ class ImageBlockPositionEstimator:
                 block_position_world = self.gt.point_camera_to_world(bpos_cam, self.robot_name, robot_config)
                 curr_block_positions_world.append(block_position_world)
             block_positions_world.append(curr_block_positions_world)
+
         # if single image, return single list
         if len(block_positions_world) == 1:
+            if return_annotations:
+                return block_positions_world[0], (annotated_cropped[0], annotated[0], depth_with_windows[0])
             return block_positions_world[0]
+
+        if return_annotations:
+            # convert to list of tuples
+            return block_positions_world, list(zip(annotated_cropped, annotated, depth_with_windows))
         return block_positions_world
