@@ -36,3 +36,8 @@ depth_camera_intrinsic_matrix = np.array([[depth_fx, 0, depth_ppx],
 
 depth_to_color_translation = np.array(depth_to_color_extr['translation'])
 
+
+if __name__ == '__main__':
+    print("fx, fy, ppx, ppy")
+    print(depth_fx, depth_fy, depth_ppx, depth_ppy)
+
