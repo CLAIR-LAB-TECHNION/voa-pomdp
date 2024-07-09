@@ -104,9 +104,9 @@ class MotionPlanner:
         vis.setColor("path", 1, 1, 1, 0.5)
         vis.setAttribute("path", "robot", robot_name)
 
-    def show_point_vis(self, point):
-        vis.add("point", point)
-        vis.setColor("point", 1, 0, 0, 0.5)
+    def show_point_vis(self, point, name="point"):
+        vis.add(name, point)
+        vis.setColor(name, 1, 0, 0, 0.5)
 
     def show_ee_poses_vis(self):
         """
@@ -198,6 +198,8 @@ class MotionPlanner:
         """
         There are 8 links in our rob for klampt, some are stationary, actual joints are 1:7
         """
+        if config_klampt is None:
+            return None
         return config_klampt[1:7]
 
     def path_klampt_to_config6d(self, path_klampt):
@@ -319,6 +321,37 @@ class MotionPlanner:
         robot.link("ee_link").setParentTransform(*ee_transform)
         # reset the robot config to update:
         robot.setConfig(robot.getConfig())
+
+    def ik_solve(self, robot_name, ee_transform, start_config=None):
+
+        if start_config is not None and len(start_config) == 6:
+            start_config = self.config6d_to_klampt(start_config)
+
+        robot = self.robot_name_mapping[robot_name]
+        return self.klampt_to_config6d(self._ik_solve_klampt(robot, ee_transform, start_config))
+
+    def _ik_solve_klampt(self, robot, ee_transform, start_config=None):
+
+        curr_config = robot.getConfig()
+        if start_config is not None:
+            robot.setConfig(start_config)
+
+        ik_objective = ik.objective(robot.link("ee_link"), R=ee_transform[0], t=ee_transform[1])
+        res = ik.solve(ik_objective, tol=1e-5)
+        if not res:
+            print("ik not solved")
+            robot.setConfig(curr_config)
+            return None
+
+        res_config = robot.getConfig()
+
+        robot.setConfig(curr_config)
+
+        ik_objective = ik.IKObjective()
+        ik_objective
+
+        return res_config
+
 
 
 
