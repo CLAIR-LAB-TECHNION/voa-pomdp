@@ -12,7 +12,7 @@ default_classes = (
 )
 
 class ObjectDetection:
-    def __init__(self, classes=default_classes, min_confidence=0.05):
+    def __init__(self, classes=default_classes, min_confidence=0.02):
         self.min_confidence = min_confidence
 
         self.yolo = YOLOWorld('yolov8x-worldv2')  # largest model

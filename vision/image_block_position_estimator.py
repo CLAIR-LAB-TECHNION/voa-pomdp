@@ -189,22 +189,39 @@ class ImageBlockPositionEstimator:
         for bbox_centers_curr, robot_config in zip(bboxes_centers, robot_configurations):
             block_positions_world_curr = []
 
-            # assume depth is unit, we only create direction vectors:
+            # Assume depth is unit, we only create direction vectors:
             z_depth = np.ones_like(bbox_centers_curr[:, 0])
+
+            # Transform image points to camera frame using intrinsic parameters
             points_camera_frame = self.points_image_to_camera_frame(bbox_centers_curr, z_depth)
 
+            # Normalize the points to get direction vectors
             directions_camera_frame = points_camera_frame / np.linalg.norm(points_camera_frame, axis=1)[:, None]
 
+            # Get transformation from camera to world frame
             transform_camera_to_world = self.gt.camera_to_world_transform(self.robot_name, robot_config)
             transform_camera_to_world = self.gt.se3_to_4x4(transform_camera_to_world)
             R_cam_to_world = transform_camera_to_world[:3, :3]
             t_cam_to_world = transform_camera_to_world[:3, 3]
 
             for direction in directions_camera_frame:
-                scale = (plane_z - t_cam_to_world[2]) / np.dot(direction, R_cam_to_world[:, 2])
-                point_cam_frame = scale * direction
-                point_world = R_cam_to_world @ point_cam_frame + t_cam_to_world
-                block_positions_world_curr.append(point_world)
+                direction_world = R_cam_to_world @ direction
+
+                if direction_world[2] == 0:
+                    # if direction is parallel to the plane, we can't find the intersection
+                    continue
+
+                # define a line in space that goes through the camera center and in the direction
+                # of the detected block
+                # the line is defined as x = t + lambda * direction, where x is the point on the line,
+
+                # we want to find the lambda that makes the z coordinate of the point on the line equal to plane_z
+                # so we solve for lambda in the equation t_cam_to_world[2] + lambda * direction_world[2] = plane_z
+
+                lambda_param = (plane_z - t_cam_to_world[2]) / direction_world[2]
+                pos_world = t_cam_to_world + lambda_param * direction_world
+
+                block_positions_world_curr.append(pos_world)
 
             block_positions_world.append(block_positions_world_curr)
 

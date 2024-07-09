@@ -1,5 +1,3 @@
-from vision.utils import crop_workspace
-from vision.object_detection import ObjectDetection
 import json
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
 import numpy as np
