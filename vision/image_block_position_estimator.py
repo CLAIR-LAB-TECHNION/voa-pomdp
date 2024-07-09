@@ -81,7 +81,6 @@ class ImageBlockPositionEstimator:
 
         return depths, windows_xyxy
 
-
     def get_block_positions_depth(self, images, depths, robot_configurations, return_annotations=True,
                                   z_offset=0.02, detect_on_cropped=True):
         """
@@ -107,37 +106,10 @@ class ImageBlockPositionEstimator:
             robot_configurations = [robot_configurations]
             depths = [depths]
 
-        # we will only fill these if return_annotations is True
-        annotated_cropped = []
-        annotated = []
+        bboxes, bboxes_centers, bbox_sizes, results, annotated_cropped, annotated =\
+            self.get_bboxes(detect_on_cropped, images, robot_configurations, return_annotations)
+
         depth_with_windows = []
-
-        if detect_on_cropped:
-            cropped_images = []
-            cropped_images_xyxy = []
-            for image, robot_config in zip(images, robot_configurations):
-                cropped_image, xyxy = crop_workspace(image, robot_config, self.gt, self.workspace_limits_x,
-                                                     self.workspace_limits_y)
-                cropped_images.append(cropped_image)
-                cropped_images_xyxy.append(xyxy)
-
-            bboxes_in_cropped, _, results = self.detector.detect_objects(cropped_images)
-            bboxes = [self.bboxes_cropped_to_orig(bboxes, xyxy)
-                      for bboxes, xyxy in zip(bboxes_in_cropped, cropped_images_xyxy)]
-        else:
-            bboxes, _, results = self.detector.detect_objects(images)
-
-        bboxes_centers = [(bbox[:, :2] + bbox[:, 2:]) / 2 for bbox in bboxes]
-        bbox_sizes = [(bbox[:, 2:] - bbox[:, :2]) for bbox in bboxes]
-
-        if return_annotations:
-            for res, bboxes_centers_curr, bboxes_curr_im, im in zip(results, bboxes_centers, bboxes, images):
-                annotated_cropped.append(res.plot())
-                annotated_image = im.copy()
-                for bbox_center in bboxes_centers_curr:
-                    annotated_image = cv2.circle(annotated_image, tuple(bbox_center.astype(int)), 6, (256, 0, 0), -1)
-                annotated.append(annotated_image)
-
         estimated_z_depths = []
         for bbox_centers_curr, bbox_sizes_curr, depth_im in zip(bboxes_centers, bbox_sizes, depths):
             # take at least 3x3 pixels, at most 10x10 pixels, and as default half of the bbox size,
@@ -185,3 +157,100 @@ class ImageBlockPositionEstimator:
             # convert to list of tuples
             return block_positions_world, list(zip(annotated_cropped, annotated, depth_with_windows))
         return block_positions_world
+
+    def get_block_position_plane_projection(self, images, robot_configurations, plane_z=-0.01,
+                                            return_annotations=True, detect_on_cropped=True):
+        """
+        Get block positions from images, without depth. To get the missing information that we get from depth,
+        we assume that the block is on a known plane (e.g. table) with known z coordinate, and we project the
+        detected block position to that plane.
+
+        parameters  are similar to get_block_positions_depth
+
+        :param images:
+        :param robot_configurations:
+        :param plane_z: the z coordinate of the plane in the world frame
+        :param return_annotations:
+        :param detect_on_cropped:
+        :return: list of detected block positions for each image and tuple of annotations if return_annotations is True
+            the tuple contains (annotated_cropped, annotated) similar to get_block_positions_depth
+             (just without the depth)
+        """
+        if len(np.array(images).shape) == 3:
+            images = [images]
+            robot_configurations = [robot_configurations]
+
+        # we will only fill these if return_annotations is True
+        bboxes, bboxes_centers, _, results, annotated_cropped, annotated =\
+            self.get_bboxes(detect_on_cropped, images, robot_configurations, return_annotations)
+
+        block_positions_world = []
+
+        for bbox_centers_curr, robot_config in zip(bboxes_centers, robot_configurations):
+            block_positions_world_curr = []
+
+            # assume depth is unit, we only create direction vectors:
+            z_depth = np.ones_like(bbox_centers_curr[:, 0])
+            points_camera_frame = self.points_image_to_camera_frame(bbox_centers_curr, z_depth)
+
+            directions_camera_frame = points_camera_frame / np.linalg.norm(points_camera_frame, axis=1)[:, None]
+
+            transform_camera_to_world = self.gt.camera_to_world_transform(self.robot_name, robot_config)
+            transform_camera_to_world = self.gt.se3_to_4x4(transform_camera_to_world)
+            R_cam_to_world = transform_camera_to_world[:3, :3]
+            t_cam_to_world = transform_camera_to_world[:3, 3]
+
+            for direction in directions_camera_frame:
+                scale = (plane_z - t_cam_to_world[2]) / np.dot(direction, R_cam_to_world[:, 2])
+                point_cam_frame = scale * direction
+                point_world = R_cam_to_world @ point_cam_frame + t_cam_to_world
+                block_positions_world_curr.append(point_world)
+
+            block_positions_world.append(block_positions_world_curr)
+
+        # If single image, return single list
+        if len(block_positions_world) == 1:
+            if return_annotations:
+                return block_positions_world[0], (annotated_cropped[0], annotated[0])
+            return block_positions_world[0]
+
+        if return_annotations:
+            # Convert to list of tuples
+            return block_positions_world, list(zip(annotated_cropped, annotated))
+        return block_positions_world
+
+    def get_bboxes(self, detect_on_cropped, images, robot_configurations, return_annotations):
+
+        # we will only fill these if return_annotations is True:
+        annotated_cropped = []
+        annotated = []
+
+
+        if detect_on_cropped:
+            cropped_images = []
+            cropped_images_xyxy = []
+            for image, robot_config in zip(images, robot_configurations):
+                cropped_image, xyxy = crop_workspace(image, robot_config, self.gt, self.workspace_limits_x,
+                                                     self.workspace_limits_y)
+                cropped_images.append(cropped_image)
+                cropped_images_xyxy.append(xyxy)
+
+            bboxes_in_cropped, _, results = self.detector.detect_objects(cropped_images)
+            bboxes = [self.bboxes_cropped_to_orig(bboxes, xyxy)
+                      for bboxes, xyxy in zip(bboxes_in_cropped, cropped_images_xyxy)]
+        else:
+            bboxes, _, results = self.detector.detect_objects(images)
+
+        bboxes_centers = [(bbox[:, :2] + bbox[:, 2:]) / 2 for bbox in bboxes]
+        bbox_sizes = [(bbox[:, 2:] - bbox[:, :2]) for bbox in bboxes]
+
+        if return_annotations:
+            for res, bboxes_centers_curr, bboxes_curr_im, im in zip(results, bboxes_centers, bboxes, images):
+                annotated_cropped.append(res.plot())
+                annotated_image = im.copy()
+                for bbox_center in bboxes_centers_curr:
+                    annotated_image = cv2.circle(annotated_image, tuple(bbox_center.astype(int)), 6, (256, 0, 0), -1)
+                annotated.append(annotated_image)
+
+        return bboxes, bboxes_centers, bbox_sizes, results, annotated_cropped, annotated
+
