@@ -23,9 +23,8 @@ sensing_configs = [[-2.04893, -2.50817, -0.00758, -1.96019, 1.51035, 1.0796],
                    [-0.13548, -1.67402, -1.56538, -2.86094, 1.10085, 1.63128],
                    [-1.4104, -1.74145, -0.18662, -2.55688, 1.09938, 1.80797]]
 
+
 app = typer.Typer()
-
-
 @app.command(
     context_settings={"ignore_unknown_options": True})
 def main(n_blocks: int = 3,
@@ -75,7 +74,7 @@ def main(n_blocks: int = 3,
                 print(f"Config {c} is not feasible, probably collides with other robot")
                 continue
             r1_controller.plan_and_moveJ(c)
-            im, depth = camera.get_frame()
+            im, depth = camera.get_frame_bgr()
             im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
             plotable_depth = camera.plotable_depth(depth)
 

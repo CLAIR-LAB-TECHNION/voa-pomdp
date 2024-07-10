@@ -65,7 +65,7 @@ if __name__ == "__main__":
         point_image = point_image_homogenous / point_image_homogenous[2]
         print("point_image:", point_image)
 
-        image, _ = camera.get_frame()
+        image, _ = camera.get_frame_bgr()
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
         plt.imshow(image)

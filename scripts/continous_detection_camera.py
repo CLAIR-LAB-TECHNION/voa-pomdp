@@ -38,7 +38,7 @@ def main(use_depth: bool = 1):
 
     while True:
         robot_config = robot.getActualQ()
-        bgr, depth = camera.get_frame()
+        bgr, depth = camera.get_frame_bgr()
         if bgr is None or depth is None:
             continue
 

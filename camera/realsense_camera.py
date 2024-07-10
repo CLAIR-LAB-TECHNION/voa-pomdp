@@ -39,7 +39,7 @@ class RealsenseCamera:
         depth_sensor = self.pipeline.get_active_profile().get_device().first_depth_sensor()
         self.depth_scale = depth_sensor.get_depth_scale()
 
-    def get_frame(self):
+    def get_frame_bgr(self):
         frames = self.pipeline.wait_for_frames()
         depth_frame = frames.get_depth_frame()
         color_frame = frames.get_color_frame()
@@ -50,6 +50,13 @@ class RealsenseCamera:
         depth_image = np.asanyarray(depth_frame.get_data())
         depth_image = depth_image * self.depth_scale
         return color_image, depth_image
+
+    def get_frame_rgb(self):
+        bgr, depth = self.get_frame_bgr()
+        rgb = None
+        if bgr is not None:
+            rgb = cv2.cvtColor(bgr, cv2.COLOR_BGR2RGB)
+        return rgb, depth
 
     def plotable_depth(self, depth_image, max_depth=3):
         depth_image = np.clip(depth_image, 0, max_depth)

@@ -9,7 +9,7 @@ max_depth = 5
 if __name__ == "__main__":
     camera = RealsenseCamera()
     while True:
-        rgb, depth = camera.get_frame()
+        rgb, depth = camera.get_frame_bgr()
         depth = np.clip(depth, 0, max_depth)
         if rgb is not None and depth is not None:
             # scale just for cv2:
