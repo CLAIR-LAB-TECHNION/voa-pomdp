@@ -47,7 +47,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
         logging.info(f"{self.robot_name} Updated motion planner with current configuration {self.getActualQ()}")
 
-    def find_ik_solution(self, pose, max_tries=10, for_down_movement=True):
+    def find_ik_solution(self, pose, max_tries=10, for_down_movement=True, shoulder_constraint_for_down_movement=0.15):
         """
         if for_down_movement is True, there will be a heuristic check that tha shoulder is not facing down, so when
         movel will be called it won't collide with the table when movingL down.
@@ -60,7 +60,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         def valid_shoulder_angle(q):
             if for_down_movement:
-                return -0.2 > q[1] > -np.pi + 0.2
+                return -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
             else:
                 return True
 
@@ -149,7 +149,9 @@ class ManipulationController(RobotInterfaceWithGripper):
                                                                                      rz)
         logging.info(f"{self.robot_name} planning and moving to xyzrz={x}{y}{z}{rz}. "
                      f"pose in robot frame:{target_pose_robot}")
-        goal_config = self.find_ik_solution(target_pose_robot, max_tries=50)
+
+        shoulder_constraint = 0.15 if z < 0.2 else 0.35
+        goal_config = self.find_ik_solution(target_pose_robot, max_tries=50, for_down_movement=for_down_movement,)
         self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
         # motion planner is automatically updated after movement
 
