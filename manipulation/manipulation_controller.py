@@ -1,5 +1,5 @@
 import numpy as np
-from robot_inteface.robot_interface import RobotInterfaceWithGripper
+from robot_inteface.robot_interface import RobotInterfaceWithGripper, home_config
 from motion_planning.motion_planner import MotionPlanner
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
 from utils import logging_util
@@ -60,7 +60,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         def valid_shoulder_angle(q):
             if for_down_movement:
-                return -0.15 > q[1] > -np.pi + 0.15
+                return -0.2 > q[1] > -np.pi + 0.2
             else:
                 return True
 
@@ -119,6 +119,17 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.move_path(path, speed, acceleration)
         # update the motion planner with the new configuration:
         self.update_mp_with_current_config()
+
+    def plan_and_move_home(self, speed=None, acceleration=None):
+        """
+        Plan and move to the home configuration.
+        """
+        if speed is None:
+            speed = self.speed
+        if acceleration is None:
+            acceleration = self.acceleration
+
+        self.plan_and_moveJ(home_config, speed, acceleration)
 
     def plan_and_move_to_xyzrz(self, x, y, z, rz, speed=None, acceleration=None, visualise=True,
                                for_down_movement=True):
@@ -194,7 +205,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         logging.debug(f"{self.robot_name} moving down until contact to put down")
         # move down until contact:
-        lin_speed = min(self.linear_speed, 0.08)
+        lin_speed = min(self.linear_speed, 0.05)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # release grasp:
         self.release_grasp()
