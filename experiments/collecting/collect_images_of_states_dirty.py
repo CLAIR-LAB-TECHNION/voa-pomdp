@@ -1,7 +1,5 @@
 import json
 import os
-from typing import List
-
 import cv2
 import numpy as np
 import typer
@@ -12,52 +10,25 @@ from robot_inteface.robots_metadata import ur5e_1, ur5e_2
 from camera.realsense_camera import RealsenseCamera
 import time
 from PIL import Image
-
-
-stack_position_r2frame = [-0.3614, 0.1927]
-
-workspace_x_lims = [-0.9, -0.54]
-workspace_y_lims = [-1.0, -0.55]
+from manipulation.utils import ur5e_2_distribute_blocks_in_workspace, ur5e_2_collect_blocks_from_positions
+from utils.workspace_utils import sample_block_positions, stack_position_r2frame, workspace_x_lims_default, \
+    workspace_y_lims_default
 
 sensing_configs = [[-2.04893, -2.50817, -0.00758, -1.96019, 1.51035, 1.0796],
-                    [-1.8152335325824183, -2.732894559899801, -0.5337811708450317, -1.1349691313556214, 1.0154942274093628, 1.1909868717193604],
-                    [-2.29237, -2.50413, -0.76933, -1.37775, 1.53721, -0.74012],
-                    [-1.54191, -1.8467, -2.39349, 0.27255, 0.80462, 0.63606],
-                    [-1.51508, -2.15687, -1.61078, -0.84643, 0.68978, 1.52553],
-                    [-0.13548, -1.67402, -1.56538, -2.86094, 1.10085, 1.63128],
-                    [-1.4104, -1.74145, -0.18662, -2.55688, 1.09938, 1.80797]]
-
+                   [-1.8152335325824183, -2.732894559899801, -0.5337811708450317, -1.1349691313556214,
+                    1.0154942274093628, 1.1909868717193604],
+                   [-2.29237, -2.50413, -0.76933, -1.37775, 1.53721, -0.74012],
+                   [-1.54191, -1.8467, -2.39349, 0.27255, 0.80462, 0.63606],
+                   [-1.51508, -2.15687, -1.61078, -0.84643, 0.68978, 1.52553],
+                   [-0.13548, -1.67402, -1.56538, -2.86094, 1.10085, 1.63128],
+                   [-1.4104, -1.74145, -0.18662, -2.55688, 1.09938, 1.80797]]
 
 app = typer.Typer()
 
 
-def valid_position(x, y, block_positions):
-    if x is None or y is None:
-        return False
-    for block_pos in block_positions:
-        # at least 0.06m apart in norm
-        if np.linalg.norm(np.array(block_pos) - np.array([x, y])) < 0.06:
-            return False
-    return True
-
-
-def sample_block_positions(n_blocks, workspace_x_lims, workspace_y_lims):
-    ''' sample n_blocks positions within the workspace limits, spaced at least by 0.05m in each axis '''
-    block_positions = []
-    for i in range(n_blocks):
-        x = None
-        y = None
-        while valid_position(x, y, block_positions) is False:
-            x = np.random.uniform(*workspace_x_lims)
-            y = np.random.uniform(*workspace_y_lims)
-        block_positions.append([x, y])
-
-    return block_positions
-
-
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 5,
+def main(n_blocks: int = 3,
          repeat: int = 1):
     camera = RealsenseCamera()
 
@@ -68,21 +39,19 @@ def main(n_blocks: int = 5,
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed = 0.75
     r1_controller.acceleration = 0.75
-    r2_controller.speed = 0.8
-    r2_controller.acceleration = 0.8
+    r2_controller.speed = 1.5
+    r2_controller.acceleration = 1.5
 
     stack_position = gt.point_robot_to_world(ur5e_2["name"], (*stack_position_r2frame, 0.2))
 
     for i in range(repeat):
         r1_controller.move_home(speed=0.5, acceleration=0.5)
 
-        # sample positions:
-        block_positions = sample_block_positions(n_blocks, workspace_x_lims, workspace_y_lims)
-
-        # distribute blocks
-        for block_pos in block_positions:
-            r2_controller.pick_up(stack_position[0], stack_position[1], rz=0, start_height=0.25)
-            r2_controller.put_down(block_pos[0], block_pos[1], rz=0)
+        block_positions = ur5e_2_distribute_blocks_in_workspace(n_blocks, r2_controller,
+                                                                ws_lim_x=workspace_x_lims_default,
+                                                                ws_lim_y=workspace_y_lims_default,
+                                                                stack_position_ur5e_2_frame=stack_position_r2frame,
+                                                                min_dist=0.06)
 
         # clear out for images
         r2_controller.plan_and_move_to_xyzrz(stack_position[0], stack_position[1], 0.2, 0)
@@ -131,12 +100,9 @@ def main(n_blocks: int = 5,
 
         r1_controller.move_home(speed=0.5, acceleration=0.5)
 
-        # recollect blocks:
-        for block_pos in block_positions:
-            r2_controller.pick_up(block_pos[0], block_pos[1], rz=0)
-            r2_controller.put_down(stack_position[0], stack_position[1], rz=0,  start_height=0.25)
+        ur5e_2_collect_blocks_from_positions(block_positions, r2_controller,
+                                             stack_position_ur5e_2_frame=stack_position_r2frame)
 
 
 if __name__ == "__main__":
     app()
-
