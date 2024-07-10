@@ -1,5 +1,7 @@
+import io
 import json
 
+from PIL import Image
 from matplotlib import pyplot as plt
 
 from motion_planning.geometry_and_transforms import GeometryAndTransforms
@@ -84,6 +86,67 @@ def crop_workspace(image,
 
     cropped_image = image[y_min:y_max, x_min:x_max]
     return cropped_image, [x_min, y_min, x_max, y_max]
+
+
+def detections_plots_no_depth_as_image(cropped_image, orig_image, pred_positions,
+                                       ws_lim_x, ws_lim_y, actual_positions=None):
+    fig, axs = plt.subplots(3, 1, figsize=(5, 10))
+    axs[0].imshow(cropped_image)
+    axs[1].imshow(orig_image)
+
+    if len(pred_positions) == 0:
+        # dummy plot:
+        pred_positions = [[0, 0]]
+    pred_positions = np.array(pred_positions)
+    axs[2].scatter(pred_positions[:, 0], pred_positions[:, 1], c="red", label="Predicted")
+    if actual_positions is not None:
+        actual_positions = np.array(actual_positions)
+        axs[2].scatter(actual_positions[:, 0], actual_positions[:, 1], c="b", label="Actual")
+    extended_x_lim_for_plot = [ws_lim_x[0] - 0.1, ws_lim_x[1] + 0.1]
+    extended_y_lim_for_plot = [ws_lim_y[0] - 0.1, ws_lim_y[1] + 0.1]
+    axs[2].set_xlim(extended_x_lim_for_plot)
+    axs[2].set_ylim(extended_y_lim_for_plot)
+
+    # instead of showing, return as image:
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img = Image.open(buf)
+    img_np = np.array(img)
+    plt.close(fig)
+
+    return img_np
+
+
+def detections_plots_with_depth_as_image(cropped_image, orig_image, depth_image, pred_positions,
+                                         ws_lim_x, ws_lim_y, actual_positions=None):
+    fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+    axs[0, 0].imshow(cropped_image)
+    axs[0, 1].imshow(orig_image)
+    axs[1, 0].imshow(depth_image)
+
+    if len(pred_positions) == 0:
+        # dummy plot:
+        pred_positions = [[0, 0]]
+    pred_positions = np.array(pred_positions)
+    if actual_positions is not None:
+        actual_positions = np.array(actual_positions)
+        axs[1, 1].scatter(actual_positions[:, 0], actual_positions[:, 1], c="b", label="Actual")
+    axs[1, 1].scatter(pred_positions[:, 0], pred_positions[:, 1], c="r", label="Predicted")
+    extended_x_lim_for_plot = [ws_lim_x[0] - 0.1, ws_lim_x[1] + 0.1]
+    extended_y_lim_for_plot = [ws_lim_y[0] - 0.1, ws_lim_y[1] + 0.1]
+    axs[1, 1].set_xlim(extended_x_lim_for_plot)
+    axs[1, 1].set_ylim(extended_y_lim_for_plot)
+
+    # instead of showing, return as image:
+    buf = io.BytesIO()
+    plt.savefig(buf, format='png')
+    buf.seek(0)
+    img = Image.open(buf)
+    img_np = np.array(img)
+    plt.close(fig)
+
+    return img_np
 
 
 def sample_sensor_configs(workspace_limits_x, workspace_limits_y, z=-0.0, num_samples=10):

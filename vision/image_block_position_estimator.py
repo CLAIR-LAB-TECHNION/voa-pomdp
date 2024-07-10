@@ -84,6 +84,7 @@ class ImageBlockPositionEstimator:
     def get_block_positions_depth(self, images, depths, robot_configurations, return_annotations=True,
                                   z_offset=0.02, detect_on_cropped=True):
         """
+        we assume RGB images!!!
         Get block positions from images and depth images. can be single image or batch of images
         :param images: ims to get block positions from
         :param depths: depths to get block positions from
@@ -158,9 +159,10 @@ class ImageBlockPositionEstimator:
             return block_positions_world, list(zip(annotated_cropped, annotated, depth_with_windows))
         return block_positions_world
 
-    def get_block_position_plane_projection(self, images, robot_configurations, plane_z=-0.01,
+    def get_block_position_plane_projection(self, images, robot_configurations, plane_z=0.00,
                                             return_annotations=True, detect_on_cropped=True):
         """
+        we assume RGB images!!!
         Get block positions from images, without depth. To get the missing information that we get from depth,
         we assume that the block is on a known plane (e.g. table) with known z coordinate, and we project the
         detected block position to that plane.
@@ -249,6 +251,9 @@ class ImageBlockPositionEstimator:
             for image, robot_config in zip(images, robot_configurations):
                 cropped_image, xyxy = crop_workspace(image, robot_config, self.gt, self.workspace_limits_x,
                                                      self.workspace_limits_y)
+                if cropped_image.shape[0] == 0 or cropped_image.shape[1] == 0:
+                    print("workspace is out of image, trying to detect on original image anyway")
+                    cropped_image = image
                 cropped_images.append(cropped_image)
                 cropped_images_xyxy.append(xyxy)
 
@@ -263,7 +268,7 @@ class ImageBlockPositionEstimator:
 
         if return_annotations:
             for res, bboxes_centers_curr, bboxes_curr_im, im in zip(results, bboxes_centers, bboxes, images):
-                annotated_cropped.append(res.plot())
+                annotated_cropped.append(cv2.cvtColor(res.plot(), cv2.COLOR_BGR2RGB))
                 annotated_image = im.copy()
                 for bbox_center in bboxes_centers_curr:
                     annotated_image = cv2.circle(annotated_image, tuple(bbox_center.astype(int)), 6, (256, 0, 0), -1)

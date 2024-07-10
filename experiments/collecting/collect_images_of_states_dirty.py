@@ -35,7 +35,8 @@ def valid_position(x, y, block_positions):
     if x is None or y is None:
         return False
     for block_pos in block_positions:
-        if np.abs(block_pos[0] - x) < 0.05 or np.abs(block_pos[1]) - y < 0.05:
+        # at least 0.06m apart in norm
+        if np.linalg.norm(np.array(block_pos) - np.array([x, y])) < 0.06:
             return False
     return True
 
@@ -67,8 +68,8 @@ def main(n_blocks: int = 5,
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed = 0.75
     r1_controller.acceleration = 0.75
-    r2_controller.speed = 1.5
-    r2_controller.acceleration = 1.5
+    r2_controller.speed = 0.8
+    r2_controller.acceleration = 0.8
 
     stack_position = gt.point_robot_to_world(ur5e_2["name"], (*stack_position_r2frame, 0.2))
 

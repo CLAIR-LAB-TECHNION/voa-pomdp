@@ -194,7 +194,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         logging.debug(f"{self.robot_name} moving down until contact to put down")
         # move down until contact:
-        lin_speed = min(self.linear_speed, 0.1)
+        lin_speed = min(self.linear_speed, 0.08)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # release grasp:
         self.release_grasp()

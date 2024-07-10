@@ -1,4 +1,4 @@
-from camera.realsense_camera import RealSenseCamera
+from camera.realsense_camera import RealsenseCamera
 import numpy as np
 import cv2
 
@@ -7,7 +7,7 @@ max_depth = 5
 
 
 if __name__ == "__main__":
-    camera = RealSenseCamera()
+    camera = RealsenseCamera()
     while True:
         rgb, depth = camera.get_frame()
         depth = np.clip(depth, 0, max_depth)
