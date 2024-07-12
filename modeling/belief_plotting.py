@@ -1,0 +1,122 @@
+import io
+
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+from PIL.Image import Image
+from scipy.stats import truncnorm
+from modeling.block_position_belief import BlocksPositionsBelief, BlockPosDist
+
+
+def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
+                      block_id,
+                      actual_state=None,
+                      positive_sensing_points=None,
+                      negative_sensing_points=None,
+                      grid_size=100,
+                      n_levels=50,
+                      ret_as_image=False):
+    """
+    Plot the belief of the block position as a heatmap on a 2D plane.
+    :param block_pos_belief: BlocksPositionsBelief that contains the belief to plot.
+    :param block_id: Block id to plot the belief for.
+    :param actual_state: Actual position of block to plot as a blue square if provided
+    :param grid_size: Number of points to use in the grid for plotting.
+    :param n_levels: Number of levels to use in the contour plot.
+    """
+    return plot_block_distribution(block_pos_belief.block_beliefs[block_id],
+                                   block_pos_belief.ws_x_lims,
+                                   block_pos_belief.ws_y_lims,
+                                   actual_state=actual_state,
+                                   positive_sensing_points=positive_sensing_points,
+                                   negative_sensing_points=negative_sensing_points,
+                                   grid_size=grid_size,
+                                   n_levels=n_levels,
+                                   ret_as_image=ret_as_image)
+
+
+def plot_block_distribution(block_pos_dist: BlockPosDist,
+                            x_lims,
+                            y_lims,
+                            actual_state=None,
+                            positive_sensing_points=None,
+                            negative_sensing_points=None,
+                            grid_size=100,
+                            n_levels=50,
+                            ret_as_image=False):
+    """
+    Plot the block position distribution on a 2D plane as a grid with color intensity.
+    :param block_pos_dist: BlocksPositionsBelief that contains the distribution to plot on x and y axis.
+    :param x_lims: x-axis limits for the plot.
+    :param y_lims: y-axis limits for the plot.
+    :param actual_state: Actual position of block to plot as a blue square if provided
+    :param grid_size: Number of points to use in the grid for plotting.
+    :param n_levels: Number of levels to use in the contour plot.
+    """
+    x = np.linspace(x_lims[0], x_lims[1], grid_size)
+    y = np.linspace(y_lims[0], y_lims[1], grid_size)
+    xx, yy = np.meshgrid(x, y)
+
+    z = block_pos_dist.x_dist.pdf(xx) * block_pos_dist.y_dist.pdf(yy)
+    levels = np.linspace(0, np.max(z), n_levels)
+
+    # Plot the heatmap
+    plt.figure(figsize=(8, 6))
+
+    plt.contourf(xx, yy, z, levels=levels, cmap='Reds')
+    plt.colorbar(label='Probability Density')
+
+    if actual_state is not None:
+        # plot 0.04x0.04 square around the actual state
+        actual_x, actual_y = actual_state
+        rect = patches.Rectangle((actual_x - 0.02, actual_y - 0.02), 0.04, 0.04, linewidth=1,
+                                 edgecolor='none', facecolor='blue', alpha=0.5)
+        plt.gca().add_patch(rect)
+        plt.plot(actual_x, actual_y, 'bo', markersize=3, )
+
+    if positive_sensing_points is not None:
+        for point in positive_sensing_points:
+            plt.plot(point[0], point[1], 'g+', markersize=7, )
+
+    if negative_sensing_points is not None:
+        for point in negative_sensing_points:
+            plt.plot(point[0], point[1], 'g_', markersize=7, )
+
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.xlim(x_lims)
+    plt.ylim(y_lims)
+    plt.gca().set_aspect('equal')
+
+    if ret_as_image:
+        # instead of showing, return as image:
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png')
+        buf.seek(0)
+        img = Image.open(buf)
+        img_np = np.array(img)
+        return img_np
+
+    plt.show()
+
+
+def plot_distribution(distribution, lower, upper, samples=2000):
+    x = np.linspace(lower, upper, samples)
+    y = distribution.pdf(x)
+
+    plt.plot(x, y)
+    plt.fill_between(x, y, )
+    plt.show()
+
+
+if __name__ == "__main__":
+    from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
+
+    mus = [-0.7, -0.7]
+    sigmas = [0.1, 0.15]
+    belief = BlocksPositionsBelief(1, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
+    plot_block_belief(belief,
+                      0,
+                      actual_state=[-0.75, -0.75],
+                      positive_sensing_points=[[-0.74, -0.745]],
+                      negative_sensing_points=[[-0.78, -0.82], [-0.8, -0.8]],)
