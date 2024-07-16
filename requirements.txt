@@ -2,17 +2,21 @@ certifi==2024.6.2
 charset-normalizer==3.3.2
 click==8.1.7
 clip @ git+https://github.com/ultralytics/CLIP.git@0c1d532fcf7b12a7d3b4a344ea7a0c9a4a4c93e8
+cloudpickle==3.0.0
 colorama==0.4.6
 contourpy==1.2.1
 cycler==0.12.1
+Farama-Notifications==0.0.4
 filelock==3.15.4
 fonttools==4.53.0
 freetype-py==2.4.0
 frozendict==2.4.4
 fsspec==2024.6.1
 ftfy==6.2.0
+gymnasium==0.29.1
 idna==3.7
 imageio==2.34.2
+importlib_metadata==8.0.0
 importlib_resources==6.4.0
 intel-openmp==2021.4.0
 Jinja2==3.1.4
@@ -50,6 +54,7 @@ requests==2.32.3
 rich==13.7.1
 scipy==1.13.1
 seaborn==0.13.2
+shapely==2.0.4
 shellingham==1.5.4
 six==1.16.0
 sympy==1.12.1

@@ -1,10 +1,10 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 from scipy.stats import truncnorm
 from collections import namedtuple
+from modeling.masked_gaussian_distribution import Masked2DTruncNorm
 
-BlockPosDist = namedtuple("BlockPosDist", ["x_dist", "y_dist"])
+
+BlockPosDist = Masked2DTruncNorm
 
 
 class BlocksPositionsBelief:
@@ -28,29 +28,14 @@ class BlocksPositionsBelief:
         if init_sigmas.ndim == 1:
             init_sigmas = np.tile(init_sigmas, (n_blocks, 1))
 
-        self.block_beliefs = [BlockPosDist(self.truncated_gaussian(init_mus[i, 0], init_sigmas[i, 0], ws_x_lims),
-                                           self.truncated_gaussian(init_mus[i, 1], init_sigmas[i, 1], ws_y_lims))
+        self.block_beliefs = [BlockPosDist(ws_x_lims, ws_y_lims, init_mus[i][0], init_sigmas[i][0],
+                                           init_mus[i][1], init_sigmas[i][1])
                               for i in range(n_blocks)]
 
-    @staticmethod
-    def truncated_gaussian(mu, sigma, limits):
-        """
-        Create a truncated Gaussian distribution from limits and mean/std.
-        """
-        a, b = (limits[0] - mu) / sigma, (limits[1] - mu) / sigma
-        return truncnorm(a, b, loc=mu, scale=sigma)
+    def add_empty_area(self, area_x_bounds, area_y_bounds):
+        for block_belief in self.block_beliefs:
+            block_belief.add_masked_area(np.array([area_x_bounds, area_y_bounds]))
 
-    def set_block_belief_truncated_gaussian(self, block_id, x_mu, x_sigma, y_mu, y_sigma):
-        self.block_beliefs[block_id] = BlockPosDist(
-            self.truncated_gaussian(self.ws_x_lims, x_mu, x_sigma),
-            self.truncated_gaussian(self.ws_y_lims, y_mu, y_sigma)
-        )
-
-    def plot_block_belief(self, block_id, actual_state=None):
-        """
-        plot the block position belief on a 2D plane by a block ID
-        """
-        self.plot_block_distribution(self.block_beliefs[block_id], actual_state=actual_state)
 
 
 
