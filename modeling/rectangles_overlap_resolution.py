@@ -88,12 +88,16 @@ def add_box_to_merged_list(merged_boxes, box_to_add):
         for merged_box in merged_boxes:
             if merged_box.intersects(current_box):
                 intersection = merged_box.intersection(current_box)
-                if not isinstance(intersection, Polygon):
+                if not (isinstance(intersection, Polygon) or isinstance(intersection, MultiPolygon)):
                     # that's point or line, which is not really an intersection
                     continue
 
                 any_intersection = True
                 difference = current_box.difference(intersection)
+
+                if difference.area < 1e-10:
+                    # in practice, this is probably a line with numerical errors
+                    continue
 
                 if isinstance(difference, Polygon):
                     if is_polygon_box(difference):

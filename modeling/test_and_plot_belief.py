@@ -1,13 +1,27 @@
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
 from modeling.block_position_belief import BlocksPositionsBelief
 from modeling.belief_plotting import plot_block_belief
-#
+
 mus = [-0.7, -0.7]
 sigmas = [0.5, 0.2]
 
-belief = BlocksPositionsBelief(1, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
-belief.add_empty_area([-0.85, -0.77], [-0.73, -0.65])
-belief.add_empty_area([-0.89, -0.81], [-0.75, -0.67])
-belief.add_empty_area([-0.8, -0.72], [-0.72, -0.64])
+empty_sensing_points = [[-0.8, -0.8], [-0.78, -0.75], [-0.73, -0.73]]
 
-plot_block_belief(belief, 0, grid_size=1000)
+belief = BlocksPositionsBelief(1, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
+
+for e_sensing_point in empty_sensing_points:
+    belief.update_belief_from_point_sensing(e_sensing_point[0], e_sensing_point[1], is_occupied=False)
+
+plot_block_belief(belief, 0, negative_sensing_points=empty_sensing_points, grid_size=1000)
+
+positive_sensing_point = [-0.65, -0.65]
+all_positive_points_so_far = [positive_sensing_point]
+belief.update_belief_from_point_sensing(positive_sensing_point[0], positive_sensing_point[1], is_occupied=True)
+plot_block_belief(belief, 0, negative_sensing_points=empty_sensing_points,
+                  positive_sensing_points=all_positive_points_so_far, grid_size=1000)
+
+positive_sensing_point = [-0.62, -0.62]
+all_positive_points_so_far.append(positive_sensing_point)
+belief.update_belief_from_point_sensing(positive_sensing_point[0], positive_sensing_point[1], is_occupied=True)
+plot_block_belief(belief, 0, negative_sensing_points=empty_sensing_points,
+                  positive_sensing_points=all_positive_points_so_far, grid_size=1000)

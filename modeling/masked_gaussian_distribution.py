@@ -12,7 +12,8 @@ class Masked2DTruncNorm:
         self.mu_y = mu_y
         self.sigma_y = sigma_y
 
-        self.masked_areas = []
+        self.masked_areas = []  # [[x,x] [y,y]] of areas that the distribution is zero
+
         ax, bx = (bounds_x[0] - mu_x) / sigma_x, (bounds_x[1] - mu_x) / sigma_x
         self.dist_x = truncnorm(ax, bx, loc=mu_x, scale=sigma_x)
         ay, by = (bounds_y[0] - mu_y) / sigma_y, (bounds_y[1] - mu_y) / sigma_y
@@ -23,6 +24,24 @@ class Masked2DTruncNorm:
     def add_masked_area(self, mask_bounds):
         # Add new mask and merge overlapping masks
         self.masked_areas.append(mask_bounds)
+        self.masked_areas = resolve_overlaps(self.masked_areas)
+        self.normalization_constant = self._calculate_normalization_constant()
+
+    def add_new_bounds(self, bounds):
+        # add bounds that the blocks must be in, or, the distribution will be zero out of these bounds
+        # just create masked areas out of these bounds, instead of maintaining those bounds
+        new_bounds_x, new_bounds_y = bounds
+
+        new_masked_areas = [
+            [[self.bounds_x[0], new_bounds_x[0]], self.bounds_y],
+            [[new_bounds_x[1], self.bounds_x[1]], self.bounds_y],
+            [new_bounds_x, [self.bounds_y[0], new_bounds_y[0]]],
+            [new_bounds_x, [new_bounds_y[1], self.bounds_y[1]]],
+        ]
+
+        # since those areas are usually large, and going to contain other masked areas if there are so,
+        # it's better to add them at the beginning of the list for the overlap resolution algorithm
+        self.masked_areas = new_masked_areas + self.masked_areas
         self.masked_areas = resolve_overlaps(self.masked_areas)
         self.normalization_constant = self._calculate_normalization_constant()
 
@@ -59,6 +78,9 @@ class Masked2DTruncNorm:
 
         # Extract x and y coordinates
         points = np.asarray(points)
+        if points.ndim == 1:
+            points = points.reshape(1, -1)
+
         x = points[:, 0]
         y = points[:, 1]
 
@@ -68,6 +90,3 @@ class Masked2DTruncNorm:
             mask_condition = (mask[0][0] <= x) & (x <= mask[0][1]) & (mask[1][0] <= y) & (y <= mask[1][1])
             result[mask_condition] = 0
         return result
-
-
-

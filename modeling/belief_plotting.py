@@ -84,11 +84,11 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
 
     if positive_sensing_points is not None:
         for point in positive_sensing_points:
-            plt.plot(point[0], point[1], 'g+', markersize=7, )
+            plt.plot(point[0], point[1], 'g+', markersize=9, )
 
     if negative_sensing_points is not None:
         for point in negative_sensing_points:
-            plt.plot(point[0], point[1], 'g_', markersize=7, )
+            plt.plot(point[0], point[1], 'g_', markersize=9, )
 
     plt.xlabel('x')
     plt.ylabel('y')
