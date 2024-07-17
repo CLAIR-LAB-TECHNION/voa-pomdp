@@ -18,6 +18,8 @@ class RobotInterface(rtdectrl, rtdercv):
         self._ip = robot_ip
 
 # test
+    #test2
+    #test2
 
     def move_home(self, speed=0.2, acceleration=0.2, asynchronous=False):
         logging.debug(f"Moving to home position ({self._ip}), speed: {speed}, acceleration: {acceleration}")
