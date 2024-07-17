@@ -2,7 +2,7 @@ import io
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from PIL.Image import Image
+from PIL import Image
 from modeling.block_position_belief import BlocksPositionsBelief, BlockPosDist
 
 
@@ -33,6 +33,48 @@ def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
                                    ret_as_image=ret_as_image)
 
 
+def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
+                            actual_state=None,
+                            positive_sensing_points=None,
+                            negative_sensing_points=None,
+                            grid_size=100,
+                            n_levels=50,
+                            ret_as_image=False):
+    """
+    Plot the belief of all blocks in the belief as a heatmap on a 2D plane.
+    parmeters are similar to plot_block_belief
+    """
+    cmaps = ['Reds', 'Oranges', 'Purples', 'Greys', 'YlOrBr', 'YlGn', 'YlGnBu', 'YlOrRd',]
+    images = []
+    for i in range(block_pos_belief.n_blocks):
+        cmap = cmaps[i % len(cmaps)]
+        im = plot_block_distribution(block_pos_belief.block_beliefs[i],
+                                     block_pos_belief.ws_x_lims,
+                                     block_pos_belief.ws_y_lims,
+                                     actual_state=actual_state,
+                                     positive_sensing_points=positive_sensing_points,
+                                     negative_sensing_points=negative_sensing_points,
+                                     grid_size=grid_size,
+                                     n_levels=n_levels,
+                                     ret_as_image=True,
+                                     color_map=cmap)
+        # remove whitespace:
+        # im = im[10:-10, 10:-10, :]
+        images.append(im)
+
+    # plot all images in a column, first stack them on y to get a single image
+    final_image = np.vstack(images)
+
+    if ret_as_image:
+        return final_image
+
+    plt.figure(figsize=(8, 6*block_pos_belief.n_blocks))
+    plt.imshow(final_image)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
+
+
 def plot_block_distribution(block_pos_dist: BlockPosDist,
                             x_lims,
                             y_lims,
@@ -41,6 +83,7 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
                             negative_sensing_points=None,
                             grid_size=100,
                             n_levels=50,
+                            color_map='Reds',
                             ret_as_image=False):
     """
     Plot the block position distribution on a 2D plane as a grid with color intensity.
@@ -71,7 +114,7 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
     # Plot the heatmap
     plt.figure(figsize=(8, 6))
 
-    plt.contourf(xx, yy, z, levels=levels, cmap='Reds')
+    plt.contourf(xx, yy, z, levels=levels, cmap=color_map)
     plt.colorbar(label='Probability Density')
 
     if actual_state is not None:
@@ -95,6 +138,7 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
     plt.xlim(x_lims)
     plt.ylim(y_lims)
     plt.gca().set_aspect('equal')
+    plt.tight_layout()
 
     if ret_as_image:
         # instead of showing, return as image:
@@ -103,6 +147,7 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
         buf.seek(0)
         img = Image.open(buf)
         img_np = np.array(img)
+        plt.close()
         return img_np
 
     plt.show()
@@ -115,4 +160,3 @@ def plot_distribution(distribution, lower, upper, samples=2000):
     plt.plot(x, y)
     plt.fill_between(x, y, )
     plt.show()
-
