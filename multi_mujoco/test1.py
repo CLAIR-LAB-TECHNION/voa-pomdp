@@ -11,7 +11,7 @@ from mujoco_env.common.transform import Transform
 # Define the configuration for multiple robots and tasks
 cfg = dict(
     scene=dict(
-        resource='tableworld',
+        resource='clairlab',
         render_camera='top-right'
     ),
     robots=dict(
@@ -19,14 +19,14 @@ cfg = dict(
             resource='ur5e',
             mount='rethink_stationary',
             attachments=['adhesive_gripper'],
-            base_pos=[0.5, 0.5, 0],  # Example base position
+            base_pos=[0.1, -0.55, 0],  # Example base position
             base_orient=[0, 0, 0, 1],  # Example base orientation (quaternion)
         ),
         robot_1=dict(
             resource='ur5e',
             mount='rethink_stationary',
             attachments=['adhesive_gripper'],
-            base_pos=[-0.5, -0.5, 0],  # Example base position
+            base_pos=[-0.76, -1.33, 0],  # Example base position
             base_orient=[0, 0, 0, 1],  # Example base orientation (quaternion)
         ),
     ),

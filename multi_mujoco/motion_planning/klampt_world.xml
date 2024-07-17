@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<world>
+  <robot name="robot_0" file="ur5_rob/ur5.rob" position="0.1 -0.55 0.976841" rotateZ="1.57079632679"/>
+  <robot name="robot_1" file="ur5_rob/ur5.rob" position="-0.76 -1.33 0.976841" rotateZ="1.57079632679"/>
+</world>

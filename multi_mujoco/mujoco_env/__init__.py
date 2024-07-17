@@ -1,4 +1,4 @@
-from . import milestones  # registers the milestones
+# from . import milestones  # registers the milestones
 from gymnasium import make
 from .common import cfg_keys
 from .episode import *
