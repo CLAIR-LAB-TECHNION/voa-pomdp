@@ -157,7 +157,7 @@ class ImageBlockPositionEstimator:
             return block_positions_world, list(zip(annotated_cropped, annotated, depth_with_windows))
         return block_positions_world
 
-    def get_block_position_plane_projection(self, images, robot_configurations, plane_z=0.00,
+    def get_block_position_plane_projection(self, images, robot_configurations, plane_z=-0.02,
                                             return_annotations=True, detect_on_cropped=True):
         """
         we assume RGB images!!!

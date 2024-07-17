@@ -1,10 +1,8 @@
 import io
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL.Image import Image
-from scipy.stats import truncnorm
 from modeling.block_position_belief import BlocksPositionsBelief, BlockPosDist
 
 
@@ -55,9 +53,19 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
     """
     x = np.linspace(x_lims[0], x_lims[1], grid_size)
     y = np.linspace(y_lims[0], y_lims[1], grid_size)
-    xx, yy = np.meshgrid(x, y)
+    dx = (x[1] - x[0]) / 2
+    dy = (y[1] - y[0]) / 2
 
-    z = block_pos_dist.x_dist.pdf(xx) * block_pos_dist.y_dist.pdf(yy)
+    # Shift x and y to midpoints for calculation, this is better for calculating the sum of the distribution
+    x_mid = x[:-1] + dx
+    y_mid = y[:-1] + dy
+
+    xx, yy = np.meshgrid(x_mid, y_mid)
+    z = block_pos_dist.pdf(np.stack([xx.ravel(), yy.ravel()], axis=1)).reshape(xx.shape)
+
+    sum_z_mid = np.sum(z) * (x[1] - x[0]) * (y[1] - y[0])
+    print(f"Sum of z using midpoints: {sum_z_mid}")
+
     levels = np.linspace(0, np.max(z), n_levels)
 
     # Plot the heatmap
@@ -108,15 +116,3 @@ def plot_distribution(distribution, lower, upper, samples=2000):
     plt.fill_between(x, y, )
     plt.show()
 
-
-if __name__ == "__main__":
-    from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
-
-    mus = [-0.7, -0.7]
-    sigmas = [0.1, 0.15]
-    belief = BlocksPositionsBelief(1, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
-    plot_block_belief(belief,
-                      0,
-                      actual_state=[-0.75, -0.75],
-                      positive_sensing_points=[[-0.74, -0.745]],
-                      negative_sensing_points=[[-0.78, -0.82], [-0.8, -0.8]],)

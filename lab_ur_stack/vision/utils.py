@@ -1,12 +1,11 @@
 import io
-
 from PIL import Image
 from klampt.math import se3
 from matplotlib import pyplot as plt
-
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 import numpy as np
 from lab_ur_stack.camera.configurations_and_params import color_camera_intrinsic_matrix
+import logging
 
 
 def project_points_to_image(points, gt: GeometryAndTransforms, robot_name, robot_config):
@@ -153,15 +152,12 @@ def sample_sensor_configs(workspace_limits_x, workspace_limits_y, z=-0.0, num_sa
     pass
 
 
-if __name__ == "__main__":
-    pass
-
-
-def lookat_verangle_distance_to_camera_transform(lookat, vertical_angle, distance, y_offset=0.3):
+def lookat_verangle_distance_to_camera_transform(lookat, vertical_angle, distance, y_offset=0.3, up_vector=(1, 0, 0)):
     """
     returns the camera se3 transform given the lookat point, vertical angle and distance.
     the camera will be in the same x as the lookat point, and y will be lookat[1] + y_offset
-    :param lookat:
+    up_vector is the up vector of the camera, it fixes the free dof that is left given the other params.
+    default is [1, 0, 0] which is good because it's toward the workspace, but it can be changed if no solution found
     :return:
     """
     vertical_angle = np.deg2rad(vertical_angle)
@@ -198,13 +194,40 @@ def lookat_verangle_distance_to_camera_transform(lookat, vertical_angle, distanc
     return rotation_matrix.flatten(), camera_position
 
 
-def lookat_verangle_distance_to_robot_config(lookat, vertical_angle, distance, gt, robot_name, y_offset=0.3):
+def lookat_verangle_distance_to_robot_config(lookat, vertical_angle, distance, gt, robot_name, y_offset=0.3,
+                                             max_trials=50):
     """
     returns the robot configuration given the lookat point, vertical angle and distance.
     the camera will be in the same x as the lookat point, and y will be lookat[1] + y_offset
     or none if no solution is found. This doesn't consider collisions! # TODO find collision free
     """
-    camera_transform = lookat_verangle_distance_to_camera_transform(lookat, vertical_angle, distance, y_offset)
-    ee_transform = se3.mul(gt.camera_to_ee_transform(), camera_transform)
+    trails_left = max_trials
+    up_vector = (1, 0, 0)
+    config = None
 
-    return gt.motion_planner.ik_solve(robot_name, ee_transform)
+    logging.debug(f"Finding robot config for camera at lookat {lookat}"
+                  f" with vertical angle {vertical_angle} and distance {distance}")
+
+    while config is None and trails_left > 0:
+        trails_left -= 1
+
+        camera_transform = lookat_verangle_distance_to_camera_transform(lookat, vertical_angle, distance, y_offset,
+                                                                        up_vector)
+        ee_transform = se3.mul(gt.camera_to_ee_transform(), camera_transform)
+        config = gt.motion_planner.ik_solve(robot_name, ee_transform)
+        if config is not None and gt.motion_planner.is_config_feasible(robot_name, config) is False:
+            config = None
+
+        # sample new up vecotr, should be normalized
+        up_vector = np.random.rand(3)
+        up_vector /= np.linalg.norm(up_vector)
+
+    if config is None:
+        logging.error(f"Could not find a valid robot configuration for the camera at lookat {lookat}"
+                      f" with vertical angle {vertical_angle} and distance {distance} after {max_trials} trials")
+    else:
+        logging.debug(f"Found robot config for camera at lookat {lookat}"
+                      f" with vertical angle {vertical_angle} and distance {distance} after"
+                      f" {max_trials - trails_left} trials")
+
+    return config

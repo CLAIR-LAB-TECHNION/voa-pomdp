@@ -18,16 +18,17 @@ from lab_ur_stack.vision.utils import (lookat_verangle_distance_to_robot_config,
 # camera pose:
 lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]  # middle of the workspace
 lookat[0] += 0.1  # move a bit from the window
-verangle = 60
-distance = 0.7
+lookat[1] += 0.0
+verangle = 50
+distance = 0.6
 y_offset = 0.2
 
 app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 5,
-         use_depth: bool = 0,):
+def main(n_blocks: int = 3,
+         use_depth: bool = 1,):
 
     camera = RealsenseCamera()
     motion_planner = MotionPlanner()
@@ -37,7 +38,14 @@ def main(n_blocks: int = 5,
     r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
-    r2_controller.speed, r2_controller.acceleration = 2.0, 5.0
+    r2_controller.speed, r2_controller.acceleration = 2.0, 6.0
+
+    r1_sensing_config = lookat_verangle_distance_to_robot_config(lookat, verangle, distance, gt, ur5e_1["name"],
+                                                                 y_offset=y_offset)
+    if r1_sensing_config is None:
+        print("Could not find a valid robot configuration for the camera")
+        return
+    motion_planner.vis_config(ur5e_1["name"], r1_sensing_config)
 
     r1_controller.plan_and_move_home(speed=0.5, acceleration=0.5)
 
@@ -46,8 +54,6 @@ def main(n_blocks: int = 5,
     r2_controller.plan_and_move_home(speed=0.5, acceleration=0.5)
 
     # r1 take image
-    r1_sensing_config = lookat_verangle_distance_to_robot_config(lookat, verangle, distance, gt, ur5e_1["name"],
-                                                                 y_offset=y_offset)
     r1_controller.plan_and_moveJ(r1_sensing_config)
 
     im, depth = camera.get_frame_rgb()
@@ -57,7 +63,8 @@ def main(n_blocks: int = 5,
                                                        workspace_x_lims_default, workspace_y_lims_default,
                                                        actual_positions=actual_block_positions)
     else:
-        positions, annotations = position_estimator.get_block_position_plane_projection(im, r1_sensing_config)
+        positions, annotations = position_estimator.get_block_position_plane_projection(im, r1_sensing_config,
+                                                                                        plane_z=-0.02)
         plot_im = detections_plots_no_depth_as_image(annotations[0], annotations[1], positions,
                                                      workspace_x_lims_default, workspace_y_lims_default,
                                                      actual_positions=actual_block_positions)

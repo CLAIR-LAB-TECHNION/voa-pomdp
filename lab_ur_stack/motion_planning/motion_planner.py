@@ -337,7 +337,7 @@ class MotionPlanner:
             robot.setConfig(start_config)
 
         ik_objective = ik.objective(robot.link("ee_link"), R=ee_transform[0], t=ee_transform[1])
-        res = ik.solve(ik_objective, tol=1e-5)
+        res = ik.solve(ik_objective, tol=1e-5, iters=5000)
         if not res:
             print("ik not solved")
             robot.setConfig(curr_config)
@@ -346,9 +346,6 @@ class MotionPlanner:
         res_config = robot.getConfig()
 
         robot.setConfig(curr_config)
-
-        ik_objective = ik.IKObjective()
-        ik_objective
 
         return res_config
 
