@@ -21,7 +21,7 @@ def valid_position(x, y, block_positions, min_dist):
 
 
 def sample_block_positions(n_blocks, workspace_x_lims=workspace_x_lims_default,
-                           workspace_y_lims=workspace_y_lims_default, min_dist=0.06):
+                           workspace_y_lims=workspace_y_lims_default, min_dist=0.07):
     """
     sample n_blocks positions within the workspace limits, spaced at least by 0.05m in each axis
     """
