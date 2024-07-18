@@ -34,7 +34,7 @@ def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
 
 
 def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
-                            actual_state=None,
+                            actual_states=None,
                             positive_sensing_points=None,
                             negative_sensing_points=None,
                             grid_size=100,
@@ -44,6 +44,8 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
     Plot the belief of all blocks in the belief as a heatmap on a 2D plane.
     parmeters are similar to plot_block_belief
     """
+    if actual_states is None:
+        actual_states = [None] * block_pos_belief.n_blocks
     cmaps = ['Reds', 'Oranges', 'Purples', 'Greys', 'YlOrBr', 'YlGn', 'YlGnBu', 'YlOrRd',]
     images = []
     for i in range(block_pos_belief.n_blocks):
@@ -51,7 +53,7 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
         im = plot_block_distribution(block_pos_belief.block_beliefs[i],
                                      block_pos_belief.ws_x_lims,
                                      block_pos_belief.ws_y_lims,
-                                     actual_state=actual_state,
+                                     actual_state=actual_states[i],
                                      positive_sensing_points=positive_sensing_points,
                                      negative_sensing_points=negative_sensing_points,
                                      grid_size=grid_size,

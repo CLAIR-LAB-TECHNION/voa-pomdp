@@ -3,6 +3,11 @@ from scipy.stats import truncnorm
 from modeling.rectangles_overlap_resolution import resolve_overlaps
 
 
+def get_truncnorm_distribution(bounds, mu, sigma):
+    a, b = (bounds[0] - mu) / sigma, (bounds[1] - mu) / sigma
+    return truncnorm(a, b, loc=mu, scale=sigma)
+
+
 class Masked2DTruncNorm:
     def __init__(self, bounds_x, bounds_y, mu_x, sigma_x, mu_y, sigma_y):
         self.bounds_x = bounds_x
@@ -14,10 +19,8 @@ class Masked2DTruncNorm:
 
         self.masked_areas = []  # [[x,x] [y,y]] of areas that the distribution is zero
 
-        ax, bx = (bounds_x[0] - mu_x) / sigma_x, (bounds_x[1] - mu_x) / sigma_x
-        self.dist_x = truncnorm(ax, bx, loc=mu_x, scale=sigma_x)
-        ay, by = (bounds_y[0] - mu_y) / sigma_y, (bounds_y[1] - mu_y) / sigma_y
-        self.dist_y = truncnorm(ay, by, loc=mu_y, scale=sigma_y)
+        self.dist_x = get_truncnorm_distribution(bounds_x, mu_x, sigma_x)
+        self.dist_y = get_truncnorm_distribution(bounds_y, mu_y, sigma_y)
 
         self.normalization_constant = None
 
@@ -70,6 +73,17 @@ class Masked2DTruncNorm:
 
         # Return the product of the probability masses in both dimensions
         return prob_mass_x * prob_mass_y
+
+    def update_parameters(self, mu_x, sigma_x, mu_y, sigma_y):
+        self.mu_x = mu_x
+        self.sigma_x = sigma_x
+        self.mu_y = mu_y
+        self.sigma_y = sigma_y
+
+        self.dist_x = get_truncnorm_distribution(self.bounds_x, mu_x, sigma_x)
+        self.dist_y = get_truncnorm_distribution(self.bounds_y, mu_y, sigma_y)
+
+        self.normalization_constant = self._calculate_normalization_constant()
 
     def pdf(self, points):
         # Ensure normalization constant is calculated
