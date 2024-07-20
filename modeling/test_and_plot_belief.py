@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
 from lab_ur_stack.utils.workspace_utils import sample_block_positions
 from modeling.block_position_belief import BlocksPositionsBelief
@@ -29,6 +31,7 @@ def one_block_point_sensing():
     plot_block_belief(belief, 0, negative_sensing_points=empty_sensing_points,
                       positive_sensing_points=all_positive_points_so_far, grid_size=1000)
 
+
 def multiple_blocks():
     block_positions = sample_block_positions(5, workspace_x_lims_default, workspace_y_lims_default)
 
@@ -45,18 +48,21 @@ def multiple_blocks():
     belief.update_from_point_sensing_observation(-0.65, -0.65, is_occupied=True)
     plot_all_blocks_beliefs(belief, grid_size=200)
 
+
 def from_detections():
     mus = [[-0.9, -0.9], [-0.75, -0.75], [-0.65, -0.65]]
     sigmas = [[0.5, 0.2], [0.25, 0.08], [0.1, 0.15]]
 
-    belief = BlocksPositionsBelief(3, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
-    plot_all_blocks_beliefs(belief, grid_size=200)
-
     detections = [[-0.73, -0.74], [-0.78, -0.77], [-0.75, -0.75]]
-    detection_sigmas = [[0.1, 0.1], [0.1, 0.1], [0.1, 0.1]]
-    belief.update_from_image_detections_position_distribution(detections, detection_sigmas)
-    plot_all_blocks_beliefs(belief, grid_size=200)
+    detection_sigmas = [[0.02, 0.02], ]*3
 
+    belief = BlocksPositionsBelief(3, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
+    initial_belief = deepcopy(belief)
+
+    mus_and_sigmas_associations = belief.update_from_image_detections_position_distribution(detections, detection_sigmas)
+    plot_all_blocks_beliefs(initial_belief, grid_size=200, per_block_observed_mus_and_sigmas=mus_and_sigmas_associations)
+
+    plot_all_blocks_beliefs(belief, grid_size=200)
 
 if __name__ == "__main__":
     # one_block_point_sensing()

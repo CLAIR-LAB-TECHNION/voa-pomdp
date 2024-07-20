@@ -52,6 +52,8 @@ class BlocksPositionsBelief:
     def update_from_image_detections_position_distribution(self, detection_mus, detection_sigmas):
         """
         This is practically p(s|o) for blocks, but not all blocks can be seen in the image.
+        returns a list of mus and sigmas in the orders of their association with the blocks, where mu and sigma
+        are -1 for blocks that were not associated with any detection.
         """
         assert len(detection_mus) == len(detection_sigmas)
         assert len(detection_mus) <= self.n_blocks, "More detections than blocks can cause a problem in" \
@@ -65,6 +67,18 @@ class BlocksPositionsBelief:
             self.update_belief_block_from_detection(detections_to_blocks[i],
                                                     detection_mus[i],
                                                     detection_sigmas[i])
+
+        mus_and_sigmas = []
+        for i in range(self.n_blocks):
+            if i in detections_to_blocks:
+                mus = detection_mus[detections_to_blocks[i]]
+                sigmas = detection_sigmas[detections_to_blocks[i]]
+            else:
+                mus = -1
+                sigmas = -1
+            mus_and_sigmas.append((mus, sigmas))
+
+        return mus_and_sigmas
 
     def _associate_detection_mus_with_blocks(self, detection_mus):
         # Calculate likelihoods for each detection across all blocks
@@ -123,8 +137,6 @@ class BlocksPositionsBelief:
         updated_sigma_y = np.sqrt(updated_sigma_y_squared)
 
         block_belief.update_parameters(updated_mu_x, updated_sigma_x, updated_mu_y, updated_sigma_y)
-
-
 
     def add_empty_area(self, area_x_bounds, area_y_bounds):
         for block_belief in self.block_beliefs:
