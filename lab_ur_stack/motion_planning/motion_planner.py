@@ -27,7 +27,7 @@ class MotionPlanner:
                                     # "shortcut": True, # only for rrt
                                   })
 
-    def __init__(self, eps=1e-1, attachments=default_attachments, settings=default_settings):
+    def __init__(self, eps=2e-2, attachments=default_attachments, settings=default_settings):
         """
         parameters:
         eps: epsilon gap for collision checking along the line in configuration space. Too high value may lead to
@@ -348,8 +348,6 @@ class MotionPlanner:
         robot.setConfig(curr_config)
 
         return res_config
-
-
 
 
 if __name__ == "__main__":
