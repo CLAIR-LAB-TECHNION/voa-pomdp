@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import truncnorm
-from modeling.rectangles_overlap_resolution import resolve_overlaps
+from modeling.belief.rectangles_overlap_resolution import resolve_overlaps
 
 
 def get_truncnorm_distribution(bounds, mu, sigma):

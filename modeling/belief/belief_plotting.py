@@ -2,10 +2,8 @@ import io
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-import scipy
 from PIL import Image
-from modeling.block_position_belief import BlocksPositionsBelief, BlockPosDist
-from matplotlib.colors import LinearSegmentedColormap, ListedColormap
+from modeling.belief.block_position_belief import BlocksPositionsBelief, BlockPosDist
 
 
 def plot_block_belief(block_pos_belief: BlocksPositionsBelief,

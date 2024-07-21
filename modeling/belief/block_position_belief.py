@@ -1,6 +1,5 @@
 import numpy as np
-from collections import namedtuple
-from modeling.masked_gaussian_distribution import Masked2DTruncNorm
+from modeling.belief.masked_gaussian_distribution import Masked2DTruncNorm
 
 BlockPosDist = Masked2DTruncNorm
 

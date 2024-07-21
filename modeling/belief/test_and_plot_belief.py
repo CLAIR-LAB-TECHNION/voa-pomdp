@@ -2,8 +2,8 @@ from copy import deepcopy
 
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
 from lab_ur_stack.utils.workspace_utils import sample_block_positions
-from modeling.block_position_belief import BlocksPositionsBelief
-from modeling.belief_plotting import plot_block_belief, plot_all_blocks_beliefs
+from modeling.belief.block_position_belief import BlocksPositionsBelief
+from modeling.belief.belief_plotting import plot_block_belief, plot_all_blocks_beliefs
 
 
 def one_block_point_sensing():
