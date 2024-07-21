@@ -34,6 +34,8 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.motion_planner = motion_palnner
         self.gt = geomtry_and_transofms
 
+        self.setTcp([0, 0, 0.150, 0, 0, 0])
+
         motion_palnner.visualize()
         time.sleep(0.2)
 
@@ -246,7 +248,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         return height
 
-    def sense_height_tilted(self, x, y, start_height=0.2):
+    def sense_height_tilted(self, x, y, start_height=0.15):
         """
         TODO
         :param x:
@@ -273,7 +275,8 @@ class ManipulationController(RobotInterfaceWithGripper):
         logging.debug(f"moving down until contact with TCP set to tip of the finger")
 
         # move down until contact:
-        self.moveUntilContact(xd=[0, 0, -self.linear_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
+        lin_speed = min(self.linear_speed, 0.05)
+        self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # measure height:
         pose = self.getActualTCPPose()
         height = pose[2]

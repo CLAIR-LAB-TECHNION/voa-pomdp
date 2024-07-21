@@ -116,7 +116,7 @@ class Masked2DTruncNorm:
 
         # make sure none of the points are in masked areas:
         while True:
-            invalid_samples = np.where(self.pdf(points) == 0)
+            invalid_samples = np.where(self.pdf(points) == 0)[0]
             if len(invalid_samples) == 0:
                 break
 

@@ -117,8 +117,9 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
     xx, yy = np.meshgrid(x_mid, y_mid)
     z = block_pos_dist.pdf(np.stack([xx.ravel(), yy.ravel()], axis=1)).reshape(xx.shape)
 
-    sum_z_mid = np.sum(z) * (x[1] - x[0]) * (y[1] - y[0])
-    print(f"Sum of z using midpoints: {sum_z_mid}")
+    # for debug, make sure the sum of z is 1
+    # sum_z_mid = np.sum(z) * (x[1] - x[0]) * (y[1] - y[0])
+    # print(f"Sum of z using midpoints: {sum_z_mid}")
 
     levels = np.linspace(0, np.max(z), n_levels)
     alpha = 1 if observed_mus_and_sigmas is not None else 1
