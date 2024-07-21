@@ -10,7 +10,7 @@ from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera
 import time
 from PIL import Image
-from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_in_workspace, ur5e_2_collect_blocks_from_positions
+from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_in_workspace_uniform, ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.utils.workspace_utils import stack_position_r2frame, workspace_x_lims_default, \
     workspace_y_lims_default
 
@@ -46,11 +46,11 @@ def main(n_blocks: int = 3,
     for i in range(repeat):
         r1_controller.move_home(speed=0.5, acceleration=0.5)
 
-        block_positions = ur5e_2_distribute_blocks_in_workspace(n_blocks, r2_controller,
-                                                                ws_lim_x=workspace_x_lims_default,
-                                                                ws_lim_y=workspace_y_lims_default,
-                                                                stack_position_ur5e_2_frame=stack_position_r2frame,
-                                                                min_dist=0.06)
+        block_positions = ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks, r2_controller,
+                                                                        ws_lim_x=workspace_x_lims_default,
+                                                                        ws_lim_y=workspace_y_lims_default,
+                                                                        stack_position_ur5e_2_frame=stack_position_r2frame,
+                                                                        min_dist=0.06)
 
         # clear out for images
         r2_controller.plan_and_move_to_xyzrz(stack_position[0], stack_position[1], 0.2, 0)

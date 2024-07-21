@@ -104,3 +104,25 @@ class Masked2DTruncNorm:
             mask_condition = (mask[0][0] <= x) & (x <= mask[0][1]) & (mask[1][0] <= y) & (y <= mask[1][1])
             result[mask_condition] = 0
         return result
+
+    def sample(self, n_samples=1):
+        # Ensure normalization constant is calculated
+        if self.normalization_constant is None:
+            self.normalization_constant = self._calculate_normalization_constant()
+
+        samples_x = self.dist_x.rvs(n_samples)
+        samples_y = self.dist_y.rvs(n_samples)
+        points = np.stack([samples_x, samples_y], axis=1)
+
+        # make sure none of the points are in masked areas:
+        while True:
+            invalid_samples = np.where(self.pdf(points) == 0)
+            if len(invalid_samples) == 0:
+                break
+
+            new_samples_x = self.dist_x.rvs(len(invalid_samples))
+            new_samples_y = self.dist_y.rvs(len(invalid_samples))
+            new_points = np.stack([new_samples_x, new_samples_y], axis=1)
+            points[invalid_samples] = new_points
+
+        return points

@@ -20,8 +20,8 @@ def valid_position(x, y, block_positions, min_dist):
     return True
 
 
-def sample_block_positions(n_blocks, workspace_x_lims=workspace_x_lims_default,
-                           workspace_y_lims=workspace_y_lims_default, min_dist=0.07):
+def sample_block_positions_uniform(n_blocks, workspace_x_lims=workspace_x_lims_default,
+                                   workspace_y_lims=workspace_y_lims_default, min_dist=0.07):
     """
     sample n_blocks positions within the workspace limits, spaced at least by 0.05m in each axis
     """
@@ -37,3 +37,17 @@ def sample_block_positions(n_blocks, workspace_x_lims=workspace_x_lims_default,
     return block_positions
 
 
+def sample_block_positions_from_dists(blocks_dist, min_dist=0.07):
+    """
+    sample n_blocks positions within the workspace limits, spaced at least by 0.05m in each axis
+    """
+    block_positions = []
+    for b in blocks_dist:
+        x = None
+        y = None
+        while valid_position(x, y, block_positions, min_dist=min_dist) is False:
+            x, y = b.sample(1)[0]
+
+        block_positions.append([x, y])
+
+    return block_positions

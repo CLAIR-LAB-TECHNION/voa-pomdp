@@ -1,7 +1,7 @@
 from copy import deepcopy
 
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
-from lab_ur_stack.utils.workspace_utils import sample_block_positions
+from lab_ur_stack.utils.workspace_utils import sample_block_positions_uniform
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.belief.belief_plotting import plot_block_belief, plot_all_blocks_beliefs
 
@@ -33,7 +33,7 @@ def one_block_point_sensing():
 
 
 def multiple_blocks():
-    block_positions = sample_block_positions(5, workspace_x_lims_default, workspace_y_lims_default)
+    block_positions = sample_block_positions_uniform(5, workspace_x_lims_default, workspace_y_lims_default)
 
     mus = block_positions
     sigmas = [[0.05, 0.2], [0.25, 0.08], [0.1, 0.15], [0.15, 0.15], [0.02, 0.03]]
