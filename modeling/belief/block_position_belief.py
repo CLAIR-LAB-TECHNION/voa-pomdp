@@ -30,13 +30,19 @@ class BlocksPositionsBelief:
                                            init_mus[i][1], init_sigmas[i][1])
                               for i in range(n_blocks)]
 
-    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied):
+    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.002):
+        """
+        We update the area within block_size distance from the point, minus a margin of no_update_margin.
+        """
+        area_to_update = [[point_x - self.block_size + no_update_margin,
+                           point_x + self.block_size - no_update_margin],
+                            [point_y - self.block_size + no_update_margin,
+                             point_y + self.block_size - no_update_margin]]
         if not is_occupied:
             # x and y is not occupied by a block. that means that there isn't a block withing
             # the block_size distance for each direction.
             for block_belief in self.block_beliefs:
-                block_belief.add_masked_area([[point_x - self.block_size, point_x + self.block_size],
-                                              [point_y - self.block_size, point_y + self.block_size]])
+                block_belief.add_masked_area(area_to_update)
 
         else:
             # x and y is occupied by a block. that means that there is a block withing
@@ -45,8 +51,7 @@ class BlocksPositionsBelief:
             blocks_probs = [b.pdf((point_x, point_y)) for b in self.block_beliefs]
             block_to_update_id = np.argmax(blocks_probs)
             block_to_update = self.block_beliefs[block_to_update_id]
-            block_to_update.add_new_bounds([[point_x - self.block_size, point_x + self.block_size],
-                                            [point_y - self.block_size, point_y + self.block_size]])
+            block_to_update.add_new_bounds(area_to_update)
 
     def update_from_image_detections_position_distribution(self, detection_mus, detection_sigmas):
         """
