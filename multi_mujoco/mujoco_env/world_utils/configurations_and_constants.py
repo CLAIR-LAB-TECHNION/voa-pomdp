@@ -10,14 +10,14 @@ env_cfg = dict(
     robots=dict(
         robot_0=dict(
             resource='ur5e',
-            mount='rethink_stationary',
+            # mount='rethink_stationary',
             attachments=['adhesive_gripper'],
             base_pos=[0.1, -0.55, 0],  # Example base position
             base_orient=[0, 0, 0, 1],  # Example base orientation (quaternion)
         ),
         robot_1=dict(
             resource='ur5e',
-            mount='rethink_stationary',
+            # mount='rethink_stationary',
             attachments=['adhesive_gripper'],
             base_pos=[-0.76, -1.33, 0],  # Example base position
             base_orient=[0, 0, 0, 1],  # Example base orientation (quaternion)

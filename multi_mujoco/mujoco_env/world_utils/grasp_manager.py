@@ -13,7 +13,7 @@ class GraspManager:
         self.graspable_objects_names = object_manager.object_names
 
         # Only considers one robot (we can expand it to a dictionary)
-        self._ee_mj_data = self._mj_data.body('rethink_mount_stationary_1/robot_1_ur5e/robot_1_adhesive gripper/')
+        self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
 
         self.attached_object_name = None
 

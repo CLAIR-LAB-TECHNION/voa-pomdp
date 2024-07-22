@@ -28,7 +28,7 @@ class WorldVoA():
         self._object_manager = ObjectManager(self._mj_model, self._mj_data)
         self._grasp_manager = GraspManager(self._mj_model, self._mj_data, self._object_manager, min_grasp_distance=0.1)
 
-        self._ee_mj_data = self._mj_data.body('rethink_mount_stationary_1/robot_1_ur5e/robot_1_adhesive gripper/')
+        self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
         # dt = self._mj_model.opt.timestep * frame_skip
         # self._pid_controller = PIDController(kp, ki, kd, dt)
 
