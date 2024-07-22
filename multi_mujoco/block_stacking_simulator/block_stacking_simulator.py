@@ -1,7 +1,7 @@
 from multi_mujoco.motion_planning.simulation_motion_planner import SimulationMotionPlanner
 from multi_mujoco.mujoco_env import mujoco_env
 from multi_mujoco.mujoco_env.tasks import NullTask
-
+from object_manager import ObjectManager
 
 muj_env_config = dict(
     scene=dict(
@@ -30,42 +30,28 @@ muj_env_config = dict(
     ),
 )
 
+
 class BlockStackingSimulator:
-    def __init__(self,):
+    def __init__(self, ):
         self.mujoco_env = mujoco_env.MujocoEnv.from_cfg(cfg=muj_env_config, render_mode="human", frame_skip=5)
         self.motion_planner = SimulationMotionPlanner()
 
         obs, info = self.mujoco_env.reset()
         self.mj_model = info["privileged"]["model"]
         self.mj_data = info["privileged"]["data"]
+        self.object_manager = ObjectManager(self.mj_model, self.mj_data)
 
-        pass
-
-    def reset(self, block_positions):
+    def reset(self, randomize=False, block_positions=None):
         """
-        TODO: set block positions given the list of block posions, implement set_all_block_positions
-        TODO: for that. Then implement get block positions.
-        TODO then move all to blocks_manager class.
+        Reset the object positions in the simulation.
+        Args:
+            randomize: if True, randomize the positions of the blocks, otherwise set them to initial positions.
+            block_positions: a list of block positions to set the blocks to. If provided, randomize will be ignored.
         """
-        # set blocks positions
-        # reset mujoco env.
-
-    def set_block_position(self, block_id, position):
-        joint_name = f"block{block_id+1}_fj"
-        joint_id = self.mj_model.joint(joint_name).id
-        pos_adrr = self.mj_model.jnt_qposadr[joint_id]
-        self.mj_data.qpos[pos_adrr:pos_adrr+3] = position
-
-
-    def set_all_block_positions(self, positions):
-        pass
-
-    def get_block_position(self, block_id):
-        pass
-
-    def get_all_block_positions(self):
-        pass
-
+        if block_positions:
+            self.object_manager.reset(randomize=False, block_positions=block_positions)
+        else:
+            self.object_manager.reset(randomize=randomize)
 
 
 if __name__ == '__main__':

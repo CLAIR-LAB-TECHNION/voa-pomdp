@@ -83,34 +83,34 @@ class MotionPlanner:
     def _build_world(self):
         """ build the obstacles in the world """
         # Floor
-        self._add_box_geom("floor", (5, 5, 0.01), [0, 0, 0], [0.1, 0.1, 0.1, 1], False)
+        self._add_box_geom("floor", (0, 0, .05), [0, 0, 0], [0.1, 0.1, 0.1, 1], False)
 
         # Tables
-        table_left_size = [0.74, 1.2, 0.02]
-        table_left_pos = [-0.6, -0.6, 0.7]
+        table_left_size = [.74, 1.2, .02]
+        table_left_pos = [-.6, -.6, 0]
         self._add_box_geom("table_left", table_left_size, table_left_pos, [0.5, 0.5, 0.5, 0.8], False)
 
-        table_right_size = [0.6, 0.6, 0.02]
-        table_right_pos = [0.2, 0, 0.7]
+        table_right_size = [.6, .6, .02]
+        table_right_pos = [.2, 0, 0]
         self._add_box_geom("table_right", table_right_size, table_right_pos, [0.5, 0.5, 0.5, 0.8], False)
 
-        # Walls
-        wall1_size = [2.44, 0.01, 2.0]
-        wall1_pos = [0, 0.36, 1.0]
-        self._add_box_geom("wall1", wall1_size, wall1_pos, [0.5, 0.5, 0.5, 1], False)
-
-        wall2_1_size = [0.01, 2.07, 2.0]
-        wall2_1_pos = [-1.165, -0.615, 1.0]
-        self._add_box_geom("wall2_1", wall2_1_size, wall2_1_pos, [0.5, 0.5, 0.5, 1], False)
-
-        wall2_2_size = [1.0, 0.01, 2.0]
-        wall2_2_pos = [-0.805, -1.90, 1.0]
-        self._add_box_geom("wall2_2", wall2_2_size, wall2_2_pos, [0.5, 0.5, 0.5, 1], False)
-
-        # UR3e keep-out zone
-        ur3e_zone_size = [0.5, 0.5, 2.0]
-        ur3e_zone_pos = [-0.725, -0.007, 0.50]
-        self._add_box_geom("keep_out_from_ur3_zone", ur3e_zone_size, ur3e_zone_pos, [0.5, 0.5, 0.5, 1], False)
+        # # Walls
+        # wall1_size = [2.44, 0.01, 2.0]
+        # wall1_pos = [0, 0.36, 1.0]
+        # self._add_box_geom("wall1", wall1_size, wall1_pos, [0.5, 0.5, 0.5, 1], False)
+        #
+        # wall2_1_size = [0.01, 2.07, 2.0]
+        # wall2_1_pos = [-1.165, -0.615, 1.0]
+        # self._add_box_geom("wall2_1", wall2_1_size, wall2_1_pos, [0.5, 0.5, 0.5, 1], False)
+        #
+        # wall2_2_size = [1.0, 0.01, 2.0]
+        # wall2_2_pos = [-0.805, -1.90, 1.0]
+        # self._add_box_geom("wall2_2", wall2_2_size, wall2_2_pos, [0.5, 0.5, 0.5, 1], False)
+        #
+        # # UR3e keep-out zone
+        # ur3e_zone_size = [0.5, 0.5, 2.0]
+        # ur3e_zone_pos = [-0.725, -0.007, 0.50]
+        # self._add_box_geom("keep_out_from_ur3_zone", ur3e_zone_size, ur3e_zone_pos, [0.5, 0.5, 0.5, 1], False)
 
     def _add_box_geom(self, name, size, center, color, update_vis=True):
         """
