@@ -17,14 +17,12 @@ cfg = dict(
     robots=dict(
         robot_0=dict(
             resource='ur5e',
-            mount='rethink_stationary',
             attachments=['adhesive_gripper'],
-            base_pos=[0.1, -0.55, 0],  # Example base position
+            base_pos=[0, 0, 0],  # Example base position
             base_orient=[0, 0, 0, 1],  # Example base orientation (quaternion)
         ),
         robot_1=dict(
             resource='ur5e',
-            mount='rethink_stationary',
             attachments=['adhesive_gripper'],
             base_pos=[-0.76, -1.33, 0],  # Example base position
             base_orient=[0, 0, 0, 1],  # Example base orientation (quaternion)
@@ -60,14 +58,14 @@ try:
             obs, rewards, term, trunc, info = env.step(actions)
             done = {agent_name: term[agent_name] for agent_name in env.agents.keys()}
             env.render()
-            if i == 10:
-                img = obs['robot_0']['camera'][:, :, :3].astype(np.uint8)
-                world_to_ee = forward(obs['robot_0']['robot_state'][:6])
-                world_to_camera = world_to_ee.compose(ee_to_camera).to_pose_quaternion()
-                # print(world_to_camera)
-                # print(obs['robot_0']['camera_pose'])
-                image = Image.fromarray(img)
-                image.show()
+            # if i == 10:
+            #     img = obs['robot_0']['camera'][:, :, :3].astype(np.uint8)
+            #     world_to_ee = forward(obs['robot_0']['robot_state'][:6])
+            #     world_to_camera = world_to_ee.compose(ee_to_camera).to_pose_quaternion()
+            #     # print(world_to_camera)
+            #     # print(obs['robot_0']['camera_pose'])
+            #     image = Image.fromarray(img)
+            #     image.show()
 except KeyboardInterrupt:
     pass
 
