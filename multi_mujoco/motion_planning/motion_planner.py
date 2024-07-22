@@ -38,6 +38,9 @@ class MotionPlanner:
 
         self.planning_config = frozendict(default_config)
 
+    def set_config(self, robot_name, config):
+        self.robot_name_mapping[robot_name].setConfig(config)
+
     def _build_world(self):
         """ build the obstacles in the world """
         # Floor

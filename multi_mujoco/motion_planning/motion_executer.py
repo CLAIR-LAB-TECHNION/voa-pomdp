@@ -1,16 +1,16 @@
 import numpy as np
 
-from .motion_planner import NTableBlocksWorldMotionPlanner
+from .motion_planner import MotionPlanner
 
 FACING_DOWN_R = [[0, 0, -1],
                  [0, 1, 0],
                  [1, 0, 0]]
 
 
-class NTableBlocksWorldMotionExecuter:
+class MotionExecuter:
     def __init__(self, env):
         self.env = env
-        self.motion_planner = NTableBlocksWorldMotionPlanner()
+        self.motion_planner = MotionPlanner()
 
         state = self.env.get_state()
 

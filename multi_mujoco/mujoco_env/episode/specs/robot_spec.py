@@ -28,7 +28,7 @@ class RobotSpec(InitStateAddonSpec):
     cameras: Sequence[CameraSpec] = tuple()
     attachments: Sequence[AttachmentSpec] = tuple()
     mount: Optional[MountSpec] = None
-    privileged_info: bool = False
+    privileged_info: bool = True
     base_pos: NDArray[np.float64] = field(default_factory=lambda: np.array([0.0, 0.0, 0.0]))
     base_orient: NDArray[np.float64] = field(default_factory=lambda: np.array([0.0, 0.0, 0.0, 1.0]))  # Quaternion
 
