@@ -36,7 +36,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         # Add window name to distinguish between different visualizations
         if not MotionPlanner.vis_initialized:
-            motion_palnner.visualize(window_name=f"{robot_name}_visualization")
+            motion_palnner.visualize(window_name="robots_visualization")
 
         self.setTcp([0, 0, 0.150, 0, 0, 0])
 
