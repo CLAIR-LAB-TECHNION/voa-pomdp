@@ -47,6 +47,7 @@ def main(n_blocks: int = 2,
     motion_planner.vis_config(ur5e_1["name"], r1_sensing_config)
 
     r1_controller.plan_and_move_home(speed=0.5, acceleration=0.5)
+    r2_controller.plan_and_move_home(speed=0.5, acceleration=0.5)
 
     # r2 distribute blocks and clear out
     actual_block_positions = ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks, r2_controller)
