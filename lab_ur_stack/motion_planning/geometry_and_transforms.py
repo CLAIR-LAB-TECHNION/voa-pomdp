@@ -120,7 +120,7 @@ class GeometryAndTransforms:
         """
         point_robot = self.point_world_to_robot(robot_name, point_world)
 
-        rotation_euler = R.from_euler('xyz', [1.2 * pi, 0.15*pi, 0])
+        rotation_euler = R.from_euler('xyz', [1.2 * pi, 0.15*pi, pi])
         r = rotation_euler.as_rotvec(degrees=False)
 
         return np.concatenate([point_robot, r])
