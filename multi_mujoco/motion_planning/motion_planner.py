@@ -28,12 +28,11 @@ class MotionPlanner:
         self.world.readFile(world_path)
         self._build_world()
 
-        self.robot_0 = self.world.robot("robot_0")
+        self.robot_0 = self.world.robot("ur5e_1")
         self.robot_0.setJointLimits(limits_l, limits_h)
-        self.robot_1 = self.world.robot("robot_1")
+        self.robot_1 = self.world.robot("ur5e_2")
         self.robot_1.setJointLimits(limits_l, limits_h)
-        self.robot_name_mapping = {"robot_0": self.robot_0, "robot_1": self.robot_1}
-        self.ee_link = self.robot_1.link("ee_link")
+        self.robot_name_mapping = {"ur5e_1": self.robot_0, "ur5e_2": self.robot_1}
 
         self.world_collider = collide.WorldCollider(self.world)
 
