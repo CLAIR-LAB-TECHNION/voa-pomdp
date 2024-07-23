@@ -34,9 +34,52 @@ class MotionPlanner:
         self.robot_1.setJointLimits(limits_l, limits_h)
         self.robot_name_mapping = {"ur5e_1": self.robot_0, "ur5e_2": self.robot_1}
 
+        self.ee_link = self.robot_1.link("ee_link")
+
         self.world_collider = collide.WorldCollider(self.world)
 
         self.planning_config = frozendict(default_config)
+
+    def set_config(self, configs):
+        for robot_name, config in configs.items():
+            self.robot_name_mapping[robot_name].setConfig(config)
+
+    def add_block(self, name, position, color=(0.3, 0.3, 0.3, 0.8)):
+        """
+        add block to the world
+        """
+        self._add_box_geom(name, block_size, position, color)
+
+    def move_block(self, name, position):
+        """
+        move block to position
+        """
+        rigid_obj = self.world.rigidObject(name)
+        width, depth, height = block_size
+        box_obj = box(width=width, height=height, depth=depth, center=position)
+        rigid_obj.geometry().set(box_obj)
+
+    def attach_box_to_ee(self):
+        """
+        attach a box to the end effector for collision detection. Should be called once
+        """
+        # Note that the order is different here, width is in z direction
+        sx, sy, sz = block_size
+        box_obj = box(width=sz, height=sy, depth=sx, center=[grasp_offset, 0, 0])
+        box_geom = Geometry3D()
+        box_geom.set(box_obj)
+
+        self.ee_link.geometry().set(box_geom)
+
+    def detach_box_from_ee(self):
+        """
+        detach the box from the end effector
+        """
+        dummy_box_obj = box(width=0.001, height=0.001, depth=0.001, center=[0, 0, 0])
+        dummy_box_geom = Geometry3D()
+        dummy_box_geom.set(dummy_box_obj)
+
+        self.ee_link.geometry().set(dummy_box_geom)
 
     def _build_world(self):
         """ build the obstacles in the world """

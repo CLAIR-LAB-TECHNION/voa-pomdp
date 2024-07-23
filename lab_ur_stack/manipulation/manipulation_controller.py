@@ -34,6 +34,10 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.motion_planner = motion_palnner
         self.gt = geomtry_and_transofms
 
+        # Add window name to distinguish between different visualizations
+        if not MotionPlanner.vis_initialized:
+            motion_palnner.visualize(window_name="robots_visualization")
+
         self.setTcp([0, 0, 0.150, 0, 0, 0])
 
         motion_palnner.visualize()

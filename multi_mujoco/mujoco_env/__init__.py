@@ -4,6 +4,7 @@ from .common import cfg_keys
 from .episode import *
 from .mujoco_env import MujocoEnv
 from .tasks.rearrangement.rearrangement_task import COMRearrangementTask as _COMTask
+from .tasks.null_task import NullTask
 
 __all__ = [
     'make',
@@ -17,7 +18,8 @@ __all__ = [
     'TaskSpec',
     'ObjectSpec',
     'AttachmentSpec',
-    'MountSpec'
+    'MountSpec',
+    'NullTask',
 ]
 
 from_cfg = MujocoEnv.from_cfg

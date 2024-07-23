@@ -41,14 +41,14 @@ class MotionPlanner(AbstractMotionPlanner):
 
 if __name__ == "__main__":
     planner = MotionPlanner()
-    planner.visualize(beckend="PyQt5")
+    planner.visualize(backend="PyQt5")
 
     point = [0, 0, 1]
     transform = planner.get_forward_kinematics("ur5e_1", planner.ur5e_1.getConfig()[1:7])
 
-    point_transofrmed = se3.apply(transform, point)
-    planner.show_point_vis(point_transofrmed)
-    print("point transformed: ", point_transofrmed)
+    point_transformed = se3.apply(transform, point)
+    planner.show_point_vis(point_transformed)
+    print("point transformed: ", point_transformed)
     # planner.is_config_feasible("ur5e_1", [0, 0, 0, 0, 0, 0])
 
     # path = planner.plan_from_start_to_goal_config("ur5e_1",

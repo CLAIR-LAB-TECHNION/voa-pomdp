@@ -28,6 +28,8 @@ class AbstractMotionPlanner:
                                     # seems like it's ignored even in rrt*
                                     # "shortcut": True, # only for rrt
                                   })
+    # Class-level attribute to track initialization
+    vis_initialized = False
 
     def __init__(self, eps=2e-2, attachments=default_attachments, settings=default_settings):
         """
@@ -53,11 +55,24 @@ class AbstractMotionPlanner:
 
         self.settings = frozendict(self.default_settings)
 
-    def visualize(self, beckend="GLUT"):
+    def is_pyqt5_available(self):
+        try:
+            import PyQt5
+            return True
+        except ImportError:
+            return False
+
+    def visualize(self, backend="GLUT", window_name=None):
         """
         open visualization window
         """
-        vis.init(beckend)
+        if backend is None:
+            backend = "Qt" if self.is_pyqt5_available() else "GLUT"
+
+        # Check if vis is already initialized
+        if not AbstractMotionPlanner.vis_initialized:
+            if window_name:
+                vis.createWindow(window_name)
 
         vis.add("world", self.world)
         # vis.setColor(('world', 'ur5e_1'), 0, 1, 1)
@@ -70,6 +85,7 @@ class AbstractMotionPlanner:
         viewport.camera.dist = 5
 
         vis.show()
+        AbstractMotionPlanner.vis_initialized = True
 
     def vis_config(self, robot_name, config_, vis_name="robot_config", rgba = (0, 0, 1, 0.5)):
         """

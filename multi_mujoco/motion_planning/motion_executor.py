@@ -1,52 +1,55 @@
 import numpy as np
 
-from .motion_planner import NTableBlocksWorldMotionPlanner
+from .motion_planner import MotionPlanner
+from ..mujoco_env.voa_world import WorldVoA
 
 FACING_DOWN_R = [[0, 0, -1],
                  [0, 1, 0],
                  [1, 0, 0]]
 
 
-class NTableBlocksWorldMotionExecuter:
-    def __init__(self, env):
+class MotionExecutor:
+    def __init__(self, env: WorldVoA):
         self.env = env
-        self.motion_planner = NTableBlocksWorldMotionPlanner()
+        self.motion_planner = MotionPlanner()
 
         state = self.env.get_state()
 
         # set current configuration
-        self.motion_planner.set_config(state['robot_joint_pos'])
+        self.motion_planner.set_config(state['robots_joint_pos'])
 
         # update world model with blocks
         for name, pos in state['object_positions'].items():
             self.motion_planner.add_block(name, pos)
 
-    def move_to(self, target_config, tolerance=0.05, end_vel=0.1, max_steps=None,
+    def move_to(self, agent, target_config, tolerance=0.05, end_vel=0.1, max_steps=None,
                 render_freq=8):
-        '''
+        """
         move robot joints to target config, until it is close within tolerance,
         or max_steps exceeded.
-        @param target_joint_pos: position to move to
+        @param agent: agent id to move
+        @param target_config: position to move to
         @param tolerance: distance withing configuration space to target to consider
          as reached
+        @param end_vel: end_vel
         @param max_steps: maximum steps to take before stopping, no limit if None
         @param render_freq: how often to render and append a frame
         @return: success, frames
-        '''
-        joint_positions = self.env.robot_joint_pos
-        joint_velocities = self.env.robot_joint_velocities
+        """
+        joint_positions = self.env.robots_joint_pos
+        joint_velocities = self.env.robots_joint_velocities
 
         frames = []
 
         i = 0
-        while np.linalg.norm(joint_positions - target_config) > tolerance \
-                or np.linalg.norm(joint_velocities) > end_vel:
+        while np.linalg.norm(joint_positions[agent] - target_config) > tolerance \
+                or np.linalg.norm(joint_velocities[agent]) > end_vel:
             if max_steps is not None and i > max_steps:
                 return False, frames
 
             state = self.env.step(target_config)
-            joint_positions = state['robot_joint_pos']
-            joint_velocities = state['robot_joint_velocities']
+            joint_positions = state['robots_joint_pos']
+            joint_velocities = state['robots_joint_velocities']
 
             if i % render_freq == 0:
                 frames.append(self.env.render())
@@ -56,7 +59,7 @@ class NTableBlocksWorldMotionExecuter:
         return True, frames
 
     def update_blocks_positions(self):
-        blocks_positions_dict= self.env.get_state()['object_positions']
+        blocks_positions_dict = self.env.get_state()['object_positions']
         for name, pos in blocks_positions_dict.items():
             self.motion_planner.move_block(name, pos)
 
@@ -74,11 +77,11 @@ class NTableBlocksWorldMotionExecuter:
         frames = []
         for config in path:
             success, frames_curr = self.move_to(
-                                           config,
-                                           tolerance=tolerance,
-                                           end_vel=end_vel,
-                                           max_steps=max_steps_per_section,
-                                           render_freq=render_freq)
+                config,
+                tolerance=tolerance,
+                end_vel=end_vel,
+                max_steps=max_steps_per_section,
+                render_freq=render_freq)
             frames.extend(frames_curr)
             if not success:
                 return False, frames
@@ -100,13 +103,13 @@ class NTableBlocksWorldMotionExecuter:
         """
         joint_state = self.env.robot_joint_pos
         path = self.motion_planner.plan_from_config_to_pose(joint_state, target_position,
-                                                       target_orientation)
+                                                            target_orientation)
         success, frames = self.execute_path(
-                                       path,
-                                       tolerance=tolerance,
-                                       end_vel=end_vel,
-                                       max_steps_per_section=max_steps_per_section,
-                                       render_freq=render_freq)
+            path,
+            tolerance=tolerance,
+            end_vel=end_vel,
+            max_steps_per_section=max_steps_per_section,
+            render_freq=render_freq)
 
         # after executing a motion, blocks position can change, update the motion planner:
         self.update_blocks_positions()
@@ -128,9 +131,9 @@ class NTableBlocksWorldMotionExecuter:
         block_pos = self.env.get_object_pos(block_name)
         target_position = block_pos + np.array([0, 0, offset])
         return self.move_to_pose(target_position,
-                            tolerance=tolerance, end_vel=end_vel,
-                            max_steps_per_section=max_steps_per_section,
-                            render_freq=render_freq)
+                                 tolerance=tolerance, end_vel=end_vel,
+                                 max_steps_per_section=max_steps_per_section,
+                                 render_freq=render_freq)
 
     def activate_grasp(self, wait_steps=10, render_freq=8):
         self.env.set_gripper(True)
@@ -146,7 +149,7 @@ class NTableBlocksWorldMotionExecuter:
         frames = []
 
         # move to current position, i.e., stay in place
-        maintain_pos = self.env.robot_joint_pos
+        maintain_pos = self.env.robots_joint_pos
         for i in range(n_steps):
             self.env.step(maintain_pos)
             if i % render_freq == 0:

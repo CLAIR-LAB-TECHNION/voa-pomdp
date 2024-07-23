@@ -29,3 +29,5 @@ table_left_pos = [0.0, -0.6, 0.7]
 table_right_pos = [0.0, 0.6, 0.7]
 table_front_pos = [0.6, 0.0, 0.7]
 
+# relative position of grasped object from end effector
+grasp_offset = 0.02
