@@ -2,15 +2,15 @@
 from copy import deepcopy
 from collections import namedtuple
 
-from mujoco_env import MujocoEnv
+from .mujoco_env import MujocoEnv
 
 from .world_utils.object_manager import ObjectManager
 from .world_utils.grasp_manager import GraspManager
 from .world_utils.configurations_and_constants import *
 
 
-class WorldVoA():
-    def __init__(self, render_mode='human', cfg=env_cfg):
+class WorldVoA:
+    def __init__(self, render_mode='human', cfg=muj_env_config):
         self.render_mode = render_mode
         self._env = MujocoEnv.from_cfg(cfg=cfg, render_mode=render_mode, frame_skip=frame_skip)
         obs, info = self._env.reset()  # once, for info, later again
@@ -34,7 +34,10 @@ class WorldVoA():
 
         self.reset()
 
-    def reset(self):
+    def close(self):
+        self._env.close()
+
+    def reset(self, randomize=True, block_positions=None):
         self.max_joint_velocities = INIT_MAX_VELOCITY
 
         obs, _ = self._env.reset()
@@ -43,7 +46,7 @@ class WorldVoA():
             self.robots_joint_velocities[agent] = obs[agent]["robot_state"][6:12]
         self.gripper_state_closed = False
         self._grasp_manager.release_object()
-        self._object_manager.reset_object_positions()
+        self._object_manager.reset(randomize=randomize, block_positions=block_positions)
 
         self.step(self.robots_joint_pos, gripper_closed=False)
 
@@ -89,7 +92,7 @@ class WorldVoA():
         self._env.close()
 
     def get_state(self):
-        object_positions = self._object_manager.get_all_object_positons_dict()
+        object_positions = self._object_manager.get_all_block_positions_dict()
         state = {"robots_joint_pos": self.robots_joint_pos,
                  "robots_joint_velocities": self.robots_joint_velocities,
                  "gripper_state_closed": self.gripper_state_closed,
@@ -99,8 +102,8 @@ class WorldVoA():
 
         return deepcopy(state)
 
-    def get_object_pos(self, name: str):
-        return self._object_manager.get_object_pos(name)
+    def get_object_pos(self, block_id: int):
+        return self._object_manager.get_block_position(block_id)
 
     def move_to(self, agent, target_joint_pos, tolerance=0.05, end_vel=0.1, max_steps=None):
         """

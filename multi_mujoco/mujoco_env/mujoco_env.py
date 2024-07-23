@@ -119,7 +119,7 @@ class MujocoEnv(Env, EzPickle):
             self.tasks = {agent_name: self.episode.tasks[agent_name].cls(self.sim) for agent_name in
                           self.episode.robots.keys()}
 
-        self.agents = {f'robot_{agent_name}': agent for agent_name, agent in enumerate(self.sim.get_agents())}
+        self.agents = {f'ur5e_{agent_name+1}': agent for agent_name, agent in enumerate(self.sim.get_agents())}
         self.observation_space = spaces.Dict(
             {agent_name: agent.observation_space for agent_name, agent in self.agents.items()})
         self.action_space = spaces.Dict({agent_name: agent.action_space for agent_name, agent in self.agents.items()})

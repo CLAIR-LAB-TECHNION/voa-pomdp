@@ -18,16 +18,16 @@ import os
 class AbstractMotionPlanner:
     ee_offset = 0.15  # end effector offset forward
     default_attachments = frozendict(ur5e_1=["camera", "gripper"], ur5e_2=["gripper"])
-    default_settings = frozendict({# "type": "lazyrrg*",
-                                    "type": "rrt*",
-                                    "bidirectional": False,
-                                    "connectionThreshold": 30.0,
-                                    "perturbationRadius": 0.2,
-                                    # "suboptimalityFactor": 1.01,  # only for rrt* and prm*.
-                                    # Don't use suboptimalityFactor as it's unclear how that parameter works...
-                                    # seems like it's ignored even in rrt*
-                                    # "shortcut": True, # only for rrt
-                                  })
+    default_settings = frozendict({  # "type": "lazyrrg*",
+        "type": "rrt*",
+        "bidirectional": False,
+        "connectionThreshold": 30.0,
+        "perturbationRadius": 0.2,
+        # "suboptimalityFactor": 1.01,  # only for rrt* and prm*.
+        # Don't use suboptimalityFactor as it's unclear how that parameter works...
+        # seems like it's ignored even in rrt*
+        # "shortcut": True, # only for rrt
+    })
     # Class-level attribute to track initialization
     vis_initialized = False
 
@@ -87,7 +87,7 @@ class AbstractMotionPlanner:
         vis.show()
         AbstractMotionPlanner.vis_initialized = True
 
-    def vis_config(self, robot_name, config_, vis_name="robot_config", rgba = (0, 0, 1, 0.5)):
+    def vis_config(self, robot_name, config_, vis_name="robot_config", rgba=(0, 0, 1, 0.5)):
         """
         Show visualization of the robot in a config
         :param robot_name:
@@ -345,4 +345,3 @@ class AbstractMotionPlanner:
     @abstractmethod
     def _get_klampt_world_path(self):
         pass
-
