@@ -1,3 +1,4 @@
+import random
 import numpy as np
 
 
@@ -15,6 +16,9 @@ class ObjectManager:
         self.object_names = [name for name in all_joint_names if name.startswith("block")]
         self.objects_mjdata_dict = {name: self._mj_model.joint(name) for name in self.object_names}
         self.initial_positions_dict = self.get_all_block_positions()
+        self.workspace_x_lims = [-0.9, -0.54]
+        self.workspace_y_lims = [-1.0, -0.55]
+        self.block_size = .04
 
     def reset(self, randomize=False, block_positions=None):
         """
@@ -22,9 +26,28 @@ class ObjectManager:
         Args:
             randomize: if True, randomize the positions of the blocks, otherwise set them to initial positions.
         """
+
+        def check_block_collision(new_pos):
+            """Tests if new position for block collides with any other block"""
+            for pos in block_positions:
+                pos_np = np.array(pos)
+                if np.linalg.norm(new_pos - pos_np) < 2 * self.block_size:
+                    return True
+            block_positions.append(list(new_pos))
+            return False
+
         if randomize:
             # randomize block positions
-            self.set_all_block_positions([np.random.uniform(-0.2, 0.2, 3) for _ in range(len(self.object_names))])
+            block_positions = []
+            for _ in range(len(self.object_names)):
+                # generate random position for block
+                block_location = [random.uniform(*self.workspace_x_lims), random.uniform(*self.workspace_y_lims), 0]
+                # check if block collides with any other previous new block position
+                while check_block_collision(np.array(block_location)):
+                    # generate new random position for block
+                    block_location = [random.uniform(*self.workspace_x_lims), random.uniform(*self.workspace_y_lims), 0]
+            # set blocks to new positions
+            self.set_all_block_positions(block_positions)
         else:
             if block_positions:
                 self.set_all_block_positions(block_positions)
@@ -41,13 +64,13 @@ class ObjectManager:
         """
         return self._mj_data.joint(block_id).qpos[:3]
 
-    def get_all_block_positions(self) -> dict:
+    def get_all_block_positions(self) -> list:
         """
         Get the positions of all blocks in the simulation.
         Returns:
             a dictionary of block names to their positions, positions will be in format {name: [x, y ,z], ...}.
         """
-        return {name: self.get_block_position(self.objects_mjdata_dict[name].id) for name in self.object_names}
+        return [self.get_block_position(self.objects_mjdata_dict[name].id) for name in self.object_names]
 
     def set_block_position(self, block_id, position):
         """
@@ -56,7 +79,7 @@ class ObjectManager:
             block_id: the id of the block to set the position of.
             position: the position to set the block to, position will be in format [x, y ,z].
         """
-        joint_name = f"block{block_id + 1}_fj"
+        joint_name = f"block{block_id}_fj"
         joint_id = self._mj_model.joint(joint_name).id
         pos_adrr = self._mj_model.jnt_qposadr[joint_id]
         self._mj_data.qpos[pos_adrr:pos_adrr + 3] = position
