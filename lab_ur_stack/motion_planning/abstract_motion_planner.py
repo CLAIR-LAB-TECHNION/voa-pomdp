@@ -17,7 +17,7 @@ import os
 
 class AbstractMotionPlanner:
     ee_offset = 0.15  # end effector offset forward
-    default_attachments = frozendict(robot_0=["camera", "gripper"], robot_1=["gripper"])
+    default_attachments = frozendict(ur5e_1=["camera", "gripper"], ur5e_2=["gripper"])
     default_settings = frozendict({# "type": "lazyrrg*",
                                     "type": "rrt*",
                                     "bidirectional": False,
@@ -41,13 +41,13 @@ class AbstractMotionPlanner:
         world_path = self._get_klampt_world_path()
         self.world.readFile(world_path)
 
-        self.ur5e_1 = self.world.robot("robot_0")
-        self.ur5e_2 = self.world.robot("robot_1")
-        self.robot_name_mapping = {"robot_0": self.ur5e_1, "robot_1": self.ur5e_2}
+        self.ur5e_1 = self.world.robot("ur5e_1")
+        self.ur5e_2 = self.world.robot("ur5e_2")
+        self.robot_name_mapping = {"ur5e_1": self.ur5e_1, "ur5e_2": self.ur5e_2}
         for robot in self.robot_name_mapping.values():
             self._set_ee_offset(robot)
-        self._add_attachments(self.ur5e_1, attachments["robot_0"])
-        self._add_attachments(self.ur5e_2, attachments["robot_1"])
+        self._add_attachments(self.ur5e_1, attachments["ur5e_1"])
+        self._add_attachments(self.ur5e_2, attachments["ur5e_2"])
 
         self.world_collider = collide.WorldCollider(self.world)
 
