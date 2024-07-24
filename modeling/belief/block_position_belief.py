@@ -9,7 +9,7 @@ class BlocksPositionsBelief:
     block_size = 0.04
 
     def __init__(self, n_blocks, ws_x_lims, ws_y_lims, init_mus=None, init_sigmas=None):
-        self.n_blocks = n_blocks
+        self.n_blocks_orig = n_blocks
         self.ws_x_lims = ws_x_lims
         self.ws_y_lims = ws_y_lims
 
@@ -29,6 +29,9 @@ class BlocksPositionsBelief:
         self.block_beliefs = [BlockPosDist(ws_x_lims, ws_y_lims, init_mus[i][0], init_sigmas[i][0],
                                            init_mus[i][1], init_sigmas[i][1])
                               for i in range(n_blocks)]
+
+        self.n_blocks_on_table = n_blocks
+        self.blocks_picked = np.zeros(n_blocks, dtype=bool)
 
     def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.002):
         """
@@ -60,7 +63,7 @@ class BlocksPositionsBelief:
         are -1 for blocks that were not associated with any detection.
         """
         assert len(detection_mus) == len(detection_sigmas)
-        assert len(detection_mus) <= self.n_blocks, "More detections than blocks can cause a problem in" \
+        assert len(detection_mus) <= self.n_blocks_on_table, "More detections than blocks can cause a problem in" \
                                                     "the belief update. please remove detections with low confidence."
 
         # first associate each detection with a block
@@ -73,7 +76,7 @@ class BlocksPositionsBelief:
                                                     detection_sigmas[i])
 
         mus_and_sigmas = []
-        for i in range(self.n_blocks):
+        for i in range(self.n_blocks_on_table):
             if i in detections_to_blocks:
                 mus = detection_mus[detections_to_blocks[i]]
                 sigmas = detection_sigmas[detections_to_blocks[i]]
@@ -83,6 +86,23 @@ class BlocksPositionsBelief:
             mus_and_sigmas.append((mus, sigmas))
 
         return mus_and_sigmas
+
+    def update_from_successful_pick(self, pick_x, pick_y):
+        """
+        Update the belief after a successful pickup. The block is not on the workspace anymore
+        """
+        # remove the nearest block:
+        block_to_remove_id = np.argmax([b.pdf((pick_x, pick_y)) for b in self.block_beliefs])
+
+        self.block_beliefs.pop(block_to_remove_id)
+        self.n_blocks_on_table -= 1
+        self.blocks_picked[block_to_remove_id] = 1
+
+        # there is nothing around this point anymore. Can use this information but carefully
+        half_block_size = self.block_size / 2
+        for block_belief in self.block_beliefs:
+            block_belief.add_masked_area([[pick_x - half_block_size, pick_x + half_block_size],
+                                          [pick_y - half_block_size, pick_y + half_block_size]])
 
     def _associate_detection_mus_with_blocks(self, detection_mus):
         # Calculate likelihoods for each detection across all blocks

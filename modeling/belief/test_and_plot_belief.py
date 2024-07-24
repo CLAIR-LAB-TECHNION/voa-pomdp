@@ -48,6 +48,9 @@ def multiple_blocks():
     belief.update_from_point_sensing_observation(-0.65, -0.65, is_occupied=True)
     plot_all_blocks_beliefs(belief, grid_size=200)
 
+    belief.update_from_successful_pick(-0.77, -0.65)
+    plot_all_blocks_beliefs(belief, grid_size=200)
+
 
 def from_detections():
     mus = [[-0.9, -0.9], [-0.75, -0.75], [-0.65, -0.65]]
@@ -60,11 +63,11 @@ def from_detections():
     initial_belief = deepcopy(belief)
 
     mus_and_sigmas_associations = belief.update_from_image_detections_position_distribution(detections, detection_sigmas)
-    plot_all_blocks_beliefs(initial_belief, grid_size=200, per_block_observed_mus_and_sigmas=mus_and_sigmas_associations)
+    plot_all_blocks_beliefs(initial_belief, grid_size=100, per_block_observed_mus_and_sigmas=mus_and_sigmas_associations)
 
     plot_all_blocks_beliefs(belief, grid_size=200)
 
 if __name__ == "__main__":
-    one_block_point_sensing()
+    # one_block_point_sensing()
     multiple_blocks()
     # from_detections()
