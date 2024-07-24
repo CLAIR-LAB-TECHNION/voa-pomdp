@@ -72,13 +72,11 @@ def main(n_blocks: int = 2,
                                 positive_sensing_points=positive_points)
 
     # find maximum likelihood within the belief, sample point within the new window:
-
-
-
-
-
-
-
+    """
+    for sensing:
+        lookat[1] -= 0.2
+    lookat_verangle_horangle_distance_to_robot_config(lookat, 50, 50, 1.1, gt, "ur5e_1")
+    """
 
 
 

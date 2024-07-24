@@ -4,7 +4,8 @@ from lab_ur_stack.utils.workspace_utils import (sample_block_positions_uniform, 
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 
 
-def distribute_blocks_in_positions(block_positions, robot_controller: ManipulationController,
+def distribute_blocks_in_positions(block_positions,
+                                   robot_controller: ManipulationController,
                                    stack_position_ur5e_2_frame=stack_position_r2frame):
     """
     distribute blocks from stack positions to given positions
