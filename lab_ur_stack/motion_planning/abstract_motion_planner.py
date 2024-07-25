@@ -67,7 +67,9 @@ class AbstractMotionPlanner:
         open visualization window
         """
         if backend is None:
-            backend = "Qt" if self.is_pyqt5_available() else "GLUT"
+            backend = "PyQt5" if self.is_pyqt5_available() else "GLUT"
+
+        vis.init(backend)
 
         # Check if vis is already initialized
         if not AbstractMotionPlanner.vis_initialized:
