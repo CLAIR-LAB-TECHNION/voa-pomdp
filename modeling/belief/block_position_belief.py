@@ -33,21 +33,24 @@ class BlocksPositionsBelief:
         self.n_blocks_on_table = n_blocks
         self.blocks_picked = np.zeros(n_blocks, dtype=bool)
 
-    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.002):
+    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.005):
         """
         We update the area within block_size distance from the point, minus a margin of no_update_margin.
+        the no update margin reflects that we have an error from the desired sensing point.
         """
-        area_to_update = [[point_x - self.block_size + no_update_margin,
-                           point_x + self.block_size - no_update_margin],
-                            [point_y - self.block_size + no_update_margin,
-                             point_y + self.block_size - no_update_margin]]
         if not is_occupied:
+            area_to_update = [[point_x - self.block_size + no_update_margin,
+                               point_x + self.block_size - no_update_margin],
+                              [point_y - self.block_size + no_update_margin,
+                               point_y + self.block_size - no_update_margin]]
             # x and y is not occupied by a block. that means that there isn't a block withing
             # the block_size distance for each direction.
             for block_belief in self.block_beliefs:
                 block_belief.add_masked_area(area_to_update)
-
         else:
+            area_to_update = [[point_x - self.block_size, point_x + self.block_size],
+                              [point_y - self.block_size, point_y + self.block_size]]
+
             # x and y is occupied by a block. that means that there is a block withing
             # the block_size distance for each direction.
             # we associate it with the block that has the highest probability of being there
