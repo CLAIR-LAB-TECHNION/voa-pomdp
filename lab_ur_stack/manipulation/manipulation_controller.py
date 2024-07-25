@@ -7,6 +7,16 @@ import time
 import logging
 
 
+def canninical_last_joint_config(config):
+    while config[5] > np.pi:
+        config[5] -= 2 * np.pi
+
+    while config[5] < -np.pi:
+        config[5] += 2 * np.pi
+
+    return config
+
+
 class ManipulationController(RobotInterfaceWithGripper):
     """
     Extension for the RobotInterfaceWithGripper to higher level manipulation actions and motion planning.
@@ -78,6 +88,8 @@ class ManipulationController(RobotInterfaceWithGripper):
             # try to find another solution, starting from other random configurations:
             qnear = np.random.uniform(-np.pi / 2, np.pi / 2, 6)
             solution = self.getInverseKinematics(pose, qnear=qnear)
+
+        solution = canninical_last_joint_config(solution)
 
         if trial == max_tries:
             logging.error(f"{self.robot_name} Could not find a feasible IK solution after {max_tries} tries")
@@ -224,33 +236,33 @@ class ManipulationController(RobotInterfaceWithGripper):
         # update the motion planner with the new configuration:
         self.update_mp_with_current_config()
 
-    def sense_height(self, x, y, start_height=0.2):
-        """
-        TODO
-        :param x:
-        :param y:
-        :param start_height:
-        :return:
-        """
-        logging.info(f"{self.robot_name} sensing height not tilted! at {x}{y} with start height {start_height}")
-        self.grasp()
-
-        # move above sensing location:
-        self.plan_and_move_to_xyzrz(x, y, start_height, 0, speed=self.speed, acceleration=self.acceleration)
-        above_sensing_config = self.getActualQ()
-
-        lin_speed = min(self.linear_speed, 0.1)
-        # move down until contact:
-        self.moveUntilContact(xd=[0, 0, lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
-        # measure height:
-        height = self.getActualTCPPose()[2]
-        # move up:
-        self.moveJ(above_sensing_config, speed=self.speed, acceleration=self.acceleration)
-
-        # update the motion planner with the new configuration:
-        self.update_mp_with_current_config()
-
-        return height
+    # def sense_height(self, x, y, start_height=0.2):
+    #     """
+    #     TODO
+    #     :param x:
+    #     :param y:
+    #     :param start_height:
+    #     :return:
+    #     """
+    #     logging.info(f"{self.robot_name} sensing height not tilted! at {x}{y} with start height {start_height}")
+    #     self.grasp()
+    #
+    #     # move above sensing location:
+    #     self.plan_and_move_to_xyzrz(x, y, start_height, 0, speed=self.speed, acceleration=self.acceleration)
+    #     above_sensing_config = self.getActualQ()
+    #
+    #     lin_speed = min(self.linear_speed, 0.1)
+    #     # move down until contact:
+    #     self.moveUntilContact(xd=[0, 0, lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
+    #     # measure height:
+    #     height = self.getActualTCPPose()[2]
+    #     # move up:
+    #     self.moveJ(above_sensing_config, speed=self.speed, acceleration=self.acceleration)
+    #
+    #     # update the motion planner with the new configuration:
+    #     self.update_mp_with_current_config()
+    #
+    #     return height
 
     def sense_height_tilted(self, x, y, start_height=0.15):
         """
@@ -265,7 +277,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.grasp()
 
         # set end effector to be the tip of the finger
-        self.setTcp([0.020, 0.012, 0.160, 0, 0, 0])
+        self.setTcp([0.02, 0.012, 0.15, 0, 0, 0])
 
         logging.debug(f"moving above sensing point with TCP set to tip of the finger")
 

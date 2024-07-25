@@ -98,7 +98,7 @@ class LabBlockStackingEnv:
         self.accumulated_cost += self._get_action_cost(action_type, x, y)
 
         if action_type == "sense":
-            height = self.r1_controller.sense_height_tilted(x, y)
+            height = self.r2_controller.sense_height_tilted(x, y)
             is_occupied = height > 0.03
             observation = (is_occupied, steps_left)
         else:
