@@ -98,8 +98,8 @@ class LabBlockStackingEnv:
         self.accumulated_cost += self._get_action_cost(action_type, x, y)
 
         if action_type == "sense":
-            height = self.r2_controller.sense_height_tilted(x, y)
-            is_occupied = height > 0.03
+            height = self.r2_controller.sense_height_tilted(x, y, start_height=0.12)
+            is_occupied = height > 0.037
             observation = (is_occupied, steps_left)
         else:
             self.r2_controller.pick_up(x, y, 0.12)
@@ -175,11 +175,11 @@ class LabBlockStackingEnv:
                                                         self.goal_tower_position[1],
                                                         start_heigh)
 
-        # first block should be at about 0.032, then 0.04 for every other block
-        if height < 0.030:
+        # first block should be at about 0.0395, then 0.04 for every other block
+        if height < 0.037:
             return 0
 
-        n_blocks_float = ((height - 0.031) / 0.04) + 1
+        n_blocks_float = ((height - 0.037) / 0.04) + 1
         # go for the ceil, worst case we will do one redundant pick
         n_blocks = int(np.ceil(n_blocks_float))
         return n_blocks

@@ -57,6 +57,7 @@ def main(n_blocks: int = 2,
         plot_im = plot_all_blocks_beliefs(current_belief,
                                           actual_states=secret_block_pos,
                                           ret_as_image=True, )
+        plt.figure(figsize=(5, 4*env.n_blocks), dpi=512)
         plt.imshow(plot_im)
         plt.axis("off")
         plt.title(f"Action: \n {action[0]}, ({action[1]:.4f}, {action[2]:.4f}) \n Steps left: {steps_left}")
