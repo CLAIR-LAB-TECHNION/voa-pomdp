@@ -15,6 +15,18 @@ from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot
     detections_plots_with_depth_as_image
 
 
+def to_canonical_config(clean_up_sensor_config):
+    """
+    change config to be between -pi and pi for all joints
+    """
+    for i in range(6):
+        while clean_up_sensor_config[i] > np.pi:
+            clean_up_sensor_config[i] -= 2*np.pi
+        while clean_up_sensor_config[i] < -np.pi:
+            clean_up_sensor_config[i] += 2*np.pi
+
+    return clean_up_sensor_config
+
 class LabBlockStackingEnv:
     cleared_blocks_position = [-0.25, -1.15]
     goal_tower_position = [-0.45, -1.15]
@@ -47,27 +59,30 @@ class LabBlockStackingEnv:
         # will update at first reset:
         self._block_positions = None  # should be hidden from the agent!
 
-    def reset_from_distribution(self, block_positions_distributions):
+    def reset_from_distribution(self, block_positions_distributions, perform_cleanup=True):
         logging.info("reseting env")
-        self._reset()
+        self._reset(perform_cleanup)
         self._block_positions = ur5e_2_distribute_blocks_from_block_positions_dists(block_positions_distributions,
                                                                                     self.r2_controller)
-        self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[0], workspace_y_lims_default[1], 0.15, 0)
+        self.r1_controller.plan_and_move_home()
+        self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[1], workspace_y_lims_default[0], 0.15, 0)
         logging.info(f"env rested, blocks are put at positions: {self._block_positions}")
 
-    def reset_from_positions(self, block_positions):
+    def reset_from_positions(self, block_positions, perform_cleanup=True):
         logging.info("reseting env")
-        self._reset()
+        self._reset(perform_cleanup)
         self._block_positions = block_positions
         distribute_blocks_in_positions(block_positions, self.r2_controller)
-        self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[0], workspace_y_lims_default[1], 0.15, 0)
+        self.r1_controller.plan_and_move_home()
+        self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[1], workspace_y_lims_default[0], 0.15, 0)
         logging.info(f"env rested, blocks are put at positions: {self._block_positions}")
 
-    def _reset(self):
+    def _reset(self, perform_cleanup=True):
         self.steps = 0
         self.accumulated_cost = 0
 
-        self.clean_workspace_for_next_experiment()
+        if perform_cleanup:
+            self.clean_workspace_for_next_experiment()
 
         # clear r1 if it's not home
         self.r1_controller.plan_and_move_home()
@@ -75,7 +90,7 @@ class LabBlockStackingEnv:
     def step(self, action_type, x, y):
         assert action_type in ["sense", "attempt_stack"]
         if self.steps >= self.max_steps:
-            print("reach max steps, episode is already done")
+            print("reached max steps, episode is already done")
             return None
 
         self.steps += 1
@@ -87,10 +102,13 @@ class LabBlockStackingEnv:
             is_occupied = height > 0.03
             observation = (is_occupied, steps_left)
         else:
-            self.r2_controller.pick_up(x, y, 0.15)
+            self.r2_controller.pick_up(x, y, 0.12)
             # success = self.r2_controller.measure_weight() TODO
             pick_success = True  # assume now success
-            self.r2_controller.put_down(x, y, start_height=self.n_blocks*0.04 + 0.1)
+            self.r2_controller.put_down(self.goal_tower_position[0],
+                                        self.goal_tower_position[1],
+                                        0,
+                                        start_height=self.n_blocks*0.04 + 0.1)
             observation = (pick_success, steps_left)
 
         return observation
@@ -103,8 +121,11 @@ class LabBlockStackingEnv:
         # first, clean the tower:
         tower_height_blocks = self.sense_tower_height()
         for i in range(tower_height_blocks):
-            start_height = 0.04 * (tower_height_blocks - i) + 0.1
-            self.r2_controller.pick_up(self.goal_tower_position[0], self.goal_tower_position[1], start_height)
+            start_height = 0.04 * (tower_height_blocks - i) + 0.12
+            self.r2_controller.pick_up(self.goal_tower_position[0],
+                                       self.goal_tower_position[1],
+                                       0,
+                                       start_height)
             self.r2_controller.plan_and_move_to_xyzrz(self.cleared_blocks_position[0],
                                                       self.cleared_blocks_position[1],
                                                       z=0,
@@ -112,13 +133,17 @@ class LabBlockStackingEnv:
             self.r2_controller.release_grasp()
 
         # now clean other blocks that remain on the table, first detect them:
-        lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]
+        lookat = [np.mean(self.ws_x_lims), np.mean(self.ws_y_lims), 0]
+        lookat[0] += 0.15
+        lookat[1] += 0.15
         clean_up_sensor_config = lookat_verangle_horangle_distance_to_robot_config(lookat,
-                                                                                   horizontal_angle=60,
-                                                                                   vertical_angle=30,
-                                                                                   distance=0.65,
+                                                                                   vertical_angle=60,
+                                                                                   horizontal_angle=30,
+                                                                                   distance=0.7,
                                                                                    gt=self.r1_controller.gt,
                                                                                    robot_name="ur5e_1")
+        clean_up_sensor_config = to_canonical_config(clean_up_sensor_config)
+
         self.r1_controller.plan_and_moveJ(clean_up_sensor_config)
         im, depth = self.camera.get_frame_rgb()
         positions, annotations = self.position_estimator.get_block_positions_depth(im, depth, clean_up_sensor_config)
@@ -135,7 +160,7 @@ class LabBlockStackingEnv:
 
         # now clean the blocks:
         for p in positions:
-            self.r2_controller.pick_up(p[0], p[1], 0.15)
+            self.r2_controller.pick_up(p[0], p[1], 0, start_height=0.15)
             self.r2_controller.plan_and_move_to_xyzrz(self.cleared_blocks_position[0],
                                                       self.cleared_blocks_position[1],
                                                       z=0,
@@ -144,17 +169,17 @@ class LabBlockStackingEnv:
 
     def sense_tower_height(self):
         max_height = 0.04 * self.n_blocks
-        start_heigh = max_height + 0.1
+        start_heigh = max_height + 0.12
 
-        height = self.r1_controller.sense_height_tilted(self.goal_tower_position[0],
+        height = self.r2_controller.sense_height_tilted(self.goal_tower_position[0],
                                                         self.goal_tower_position[1],
                                                         start_heigh)
 
         # first block should be at about 0.032, then 0.04 for every other block
-        if height < 0.03:
+        if height < 0.030:
             return 0
 
-        n_blocks_float = ((height - 0.032) / 0.04) + 1
+        n_blocks_float = ((height - 0.031) / 0.04) + 1
         # go for the ceil, worst case we will do one redundant pick
         n_blocks = int(np.ceil(n_blocks_float))
         return n_blocks
