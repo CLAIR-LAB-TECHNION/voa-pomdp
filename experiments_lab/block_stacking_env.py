@@ -3,7 +3,7 @@ from matplotlib import pyplot as plt
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_from_block_positions_dists,\
-    distribute_blocks_in_positions
+    distribute_blocks_in_positions, to_canonical_config
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default)
@@ -15,17 +15,6 @@ from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot
     detections_plots_with_depth_as_image
 
 
-def to_canonical_config(clean_up_sensor_config):
-    """
-    change config to be between -pi and pi for all joints
-    """
-    for i in range(6):
-        while clean_up_sensor_config[i] > np.pi:
-            clean_up_sensor_config[i] -= 2*np.pi
-        while clean_up_sensor_config[i] < -np.pi:
-            clean_up_sensor_config[i] += 2*np.pi
-
-    return clean_up_sensor_config
 
 class LabBlockStackingEnv:
     cleared_blocks_position = [-0.25, -1.15]

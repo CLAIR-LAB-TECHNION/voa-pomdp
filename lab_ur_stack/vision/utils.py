@@ -218,7 +218,7 @@ def lookat_verangle_distance_to_robot_config(lookat, vertical_angle, distance, g
         if config is not None and gt.motion_planner.is_config_feasible(robot_name, config) is False:
             config = None
 
-        # sample new up vecotr, should be normalized
+        # sample new up vector, should be normalized
         up_vector = np.random.rand(3)
         up_vector /= np.linalg.norm(up_vector)
 

@@ -62,7 +62,7 @@ class AbstractMotionPlanner:
         except ImportError:
             return False
 
-    def visualize(self, backend="GLUT", window_name=None):
+    def visualize(self, backend=None, window_name=None):
         """
         open visualization window
         """

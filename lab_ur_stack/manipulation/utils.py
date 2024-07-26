@@ -4,16 +4,15 @@ from lab_ur_stack.utils.workspace_utils import (sample_block_positions_uniform, 
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 
 
-
 def to_canonical_config(clean_up_sensor_config):
     """
     change config to be between -pi and pi for all joints
     """
     for i in range(6):
         while clean_up_sensor_config[i] > np.pi:
-            clean_up_sensor_config[i] -= 2*np.pi
+            clean_up_sensor_config[i] -= 2 * np.pi
         while clean_up_sensor_config[i] < -np.pi:
-            clean_up_sensor_config[i] += 2*np.pi
+            clean_up_sensor_config[i] += 2 * np.pi
 
     return clean_up_sensor_config
 
