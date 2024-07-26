@@ -4,6 +4,20 @@ from lab_ur_stack.utils.workspace_utils import (sample_block_positions_uniform, 
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 
 
+
+def to_canonical_config(clean_up_sensor_config):
+    """
+    change config to be between -pi and pi for all joints
+    """
+    for i in range(6):
+        while clean_up_sensor_config[i] > np.pi:
+            clean_up_sensor_config[i] -= 2*np.pi
+        while clean_up_sensor_config[i] < -np.pi:
+            clean_up_sensor_config[i] += 2*np.pi
+
+    return clean_up_sensor_config
+
+
 def distribute_blocks_in_positions(block_positions,
                                    robot_controller: ManipulationController,
                                    stack_position_ur5e_2_frame=stack_position_r2frame):
@@ -13,11 +27,11 @@ def distribute_blocks_in_positions(block_positions,
     stack_position_world = robot_controller.gt.point_robot_to_world(robot_controller.robot_name,
                                                                     [*stack_position_ur5e_2_frame, 0.])
 
-    start_hight = 0.1 + 0.04 * len(block_positions)
+    start_height = 0.1 + 0.04 * len(block_positions)
     for block_pos in block_positions:
-        robot_controller.pick_up(stack_position_world[0], stack_position_world[1], rz=0, start_height=start_hight)
+        robot_controller.pick_up(stack_position_world[0], stack_position_world[1], rz=0, start_height=start_height)
         robot_controller.put_down(block_pos[0], block_pos[1], rz=0, start_height=0.15)
-        start_hight -= 0.04
+        start_height -= 0.04
 
 
 def ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks,
@@ -33,17 +47,18 @@ def ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks,
     distribute_blocks_in_positions(block_positions, robot_controller, stack_position_ur5e_2_frame)
     return block_positions
 
-def ur5e_2_distribute_blocks_from_block_positions_dists(blocks_distsributuins,
+
+def ur5e_2_distribute_blocks_from_block_positions_dists(blocks_distributions,
                                                         robot_controller: ManipulationController,
                                                         stack_position_ur5e_2_frame=stack_position_r2frame,
                                                         min_distance=0.07):
-    block_positions = sample_block_positions_from_dists(blocks_distsributuins, min_distance)
+    block_positions = sample_block_positions_from_dists(blocks_distributions, min_distance)
     distribute_blocks_in_positions(block_positions, robot_controller, stack_position_ur5e_2_frame)
     return block_positions
 
 
 def ur5e_2_collect_blocks_from_positions(block_positions, robot_controller: ManipulationController,
-                                        stack_position_ur5e_2_frame=stack_position_r2frame):
+                                         stack_position_ur5e_2_frame=stack_position_r2frame):
     """
     collect blocks from block_positions and stack them at stack_position
     """
@@ -56,4 +71,3 @@ def ur5e_2_collect_blocks_from_positions(block_positions, robot_controller: Mani
         robot_controller.pick_up(block_pos[0], block_pos[1], rz=0, start_height=0.15)
         robot_controller.put_down(stack_position_world[0], stack_position_world[1], rz=0,
                                   start_height=put_down_start_height)
-
