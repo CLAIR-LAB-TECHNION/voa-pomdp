@@ -48,6 +48,28 @@ class Masked2DTruncNorm:
         self.masked_areas = resolve_overlaps(self.masked_areas)
         self.normalization_constant = self._calculate_normalization_constant()
 
+    def add_multiple_new_areas(self, masked_areas, new_bounds):
+        """
+        equivalent to calling add_masked_area and add_new_bounds for all areas and abounds, but this one is
+        way more efficient since overlaps is resolved only once for all new areas
+        """
+        # first add all the new bounds at the beginning:
+        for bound in new_bounds:
+            new_bounds_x, new_bounds_y = bound
+            masked_areas_from_bounds = [
+                [[self.bounds_x[0], new_bounds_x[0]], self.bounds_y],
+                [[new_bounds_x[1], self.bounds_x[1]], self.bounds_y],
+                [new_bounds_x, [self.bounds_y[0], new_bounds_y[0]]],
+                [new_bounds_x, [new_bounds_y[1], self.bounds_y[1]]], ]
+            self.masked_areas = masked_areas_from_bounds + self.masked_areas
+
+        # now add the new masked areas at the end:
+        self.masked_areas = self.masked_areas + masked_areas
+
+        # now resolve overlaps for all:
+        self.masked_areas = resolve_overlaps(self.masked_areas)
+        self.normalization_constant = self._calculate_normalization_constant()
+
     def _calculate_normalization_constant(self):
         """Calculates the normalization constant for the joint PDF."""
         full_probability = 1  # Assume full probability mass covers the entire normalized range

@@ -177,14 +177,3 @@ class LabBlockStackingEnv:
         return 0  # TODO, need to model that in the pomdp as well, maybe create cost model...
 
 
-
-
-
-
-
-
-
-
-
-
-
