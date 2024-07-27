@@ -121,7 +121,7 @@ class BlocksPositionsBelief:
                                                    positive_sensing_points,
                                                    negative_sensing_points,
                                                    successful_pickup_points,
-                                                   no_update_margin=0.002):
+                                                   no_update_margin=0.005):
         """
         This is almost equivalent to calls for update_from_point_sensing_observation for the positive
         and the negative sensing points and update_from_successful_pick for the successful picks.

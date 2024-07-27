@@ -81,6 +81,6 @@ def from_detections():
     plot_all_blocks_beliefs(belief, grid_size=200)
 
 if __name__ == "__main__":
-    one_block_point_sensing()
-    # multiple_blocks()
+    # one_block_point_sensing()
+    multiple_blocks()
     # from_detections()
