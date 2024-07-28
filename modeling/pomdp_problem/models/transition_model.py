@@ -7,12 +7,14 @@ import pomdp_py
 
 
 class TransitionModel(pomdp_py.TransitionModel):
-    def __init__(self, block_size=0.04, successful_grasp_offset_x=0.01, successful_grasp_offset_y=0.01):
+    def __init__(self, block_size=0.04, successful_grasp_offset_x=0.015, successful_grasp_offset_y=0.01):
         self.block_size = block_size
         self.successful_grasp_offset_x = successful_grasp_offset_x
         self.successful_grasp_offset_y = successful_grasp_offset_y
 
     def sample(self, state, action):
+        assert state.steps_left > 0
+
         if isinstance(action, ActionAttemptStack):
             return self.sample_stack_attempt(state, action)
         elif isinstance(action, ActionSense):

@@ -148,3 +148,30 @@ class Masked2DTruncNorm:
             points[invalid_samples] = new_points
 
         return points
+
+    def sample_with_redundency(self, n_samples=1, ratio=2):
+        # should be more efficient sampling. start by sampling more points (by ratio), and filter
+        # out points that are in masked areas this way the loop of resampling should be ran less time
+
+        if self.normalization_constant is None:
+            self.normalization_constant = self._calculate_normalization_constant()
+
+        samples_x = self.dist_x.rvs(ratio*n_samples)
+        samples_y = self.dist_y.rvs(ratio*n_samples)
+        points = np.stack([samples_x, samples_y], axis=1)
+
+        valid_points = points[np.where(self.pdf(points) != 0)[0]]
+
+        # make sure none of the points are in masked areas:
+        while len(valid_points) < n_samples:
+            print("resampling")
+            new_samples_x = self.dist_x.rvs(ratio * n_samples)
+            new_samples_y = self.dist_y.rvs(ratio * n_samples)
+            new_points = np.stack([new_samples_x, new_samples_y], axis=1)
+            new_valid_points = new_points[np.where(self.pdf(new_points) != 0)[0]]
+            valid_points = np.concatenate((valid_points, new_valid_points))
+
+            ratio *= 2
+
+        return valid_points[:n_samples]
+
