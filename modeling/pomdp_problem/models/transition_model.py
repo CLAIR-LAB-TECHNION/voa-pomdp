@@ -7,7 +7,7 @@ import pomdp_py
 
 
 class TransitionModel(pomdp_py.TransitionModel):
-    def __init__(self, block_size=0.04, successful_grasp_offset_x=0.015, successful_grasp_offset_y=0.01):
+    def __init__(self, block_size=0.04, successful_grasp_offset_x=0.015, successful_grasp_offset_y=0.015):
         self.block_size = block_size
         self.successful_grasp_offset_x = successful_grasp_offset_x
         self.successful_grasp_offset_y = successful_grasp_offset_y
@@ -37,6 +37,9 @@ class TransitionModel(pomdp_py.TransitionModel):
 
         if success:
             next_state.block_positions = np.delete(state.block_positions, nearest_block, axis=0)
+            if len(next_state.block_positions) == 0:
+                # And there's also a reward for that
+                next_state.steps_left = 0
 
         next_state.last_stack_attempt_succeded = success
 

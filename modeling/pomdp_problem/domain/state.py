@@ -10,7 +10,7 @@ class State(pomdp_py.State):
         # this is meant to hold the information about success after stack attempt.
         # we need it because the observation depends only on next state on pomdp_py
         # and we need to know previous state. this is a small hack to overcome this.
-        self.last_stack_attempt_succeded = None
+        self.last_stack_attempt_succeded = last_stack_attempt_succeded
 
     def __eq__(self, other):
         return self.block_positions == other.block_positions and self.steps_left == other.steps_left
