@@ -90,4 +90,6 @@ class PolicyModel(pomdp_py.PolicyModel):
         return actions_to_return
 
     def rollout(self, state, history):
+        if state.steps_left <= 0:
+            return None
         return random.sample(self.get_all_actions(state, history), 1)[0]

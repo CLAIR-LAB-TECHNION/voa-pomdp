@@ -10,6 +10,9 @@ class ObservationModel(pomdp_py.ObservationModel):
         self.block_size = block_size
 
     def sample(self, next_state, action):
+        if action is None:
+            return None
+
         if isinstance(action, ActionAttemptStack):
             # for simplicity, right now we assume that the robot can accurately sense if block is picked
             # We can make this probabilistic if we see this is not accurate enough

@@ -13,6 +13,9 @@ class TransitionModel(pomdp_py.TransitionModel):
         self.successful_grasp_offset_y = successful_grasp_offset_y
 
     def sample(self, state, action):
+        if action is None:
+            return state
+
         assert state.steps_left > 0
 
         if isinstance(action, ActionAttemptStack):
