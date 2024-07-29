@@ -17,3 +17,6 @@ class State(pomdp_py.State):
 
     def __hash__(self):
         return hash((self.block_positions, self.steps_left, self.last_stack_attempt_succeded))
+
+    def __str__(self):
+        return f"State(block_positions={self.block_positions}, steps_left={self.steps_left})"

@@ -67,8 +67,9 @@ class Masked2DTruncNorm:
         self.masked_areas = self.masked_areas + masked_areas
 
         # now resolve overlaps for all:
-        self.masked_areas = resolve_overlaps(self.masked_areas)
-        self.normalization_constant = self._calculate_normalization_constant()
+        if len(self.masked_areas) > 0:
+            self.masked_areas = resolve_overlaps(self.masked_areas)
+            self.normalization_constant = self._calculate_normalization_constant()
 
     def _calculate_normalization_constant(self):
         """Calculates the normalization constant for the joint PDF."""
@@ -164,7 +165,7 @@ class Masked2DTruncNorm:
 
         # make sure none of the points are in masked areas:
         while len(valid_points) < n_samples:
-            print("resampling")
+            # print("resampling")
             new_samples_x = self.dist_x.rvs(ratio * n_samples)
             new_samples_y = self.dist_y.rvs(ratio * n_samples)
             new_points = np.stack([new_samples_x, new_samples_y], axis=1)

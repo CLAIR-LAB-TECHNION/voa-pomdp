@@ -1,6 +1,6 @@
+import copy
 import random
 from copy import deepcopy
-
 import numpy as np
 import pomdp_py
 from modeling.belief.block_position_belief import BlocksPositionsBelief
@@ -9,7 +9,27 @@ from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 
 
-def history_to_belief(initial_belief: BlocksPositionsBelief, history):
+class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
+    """
+    just extend BlockPositionsBelief to implement GenerativeDistribution as well,
+    so it can be used as belief by agent and policy
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)  # calls only BlocksPositionsBelief initializer
+
+    def __new__(cls, *args, **kwargs):
+        # Ensure proper creation of the instance using BlocksPositionsBelief's __new__
+        instance = BlocksPositionsBelief.__new__(cls)
+        return instance
+
+    def __deepcopy__(self, memo):
+        # Create a new instance without calling __init__
+        new_instance = self.__class__.__new__(self.__class__)
+        # Perform a deep copy of the instance's dictionary and update the new instance
+        new_instance.__dict__ = copy.deepcopy(self.__dict__, memo)
+        return new_instance
+
+def history_to_belief(initial_belief: BeliefModel, history):
     # filter to sensing actions with positive sensing, sensing actions with negative sensing
     # and stack attempt actions with success
 
@@ -32,9 +52,9 @@ def history_to_belief(initial_belief: BlocksPositionsBelief, history):
     return new_belief
 
 
-class PolicyModel(pomdp_py.PolicyModel):
+class PolicyModel(pomdp_py.RolloutPolicy):
     def __init__(self,
-                 initial_blocks_position_belief: BlocksPositionsBelief,
+                 initial_blocks_position_belief: BeliefModel,
                  points_to_sample_for_each_block=200,
                  sensing_actions_to_sample_per_block=2):
         self.initial_blocks_position_belief = initial_blocks_position_belief

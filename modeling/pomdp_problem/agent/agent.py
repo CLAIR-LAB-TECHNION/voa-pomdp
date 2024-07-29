@@ -4,7 +4,7 @@ from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
 from modeling.pomdp_problem.domain.state import State
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase
-from modeling.pomdp_problem.models.policy_model import PolicyModel
+from modeling.pomdp_problem.models.policy_model import PolicyModel, BeliefModel
 from modeling.pomdp_problem.models.reward_model import RewardModel
 from modeling.pomdp_problem.models.obseration_model import ObservationModel
 from modeling.pomdp_problem.models.transition_model import TransitionModel
@@ -13,7 +13,7 @@ import pomdp_py
 
 class Agent(pomdp_py.Agent):
     def __init__(self,
-                 initial_blocks_position_belief: BlocksPositionsBelief,
+                 initial_blocks_position_belief: BeliefModel,
                  max_steps,
                  successful_grasp_offset_x=0.015,
                  successful_grasp_offset_y=0.015,
@@ -53,4 +53,20 @@ class Agent(pomdp_py.Agent):
                      last_stack_attempt_succeded=None)
 
     def update(self, actual_action, actual_observation):
-        raise NotImplementedError
+        self.update_history(actual_action, actual_observation)
+        self.update_belief(actual_action, actual_observation)
+
+    def update_belief(self, actual_action, actual_observation):
+        if isinstance(actual_action, ActionSense):
+            x, y = actual_action.x, actual_action.y
+            is_occupied = actual_observation.is_occupied
+            self._cur_belief.update_from_point_sensing_observation(x, y, is_occupied)
+            self.set_belief(self._cur_belief)  # due to weird cpython stuff
+        elif isinstance(actual_action, ActionAttemptStack):
+            if actual_observation.is_object_picked:
+                x, y = actual_action.x, actual_action.y
+                self._cur_belief.update_from_successful_pick(x, y)
+                self.set_belief(self._cur_belief)  # due to weird cpython stuff
+        else:
+            raise NotImplementedError
+

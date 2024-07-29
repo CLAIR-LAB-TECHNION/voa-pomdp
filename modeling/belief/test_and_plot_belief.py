@@ -86,42 +86,42 @@ def from_detections():
 
 if __name__ == "__main__":
     # one_block_point_sensing()
-    # multiple_blocks()
+    multiple_blocks()
     # from_detections()
 
-    block_positions = sample_block_positions_uniform(5, workspace_x_lims_default, workspace_y_lims_default)
-
-    mus = block_positions
-    sigmas = [[0.05, 0.2], [0.25, 0.08], [0.1, 0.15], [0.15, 0.15], [0.02, 0.03]]
-    positive_sensing_points = [[-0.65, -0.65]]
-    negative_sensing_points = [[-0.7, -0.7], [-0.75, -0.75]]
-    pickup_points = [[-0.77, -0.65]]
-
-    belief = BlocksPositionsBelief(5, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
-    belief.update_from_history_of_sensing_and_pick_up(positive_sensing_points,
-                                                       negative_sensing_points,
-                                                       successful_pickup_points=[])
-
-    # test the amount of time it will take to compute pdf on a grid:
-    tstart = time.time()
-    grid_size = 100
-    x = np.linspace(*belief.ws_x_lims, grid_size)
-    y = np.linspace(*belief.ws_y_lims, grid_size)
-    xx, yy = np.meshgrid(x, y)
-    points = np.stack([xx.flatten(), yy.flatten()], axis=1)
-    pdf = np.asarray(belief.block_beliefs[0].pdf(points)).reshape(grid_size, grid_size)
-    print(f"pdf computed in {time.time() - tstart} seconds")
-    max_likelihood_idx = np.argmax(pdf)
-    print(f"max likelihood computed in {time.time()-tstart} seconds")
-
-    plot_block_belief(belief, 0, positive_sensing_points=points)
-
-    # test the amount of time to compute pdf on 100 samples from it:
-    tstart = time.time()
-    points = belief.block_beliefs[0].sample_with_redundency(200)
-    pdf = np.asarray(belief.block_beliefs[0].pdf(points))
-    print(f"pdf computed in {time.time() - tstart} seconds")
-    max_likelihood_idx = np.argmax(pdf)
-    print(f"max likelihood computed in {time.time()-tstart} seconds")
-    plot_block_belief(belief, 0, positive_sensing_points=points)
+    # block_positions = sample_block_positions_uniform(5, workspace_x_lims_default, workspace_y_lims_default)
+    #
+    # mus = block_positions
+    # sigmas = [[0.05, 0.2], [0.25, 0.08], [0.1, 0.15], [0.15, 0.15], [0.02, 0.03]]
+    # positive_sensing_points = [[-0.65, -0.65]]
+    # negative_sensing_points = [[-0.7, -0.7], [-0.75, -0.75]]
+    # pickup_points = [[-0.77, -0.65]]
+    #
+    # belief = BlocksPositionsBelief(5, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
+    # belief.update_from_history_of_sensing_and_pick_up(positive_sensing_points,
+    #                                                    negative_sensing_points,
+    #                                                    successful_pickup_points=[])
+    #
+    # # test the amount of time it will take to compute pdf on a grid:
+    # tstart = time.time()
+    # grid_size = 100
+    # x = np.linspace(*belief.ws_x_lims, grid_size)
+    # y = np.linspace(*belief.ws_y_lims, grid_size)
+    # xx, yy = np.meshgrid(x, y)
+    # points = np.stack([xx.flatten(), yy.flatten()], axis=1)
+    # pdf = np.asarray(belief.block_beliefs[0].pdf(points)).reshape(grid_size, grid_size)
+    # print(f"pdf computed in {time.time() - tstart} seconds")
+    # max_likelihood_idx = np.argmax(pdf)
+    # print(f"max likelihood computed in {time.time()-tstart} seconds")
+    #
+    # plot_block_belief(belief, 0, positive_sensing_points=points)
+    #
+    # # test the amount of time to compute pdf on 100 samples from it:
+    # tstart = time.time()
+    # points = belief.block_beliefs[0].sample_with_redundency(200)
+    # pdf = np.asarray(belief.block_beliefs[0].pdf(points))
+    # print(f"pdf computed in {time.time() - tstart} seconds")
+    # max_likelihood_idx = np.argmax(pdf)
+    # print(f"max likelihood computed in {time.time()-tstart} seconds")
+    # plot_block_belief(belief, 0, positive_sensing_points=points)
 

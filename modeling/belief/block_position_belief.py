@@ -26,6 +26,9 @@ class BlocksPositionsBelief:
         if init_sigmas.ndim == 1:
             init_sigmas = np.tile(init_sigmas, (n_blocks, 1))
 
+        assert len(init_mus) == n_blocks
+        assert len(init_sigmas) == n_blocks
+
         self.block_beliefs = [BlockPosDist(ws_x_lims, ws_y_lims, init_mus[i][0], init_sigmas[i][0],
                                            init_mus[i][1], init_sigmas[i][1])
                               for i in range(n_blocks)]
@@ -173,11 +176,9 @@ class BlocksPositionsBelief:
                 self.block_beliefs[i].add_multiple_new_areas(masked_areas, new_bounds_list)
 
         # now remove the blocks that were picked up:
-        for i in range(self.n_blocks_on_table):
-            if is_block_picked_up[i]:
-                self.block_beliefs.pop(i)
-                self.n_blocks_on_table -= 1
-                self.blocks_picked[i] = 1
+        self.block_beliefs = [b for i, b in enumerate(self.block_beliefs) if not is_block_picked_up[i]]
+        self.n_blocks_on_table = len(self.block_beliefs)
+        self.blocks_picked[is_block_picked_up] = 1
 
 
     def _associate_detection_mus_with_blocks(self, detection_mus):
