@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import truncnorm
-from modeling.belief.rectangles_overlap_resolution import resolve_overlaps
+from modeling.belief.rectangles_overlap_resolution import resolve_overlaps, resolve_overlaps_only_for_new
 
 
 def get_truncnorm_distribution(bounds, mu, sigma):
@@ -78,6 +78,9 @@ class Masked2DTruncNorm:
             masked_probability = self._calculate_masked_probability(mask, self.bounds_x, self.mu_x, self.sigma_x,
                                                                     self.bounds_y, self.mu_y, self.sigma_y)
             full_probability -= masked_probability
+
+        if full_probability == 0:
+            full_probability = 1e-9
         return full_probability
 
     def _calculate_probability_mass(self, mask_dim, bounds, mu, sigma):
@@ -121,6 +124,7 @@ class Masked2DTruncNorm:
         x = points[:, 0]
         y = points[:, 1]
 
+        norm_const = self.normalization_constant if self.normalization_constant != 0 else 1e-8
         # Vectorized check for masked areas
         result = (self.dist_x.pdf(x) * self.dist_y.pdf(y)) / self.normalization_constant
         for mask in self.masked_areas:
@@ -150,9 +154,12 @@ class Masked2DTruncNorm:
 
         return points
 
-    def sample_with_redundency(self, n_samples=1, ratio=2):
-        # should be more efficient sampling. start by sampling more points (by ratio), and filter
-        # out points that are in masked areas this way the loop of resampling should be ran less time
+    def sample_with_redundency(self, n_samples=1, ratio=2, max_retries=5):
+        """
+        should be more efficient sampling. start by sampling more points (by ratio), and filter
+        out points that are in masked areas this way the loop of resampling should be ran less time
+        Resampling will happen up to max_retries times
+        """
 
         if self.normalization_constant is None:
             self.normalization_constant = self._calculate_normalization_constant()
@@ -164,7 +171,9 @@ class Masked2DTruncNorm:
         valid_points = points[np.where(self.pdf(points) != 0)[0]]
 
         # make sure none of the points are in masked areas:
-        while len(valid_points) < n_samples:
+        retries = 0
+        while len(valid_points) and retries < max_retries:
+            retries += 1
             # print("resampling")
             new_samples_x = self.dist_x.rvs(ratio * n_samples)
             new_samples_y = self.dist_y.rvs(ratio * n_samples)
@@ -175,4 +184,25 @@ class Masked2DTruncNorm:
             ratio *= 2
 
         return valid_points[:n_samples]
+
+    def sample_max_points(self, n_samples, min_samples):
+        """
+        sample n_samples from the underlying gaussian distribution, remove samples in masked areas
+        and don't sample again until you reach n_samples, just return what is filtered, unless
+        there are less than min_samples in the filtered list, in which case do sample more
+        """
+
+        if self.normalization_constant is None:
+            self.normalization_constant = self._calculate_normalization_constant()
+
+        samples_x = self.dist_x.rvs(n_samples)
+        samples_y = self.dist_y.rvs(n_samples)
+        points = np.stack([samples_x, samples_y], axis=1)
+
+        valid_points = points[np.where(self.pdf(points) != 0)[0]]
+
+        if len(valid_points) < min_samples:
+            valid_points = self.sample(n_samples=min_samples)
+
+        return valid_points
 
