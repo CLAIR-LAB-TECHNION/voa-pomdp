@@ -1,7 +1,7 @@
 from copy import deepcopy
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
 from modeling.pomdp_problem.domain.state import State
-from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
+from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, DummyAction
 import numpy as np
 import pomdp_py
 
@@ -13,7 +13,7 @@ class TransitionModel(pomdp_py.TransitionModel):
         self.successful_grasp_offset_y = successful_grasp_offset_y
 
     def sample(self, state, action):
-        if action is None:
+        if isinstance(action, DummyAction):
             return state
 
         assert state.steps_left > 0

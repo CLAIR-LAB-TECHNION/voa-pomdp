@@ -2,7 +2,7 @@ import numpy as np
 import pomdp_py
 from modeling.pomdp_problem.domain.state import State
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
-from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
+from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, DummyAction
 
 
 class ObservationModel(pomdp_py.ObservationModel):
@@ -10,7 +10,7 @@ class ObservationModel(pomdp_py.ObservationModel):
         self.block_size = block_size
 
     def sample(self, next_state, action):
-        if action is None:
+        if isinstance(action, DummyAction):
             return None
 
         if isinstance(action, ActionAttemptStack):

@@ -33,8 +33,10 @@ class BlocksPositionsBelief:
                                            init_mus[i][1], init_sigmas[i][1])
                               for i in range(n_blocks)]
 
+        # maintain a list where blocks are in the same position, useful for plotting. blocks that are removed
+        # are replaced by None:
+        self.block_beliefs_original_position = [b for b in self.block_beliefs]
         self.n_blocks_on_table = n_blocks
-        self.blocks_picked = np.zeros(n_blocks, dtype=bool)
 
     def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.005):
         """
@@ -111,8 +113,8 @@ class BlocksPositionsBelief:
         block_to_remove_id = np.argmax([b.pdf((pick_x, pick_y)) for b in self.block_beliefs])
 
         self.block_beliefs.pop(block_to_remove_id)
+        self.block_beliefs_original_position[block_to_remove_id] = None
         self.n_blocks_on_table -= 1
-        self.blocks_picked[block_to_remove_id] = 1
 
         # there is nothing around this point anymore. Can use this information but carefully
         half_block_size = self.block_size / 2
@@ -178,7 +180,9 @@ class BlocksPositionsBelief:
         # now remove the blocks that were picked up:
         self.block_beliefs = [b for i, b in enumerate(self.block_beliefs) if not is_block_picked_up[i]]
         self.n_blocks_on_table = len(self.block_beliefs)
-        self.blocks_picked[is_block_picked_up] = 1
+        for i, is_picked in enumerate(is_block_picked_up):
+            if is_picked:
+                self.block_beliefs_original_position[i] = None
 
 
     def _associate_detection_mus_with_blocks(self, detection_mus):

@@ -48,12 +48,12 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
     """
     if actual_states is None:
         actual_states = [None] * block_pos_belief.n_blocks_orig
+
     cmaps = ['Reds', 'Oranges', 'Purples', 'pink_r', 'hot_r',]
     images = []
-    curr_existing_block = 0
-    for i in range(len(block_pos_belief.blocks_picked)):
+    for i, block_belief in enumerate(block_pos_belief.block_beliefs_original_position):
         cmap = cmaps[i % len(cmaps)]
-        if block_pos_belief.blocks_picked[i]:
+        if block_belief is None:
             # there is no block anymore, just an empty image
             im = None
 
@@ -63,7 +63,7 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
                 if not per_block_observed_mus_and_sigmas[i][1][0] == -1:
                     observed_mus_and_sigmas = per_block_observed_mus_and_sigmas[i]
 
-            im = plot_block_distribution(block_pos_belief.block_beliefs[curr_existing_block],
+            im = plot_block_distribution(block_belief,
                                          block_pos_belief.ws_x_lims,
                                          block_pos_belief.ws_y_lims,
                                          actual_state=actual_states[i],
@@ -74,7 +74,6 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
                                          n_levels=n_levels,
                                          ret_as_image=True,
                                          color_map=cmap)
-            curr_existing_block += 1
         # remove whitespace:
         # im = im[10:-10, 10:-10, :]
         images.append(im)

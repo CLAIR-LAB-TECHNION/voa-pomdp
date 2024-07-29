@@ -1,6 +1,6 @@
 import pomdp_py
 from lab_ur_stack.utils.workspace_utils import sample_block_positions_uniform, workspace_x_lims_default, \
-    workspace_y_lims_default
+    workspace_y_lims_default, sample_block_positions_from_dists
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.pomdp_problem.agent.agent import Agent
 from modeling.pomdp_problem.env.env import Environment
@@ -12,11 +12,12 @@ from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 
 
 def get_positions_and_init_belief():
-    block_positions = sample_block_positions_uniform(3, workspace_x_lims_default, workspace_y_lims_default)
-    mus = block_positions
+    mus = [[-0.9, -0.9], [-0.75, -0.75], [-0.65, -0.65]]
     sigmas = [[0.05, 0.2], [0.25, 0.08], [0.1, 0.15], [0.15, 0.15], [0.02, 0.03]]
     sigmas = sigmas[:3]
     belief = BeliefModel(3, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
+
+    block_positions = sample_block_positions_from_dists(belief.block_beliefs)
 
     return block_positions, belief
 
@@ -40,10 +41,11 @@ if __name__ == "__main__":
     env = Environment.from_agent(agent=agent, init_state=actual_init_state)
 
     planner = pomdp_py.POUCT(max_depth=5,
-                             planning_time=3,
+                             planning_time=2,
                              rollout_policy=agent.policy_model,
                              show_progress=True)
 
+    print("init state", actual_init_state)
     total_reward = 0
     plot_all_blocks_beliefs(agent.belief)
     for i in range(max_steps):

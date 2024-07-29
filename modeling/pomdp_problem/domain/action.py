@@ -9,6 +9,21 @@ class ActionBase(pomdp_py.Action):
     def __eq__(self, other):
         raise NotImplementedError
 
+
+class DummyAction(ActionBase):
+    """ for terminal states"""
+    def __init__(self):
+        super().__init__(None, None)
+
+    def __eq__(self, other):
+        return isinstance(other, DummyAction)
+
+    def __hash__(self):
+        return hash("dummy_action")
+
+    def __str__(self):
+        return "dummy_action"
+
 class ActionAttemptStack(ActionBase):
     def __init__(self, x, y):
         super().__init__(x, y)
@@ -21,6 +36,9 @@ class ActionAttemptStack(ActionBase):
 
     def __str__(self):
         return f"AttemptStack({self.x}, {self.y})"
+
+    def __repr__(self):
+        return str(self)
 
 
 class ActionSense(ActionBase):
@@ -35,3 +53,6 @@ class ActionSense(ActionBase):
 
     def __str__(self):
         return f"Sense({self.x}, {self.y})"
+
+    def __repr__(self):
+        return str(self)

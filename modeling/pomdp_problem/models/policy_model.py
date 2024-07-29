@@ -5,8 +5,9 @@ import numpy as np
 import pomdp_py
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
-from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase
+from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase, DummyAction
 from modeling.belief.block_position_belief import BlocksPositionsBelief
+from modeling.pomdp_problem.domain.state import State
 
 
 class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
@@ -66,7 +67,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         this actually samples actions
         """
         if state.steps_left <= 0:
-            return []
+            return [DummyAction()]
 
         actions_to_return: list[ActionBase] = []
 
@@ -109,7 +110,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
         return actions_to_return
 
-    def rollout(self, state, history):
+    def rollout(self, state, history) -> ActionBase:
         if state.steps_left <= 0:
-            return None
+            return DummyAction()
         return random.sample(self.get_all_actions(state, history), 1)[0]
