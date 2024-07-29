@@ -1,6 +1,4 @@
 import time
-from copy import deepcopy
-
 import numpy as np
 from shapely import MultiPolygon
 from shapely.geometry import box, Polygon
@@ -35,7 +33,7 @@ def is_polygon_box(polygon):
 
 
 def decompose_to_rectangles(polygon):
-    curr_polygon = deepcopy(polygon)
+    curr_polygon = polygon
     rectangles = []
 
     while curr_polygon.area > 0 and not is_polygon_box(curr_polygon):
@@ -125,6 +123,19 @@ def resolve_overlaps(rectangles):
     merged_boxes = [boxes[0]]
 
     for box in boxes[1:]:
+        add_box_to_merged_list(merged_boxes, box)
+
+    return [shapely_box_to_rect(box) for box in merged_boxes]
+
+
+def resolve_overlaps_only_for_new(resolved_rectangles, new_rectangles):
+    if len(resolved_rectangles) == 0:
+        return resolve_overlaps(new_rectangles)
+
+    new_boxes = [rect_to_shaply_box(rect) for rect in new_rectangles]
+    merged_boxes = [rect_to_shaply_box(rect) for rect in resolved_rectangles]
+
+    for box in new_boxes:
         add_box_to_merged_list(merged_boxes, box)
 
     return [shapely_box_to_rect(box) for box in merged_boxes]
