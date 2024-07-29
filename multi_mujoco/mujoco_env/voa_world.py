@@ -19,9 +19,13 @@ class WorldVoA:
         self._env_entities = {name: agent.entity for name, agent in self._env.agents.items()}
         self.robots_joint_pos = {}
         self.robots_joint_velocities = {}
+        self.robots_force = {}
+        self.robots_camera = {}
         for agent in self._env_entities.keys():
             self.robots_joint_pos[agent] = np.zeros((1, 6))  # will be updated in reset
             self.robots_joint_velocities[agent] = np.zeros((1, 6))  # --""--
+            self.robots_force[agent] = 0.0
+            self.robots_camera[agent] = []
         self.gripper_state_closed = False  # --""--
         self.max_joint_velocities = INIT_MAX_VELOCITY
 
@@ -44,6 +48,8 @@ class WorldVoA:
         for agent in obs.keys():
             self.robots_joint_pos[agent] = obs[agent]['robot_state'][:6]
             self.robots_joint_velocities[agent] = obs[agent]["robot_state"][6:12]
+            self.robots_force[agent] = obs[agent]['sensor']
+            self.robots_camera = [obs[agent]['camera'], obs[agent]['camera']]
         self.gripper_state_closed = False
         self._grasp_manager.release_object()
         self._object_manager.reset(randomize=randomize, block_positions=block_positions)
@@ -95,6 +101,8 @@ class WorldVoA:
         object_positions = self._object_manager.get_all_block_positions_dict()
         state = {"robots_joint_pos": self.robots_joint_pos,
                  "robots_joint_velocities": self.robots_joint_velocities,
+                 "robots_force": self.robots_force,
+                 "robots_camera": self.robots_camera,
                  "gripper_state_closed": self.gripper_state_closed,
                  "object_positions": object_positions,
                  "grasped_object": self._grasp_manager.attached_object_name,
@@ -167,6 +175,8 @@ class WorldVoA:
         for agent, ob in obs.items():
             self.robots_joint_pos[agent] = ob['robot_state'][:6]
             self.robots_joint_velocities[agent] = ob['robot_state'][6:12]
+            self.robots_force[agent] = obs[agent]['sensor']
+            self.robots_camera = [obs[agent]['camera'], obs[agent]['camera']]
         self.gripper_state_closed = gripper_closed
 
     def get_ee_pos(self):
