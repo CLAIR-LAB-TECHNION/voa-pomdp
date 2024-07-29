@@ -48,6 +48,29 @@ class Masked2DTruncNorm:
         self.masked_areas = resolve_overlaps(self.masked_areas)
         self.normalization_constant = self._calculate_normalization_constant()
 
+    def add_multiple_new_areas(self, masked_areas, new_bounds):
+        """
+        equivalent to calling add_masked_area and add_new_bounds for all areas and abounds, but this one is
+        way more efficient since overlaps is resolved only once for all new areas
+        """
+        # first add all the new bounds at the beginning:
+        for bound in new_bounds:
+            new_bounds_x, new_bounds_y = bound
+            masked_areas_from_bounds = [
+                [[self.bounds_x[0], new_bounds_x[0]], self.bounds_y],
+                [[new_bounds_x[1], self.bounds_x[1]], self.bounds_y],
+                [new_bounds_x, [self.bounds_y[0], new_bounds_y[0]]],
+                [new_bounds_x, [new_bounds_y[1], self.bounds_y[1]]], ]
+            self.masked_areas = masked_areas_from_bounds + self.masked_areas
+
+        # now add the new masked areas at the end:
+        self.masked_areas = self.masked_areas + masked_areas
+
+        # now resolve overlaps for all:
+        if len(self.masked_areas) > 0:
+            self.masked_areas = resolve_overlaps(self.masked_areas)
+            self.normalization_constant = self._calculate_normalization_constant()
+
     def _calculate_normalization_constant(self):
         """Calculates the normalization constant for the joint PDF."""
         full_probability = 1  # Assume full probability mass covers the entire normalized range
@@ -126,3 +149,30 @@ class Masked2DTruncNorm:
             points[invalid_samples] = new_points
 
         return points
+
+    def sample_with_redundency(self, n_samples=1, ratio=2):
+        # should be more efficient sampling. start by sampling more points (by ratio), and filter
+        # out points that are in masked areas this way the loop of resampling should be ran less time
+
+        if self.normalization_constant is None:
+            self.normalization_constant = self._calculate_normalization_constant()
+
+        samples_x = self.dist_x.rvs(ratio*n_samples)
+        samples_y = self.dist_y.rvs(ratio*n_samples)
+        points = np.stack([samples_x, samples_y], axis=1)
+
+        valid_points = points[np.where(self.pdf(points) != 0)[0]]
+
+        # make sure none of the points are in masked areas:
+        while len(valid_points) < n_samples:
+            # print("resampling")
+            new_samples_x = self.dist_x.rvs(ratio * n_samples)
+            new_samples_y = self.dist_y.rvs(ratio * n_samples)
+            new_points = np.stack([new_samples_x, new_samples_y], axis=1)
+            new_valid_points = new_points[np.where(self.pdf(new_points) != 0)[0]]
+            valid_points = np.concatenate((valid_points, new_valid_points))
+
+            ratio *= 2
+
+        return valid_points[:n_samples]
+

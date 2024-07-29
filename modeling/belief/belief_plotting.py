@@ -11,6 +11,7 @@ def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
                       actual_state=None,
                       positive_sensing_points=None,
                       negative_sensing_points=None,
+                      pickup_attempt_points=None,
                       grid_size=100,
                       n_levels=50,
                       ret_as_image=False):
@@ -28,6 +29,7 @@ def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
                                    actual_state=actual_state,
                                    positive_sensing_points=positive_sensing_points,
                                    negative_sensing_points=negative_sensing_points,
+                                   pickup_attempt_points=pickup_attempt_points,
                                    grid_size=grid_size,
                                    n_levels=n_levels,
                                    ret_as_image=ret_as_image)
@@ -37,6 +39,7 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
                             actual_states=None,
                             positive_sensing_points=None,
                             negative_sensing_points=None,
+                            pickup_attempt_points=None,
                             per_block_observed_mus_and_sigmas=None,
                             grid_size=100,
                             n_levels=50,
@@ -47,30 +50,46 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
     as a list, where if a block doesn't have observation, sigmas are set to -1.
     """
     if actual_states is None:
-        actual_states = [None] * block_pos_belief.n_blocks
+        actual_states = [None] * block_pos_belief.n_blocks_orig
+
     cmaps = ['Reds', 'Oranges', 'Purples', 'pink_r', 'hot_r',]
     images = []
-    for i in range(block_pos_belief.n_blocks):
+    for i, block_belief in enumerate(block_pos_belief.block_beliefs_original_position):
         cmap = cmaps[i % len(cmaps)]
-        observed_mus_and_sigmas = None
-        if per_block_observed_mus_and_sigmas is not None:
-            if not per_block_observed_mus_and_sigmas[i][1][0] == -1:
-                observed_mus_and_sigmas = per_block_observed_mus_and_sigmas[i]
+        if block_belief is None:
+            # there is no block anymore, just an empty image
+            im = None
 
-        im = plot_block_distribution(block_pos_belief.block_beliefs[i],
-                                     block_pos_belief.ws_x_lims,
-                                     block_pos_belief.ws_y_lims,
-                                     actual_state=actual_states[i],
-                                     positive_sensing_points=positive_sensing_points,
-                                     negative_sensing_points=negative_sensing_points,
-                                     observed_mus_and_sigmas=observed_mus_and_sigmas,
-                                     grid_size=grid_size,
-                                     n_levels=n_levels,
-                                     ret_as_image=True,
-                                     color_map=cmap)
+        else:
+            observed_mus_and_sigmas = None
+            if per_block_observed_mus_and_sigmas is not None:
+                if not per_block_observed_mus_and_sigmas[i][1][0] == -1:
+                    observed_mus_and_sigmas = per_block_observed_mus_and_sigmas[i]
+
+            im = plot_block_distribution(block_belief,
+                                         block_pos_belief.ws_x_lims,
+                                         block_pos_belief.ws_y_lims,
+                                         actual_state=actual_states[i],
+                                         positive_sensing_points=positive_sensing_points,
+                                         negative_sensing_points=negative_sensing_points,
+                                         pickup_attempt_points=pickup_attempt_points,
+                                         observed_mus_and_sigmas=observed_mus_and_sigmas,
+                                         grid_size=grid_size,
+                                         n_levels=n_levels,
+                                         ret_as_image=True,
+                                         color_map=cmap)
         # remove whitespace:
         # im = im[10:-10, 10:-10, :]
         images.append(im)
+
+    # if all images are blank, return empty image
+    if all([im is None for im in images]):
+        return np.zeros((5, 5, 3), dtype=np.uint8)
+
+    # otherwise, create blank image in the same size of others instead of Nones:
+    non_blank_images = [im for im in images if im is not None]
+    blank_image = np.zeros_like(non_blank_images[0])
+    images = [im if im is not None else blank_image for im in images]
 
     # plot all images in a column, first stack them on y to get a single image
     final_image = np.vstack(images)
@@ -78,7 +97,7 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
     if ret_as_image:
         return final_image
 
-    plt.figure(figsize=(8, 6*block_pos_belief.n_blocks))
+    plt.figure(figsize=(8, 6*block_pos_belief.n_blocks_orig))
     plt.imshow(final_image)
     plt.axis('off')
     plt.tight_layout()
@@ -91,6 +110,7 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
                             actual_state=None,
                             positive_sensing_points=None,
                             negative_sensing_points=None,
+                            pickup_attempt_points=None,
                             observed_mus_and_sigmas=None,
                             grid_size=100,
                             n_levels=50,
@@ -145,6 +165,10 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
     if negative_sensing_points is not None:
         for point in negative_sensing_points:
             plt.plot(point[0], point[1], 'g_', markersize=9, )
+
+    if pickup_attempt_points is not None:
+        for point in pickup_attempt_points:
+            plt.plot(point[0], point[1], 'go', markersize=9, )
 
     if observed_mus_and_sigmas is not None:
         # add plots of 2d gaussian with the observed mus and sigmas in gray, opacity is 0.5

@@ -45,7 +45,7 @@ def crop_workspace(image,
                    workspace_limits_y,
                    z=-0.0,
                    robot_name="ur5e_1",
-                   extension_radius=0.04,):
+                   extension_radius=0.04, ):
     """
     crop the workspace that is within given workspace limits and return the cropped image and coordinates of
      the cropped image in the original image
@@ -174,7 +174,7 @@ def lookat_verangle_distance_to_camera_transform(lookat, vertical_angle, distanc
     # build rotation matrix from up, right, forward vectors
     # Assume the up vector is [1, 0, 0] for simplicity this is good because it's toward the workspace,
     # the camera will be aligned
-    up = np.array([1, 0, 0])
+    up = up_vector
 
     # Calculate the right vector
     right = np.cross(up, direction)
@@ -218,7 +218,7 @@ def lookat_verangle_distance_to_robot_config(lookat, vertical_angle, distance, g
         if config is not None and gt.motion_planner.is_config_feasible(robot_name, config) is False:
             config = None
 
-        # sample new up vecotr, should be normalized
+        # sample new up vector, should be normalized
         up_vector = np.random.rand(3)
         up_vector /= np.linalg.norm(up_vector)
 
@@ -231,3 +231,61 @@ def lookat_verangle_distance_to_robot_config(lookat, vertical_angle, distance, g
                       f" {max_trials - trails_left} trials")
 
     return config
+
+
+def lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle, horizontal_angle, distance,
+                                                          rotation_angle=0):
+    """
+    returns the camera se3 transform given the lookat point, vertical angle, horizontal angle and distance.
+    the camera will look at the lookat point with the given angles and distance.
+    vertical angle is the angle from the xy plane, horizontal angle is the angle from xz plane.
+    There's one degree of freedom which is the rotation of the camera around lookat direction
+    """
+    vertical_angle = np.deg2rad(vertical_angle)
+    horizontal_angle = np.deg2rad(horizontal_angle)
+    rotation_angle = np.deg2rad(rotation_angle)
+
+    # Calculate the camera position in the world frame
+    delta_x = distance * np.cos(vertical_angle) * np.cos(horizontal_angle)
+    delta_y = distance * np.cos(vertical_angle) * np.sin(horizontal_angle)
+    delta_z = distance * np.sin(vertical_angle)
+    assert np.abs(delta_x ** 2 + delta_y ** 2 + delta_z ** 2 - distance ** 2) < 1e-5
+
+    camera_position = np.array([lookat[0] + delta_x, lookat[1] + delta_y, lookat[2] + delta_z])
+
+    # Calculate the direction vector from the camera to the look-at point
+    direction = lookat - camera_position
+    direction /= np.linalg.norm(direction)  # Normalize the direction vector
+
+    # build rotation matrix from up, right, forward vectors
+    forward = direction
+    up = np.array([np.cos(rotation_angle), np.sin(rotation_angle), 0])
+    up /= np.linalg.norm(up)  # Normalize the up vector
+    right = np.cross(up, forward)
+    right /= np.linalg.norm(right)  # Normalize the right vector
+    up = np.cross(forward, right)
+
+    # Create the rotation matrix, this is the world to camera rotation matrix
+    rotation_matrix = np.eye(3)
+    rotation_matrix[:, 0] = right
+    rotation_matrix[:, 1] = up
+    rotation_matrix[:, 2] = forward
+    # Invert the rotation matrix to get the camera to world rotation matrix
+    rotation_matrix = np.linalg.inv(rotation_matrix)
+
+    return rotation_matrix.flatten(), camera_position
+
+
+def lookat_verangle_horangle_distance_to_robot_config(lookat, vertical_angle, horizontal_angle,
+                                                      distance, gt, robot_name, ):
+    camera_rotations = np.linspace(0, 270, 27)
+    for rot in camera_rotations:
+        camera_transform = lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle,
+                                                                                 horizontal_angle, distance,
+                                                                                 rotation_angle=rot)
+        ee_transform = se3.mul(gt.camera_to_ee_transform(), camera_transform)
+        config = gt.motion_planner.ik_solve(robot_name, ee_transform)
+        if config is not None and gt.motion_planner.is_config_feasible(robot_name, config):
+            return config
+
+    return None
