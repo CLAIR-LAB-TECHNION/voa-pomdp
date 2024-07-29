@@ -63,10 +63,9 @@ class Agent(pomdp_py.Agent):
             self._cur_belief.update_from_point_sensing_observation(x, y, is_occupied)
             self.set_belief(self._cur_belief)  # due to weird cpython stuff
         elif isinstance(actual_action, ActionAttemptStack):
-            if actual_observation.is_object_picked:
-                x, y = actual_action.x, actual_action.y
-                self._cur_belief.update_from_successful_pick(x, y)
-                self.set_belief(self._cur_belief)  # due to weird cpython stuff
+            x, y = actual_action.x, actual_action.y
+            self._cur_belief.update_from_pickup_attempt(x, y, actual_observation.is_object_picked)
+            self.set_belief(self._cur_belief)  # due to weird cpython stuff
         else:
             raise NotImplementedError
 

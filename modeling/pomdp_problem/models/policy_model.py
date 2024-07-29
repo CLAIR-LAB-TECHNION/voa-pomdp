@@ -37,6 +37,7 @@ def history_to_belief(initial_belief: BeliefModel, history):
     sense_positive = []  # points where we sense there is a block
     sense_negative = []  # points where we sensed there isn't block
     stack_positive = []  # points where we stacked form
+    stack_negative = []  # points where we tried to stack from but failed
 
     for (action, observation) in history:
         if isinstance(action, ActionSense):
@@ -47,9 +48,14 @@ def history_to_belief(initial_belief: BeliefModel, history):
         elif isinstance(action, ActionAttemptStack):
             if observation.is_object_picked:
                 stack_positive.append((action.x, action.y))
+            else:
+                stack_negative.append((action.x, action.y))
 
     new_belief = deepcopy(initial_belief)
-    new_belief.update_from_history_of_sensing_and_pick_up(sense_positive, sense_negative, stack_positive)
+    new_belief.update_from_history_of_sensing_and_pick_up(sense_positive,
+                                                          sense_negative,
+                                                          stack_positive,
+                                                          stack_negative)
     return new_belief
 
 

@@ -93,3 +93,4 @@ if __name__ == "__main__":
         # TODO: think how not to call get_all_actions on each rollout
         # TODO: Is there a way to limit max_num_rollouts per node?
         # TODO: profile
+        # TODO: lab task for tomorrow check pickup success in env

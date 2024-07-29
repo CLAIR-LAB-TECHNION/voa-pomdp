@@ -69,8 +69,7 @@ def main(n_blocks: int = 2,
         if action[0] == "sense":
             current_belief.update_from_point_sensing_observation(action[1], action[2], observation[0])
         elif action[0] == "attempt_stack":
-            if observation[0]:  # successful pickup
-                current_belief.update_from_successful_pick(action[1], action[2])
+            current_belief.update_from_pickup_attempt(action[1], action[2], observation[0])
 
         prev_observation = observation
 

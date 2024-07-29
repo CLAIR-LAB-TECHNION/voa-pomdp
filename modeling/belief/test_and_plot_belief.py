@@ -56,7 +56,7 @@ def multiple_blocks():
     belief.update_from_point_sensing_observation(*positive_sensing_points[0], is_occupied=True)
     plot_all_blocks_beliefs(belief, grid_size=200)
 
-    belief.update_from_successful_pick(*pickup_points[0])
+    belief.update_from_pickup_attempt(*pickup_points[0], observed_success=True)
     plot_all_blocks_beliefs(belief, grid_size=200)
 
     # should be equivalent to:
