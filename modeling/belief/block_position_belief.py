@@ -1,5 +1,7 @@
 import numpy as np
 from modeling.belief.masked_gaussian_distribution import Masked2DTruncNorm
+from line_profiler_pycharm import profile
+
 
 BlockPosDist = Masked2DTruncNorm
 
@@ -135,6 +137,7 @@ class BlocksPositionsBelief:
             self.add_empty_area([pick_x - self.successful_grasp_margin_x, pick_x + self.successful_grasp_margin_x],
                                 [pick_y - self.successful_grasp_margin_y, pick_y + self.successful_grasp_margin_y], )
 
+    @profile
     def update_from_history_of_sensing_and_pick_up(self,
                                                    positive_sensing_points,
                                                    negative_sensing_points,

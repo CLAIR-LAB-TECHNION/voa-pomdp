@@ -8,6 +8,7 @@ from modeling.pomdp_problem.domain.observation import ObservationSenseResult, Ob
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase, DummyAction
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.pomdp_problem.domain.state import State
+from line_profiler_pycharm import profile
 
 
 class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
@@ -30,6 +31,7 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
         new_instance.__dict__ = copy.deepcopy(self.__dict__, memo)
         return new_instance
 
+@profile
 def history_to_belief(initial_belief: BeliefModel, history):
     # filter to sensing actions with positive sensing, sensing actions with negative sensing
     # and stack attempt actions with success
@@ -58,7 +60,6 @@ def history_to_belief(initial_belief: BeliefModel, history):
                                                           stack_negative)
     return new_belief
 
-
 class PolicyModel(pomdp_py.RolloutPolicy):
     def __init__(self,
                  initial_blocks_position_belief: BeliefModel,
@@ -68,6 +69,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         self.points_to_sample_for_each_block = points_to_sample_for_each_block
         self.sensing_actions_to_sample_per_block = sensing_actions_to_sample_per_block
 
+    @profile
     def get_all_actions(self, state, history, best_points=None):
         """
         this actually samples actions
@@ -83,7 +85,12 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         per_block_points = []
         per_block_pdfs = []
         for block_dist in belief.block_beliefs:
-            points = block_dist.sample_with_redundency(self.points_to_sample_for_each_block)
+            points = block_dist.sample_max_points(self.points_to_sample_for_each_block,
+                                                  min_samples=self.sensing_actions_to_sample_per_block*2)
+            # if len(points) <= 10:
+            #     from modeling.belief.belief_plotting import plot_all_blocks_beliefs
+            #     plot_all_blocks_beliefs(belief, positive_sensing_points=points)
+
             per_block_points.append(points)
             per_block_pdfs.append(block_dist.pdf(points))
 

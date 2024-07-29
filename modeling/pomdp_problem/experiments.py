@@ -89,7 +89,10 @@ if __name__ == "__main__":
                                 pickup_attempt_points=pickup_attempt_points)
 
         pass
-        # TODO: next optimizations: 1. rectangles overlap. 2. belie update caching, need overlap for one rectangle
+        # TODO next step is to implement new beleif representation that doesn't resolve overlap and doesn't compute
+        #   normalization factor. Add flag to current belief
+        # TODO we are plotting many cases where we stuck in resampling where block support is really small.
+        #   In that case sample on a grid within this area, need to maintain some kind of new bounds
 
         # TODO: Use TreeDebuger or visualization
         # TODO: sample that filters and doesn't try to find other valid points
@@ -101,3 +104,4 @@ if __name__ == "__main__":
         # TODO: Is there a way to limit max_num_rollouts per node?
         # TODO: profile
         # TODO: lab task for tomorrow check pickup success in env
+        # TODO: learning? belief will belong to helper only

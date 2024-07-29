@@ -1,6 +1,6 @@
 import numpy as np
 from scipy.stats import truncnorm
-from modeling.belief.rectangles_overlap_resolution import resolve_overlaps, resolve_overlaps_only_for_new
+from modeling.belief.rectangles_overlap_resolution import resolve_overlaps, add_rectangle_to_decomposed
 
 
 def get_truncnorm_distribution(bounds, mu, sigma):
@@ -124,7 +124,6 @@ class Masked2DTruncNorm:
         x = points[:, 0]
         y = points[:, 1]
 
-        norm_const = self.normalization_constant if self.normalization_constant != 0 else 1e-8
         # Vectorized check for masked areas
         result = (self.dist_x.pdf(x) * self.dist_y.pdf(y)) / self.normalization_constant
         for mask in self.masked_areas:
