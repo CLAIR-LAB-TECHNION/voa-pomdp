@@ -11,6 +11,7 @@ def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
                       actual_state=None,
                       positive_sensing_points=None,
                       negative_sensing_points=None,
+                      pickup_attempt_points=None,
                       grid_size=100,
                       n_levels=50,
                       ret_as_image=False):
@@ -28,6 +29,7 @@ def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
                                    actual_state=actual_state,
                                    positive_sensing_points=positive_sensing_points,
                                    negative_sensing_points=negative_sensing_points,
+                                   pickup_attempt_points=pickup_attempt_points,
                                    grid_size=grid_size,
                                    n_levels=n_levels,
                                    ret_as_image=ret_as_image)
@@ -37,6 +39,7 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
                             actual_states=None,
                             positive_sensing_points=None,
                             negative_sensing_points=None,
+                            pickup_attempt_points=None,
                             per_block_observed_mus_and_sigmas=None,
                             grid_size=100,
                             n_levels=50,
@@ -69,6 +72,7 @@ def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
                                          actual_state=actual_states[i],
                                          positive_sensing_points=positive_sensing_points,
                                          negative_sensing_points=negative_sensing_points,
+                                         pickup_attempt_points=pickup_attempt_points,
                                          observed_mus_and_sigmas=observed_mus_and_sigmas,
                                          grid_size=grid_size,
                                          n_levels=n_levels,
@@ -106,6 +110,7 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
                             actual_state=None,
                             positive_sensing_points=None,
                             negative_sensing_points=None,
+                            pickup_attempt_points=None,
                             observed_mus_and_sigmas=None,
                             grid_size=100,
                             n_levels=50,
@@ -160,6 +165,10 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
     if negative_sensing_points is not None:
         for point in negative_sensing_points:
             plt.plot(point[0], point[1], 'g_', markersize=9, )
+
+    if pickup_attempt_points is not None:
+        for point in pickup_attempt_points:
+            plt.plot(point[0], point[1], 'go', markersize=9, )
 
     if observed_mus_and_sigmas is not None:
         # add plots of 2d gaussian with the observed mus and sigmas in gray, opacity is 0.5

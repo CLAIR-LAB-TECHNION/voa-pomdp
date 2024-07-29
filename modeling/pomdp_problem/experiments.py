@@ -46,8 +46,13 @@ if __name__ == "__main__":
                              show_progress=True)
 
     print("init state", actual_init_state)
+    plot_all_blocks_beliefs(agent.belief,
+                            actual_states=block_positions,)
+
     total_reward = 0
-    plot_all_blocks_beliefs(agent.belief)
+    positive_sensing_points = []
+    negative_sensing_points = []
+    pickup_attempt_points = []
     for i in range(max_steps):
         actual_action = planner.plan(agent)
         actual_reward = env.state_transition(actual_action, execute=True)
@@ -64,13 +69,27 @@ if __name__ == "__main__":
         print(f"step: {i}, action: {actual_action}, observation: {actual_observation}, reward: {actual_reward}")
         print(f"total reward: {total_reward}, hidden_state={env.state}")
         print("num_sims", planner.last_num_sims)
-        plot_all_blocks_beliefs(agent.belief)
+        if isinstance(actual_observation, ObservationSenseResult):
+            if actual_observation.is_occupied:
+                positive_sensing_points.append((actual_observation.x, actual_observation.y))
+            else:
+                negative_sensing_points.append((actual_observation.x, actual_observation.y))
+        elif isinstance(actual_observation, ObservationStackAttemptResult):
+            pickup_attempt_points.append((actual_action.x, actual_action.y))
+        plot_all_blocks_beliefs(agent.belief,
+                                actual_states=block_positions,
+                                negative_sensing_points=negative_sensing_points,
+                                positive_sensing_points=positive_sensing_points,
+                                pickup_attempt_points=pickup_attempt_points)
 
         # TODO: plot actual block positions,
         #   pickup attempt points,
         #   negative and positive sensing points
-        # TODO: Run multiple times to find more bugs
+        # TODO: belief update after non-succesfull pickup, need to add those constants to config file
         # TODO: sample that filters and doesn't try to find other valid points
+        # TODO: actions for not all blocks... (sensed positie, low variance)
+        # TODO: Save amount of times blocks sensed positive and priortize actions for that block
+        # TODO: Run multiple times to find more bugs
         # TODO: think how not to call get_all_actions on each rollout
-        # TODO: resampling happens alot. print it in gaussian masked distribution again
+        # TODO: Is there a way to limit max_num_rollouts per node?
         # TODO: profile
