@@ -26,7 +26,7 @@ app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 2,
+def main(n_blocks: int = 4,
          use_depth: bool = 1,):
 
     camera = RealsenseCamera()

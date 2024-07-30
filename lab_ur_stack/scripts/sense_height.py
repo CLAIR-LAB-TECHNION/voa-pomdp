@@ -19,8 +19,8 @@ points = [[workspace_x_lims_default[0], workspace_y_lims_default[0]],
     context_settings={"ignore_unknown_options": True})
 def main(repeat: int = 1):
     controller = ManipulationController.build_from_robot_name_and_ip(ur5e_2["ip"], ur5e_2["name"])
-    controller.moveL_relative([0, 0, 0.1], speed=0.5, acceleration=0.5)
-
+    # controller.moveL_relative([0, 0, 0.1], speed=0.5, acceleration=0.5)
+    controller.plan_and_move_home()
     for point in points:
         heights = []
         print("---tilted:")

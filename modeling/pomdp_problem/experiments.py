@@ -1,7 +1,7 @@
 import pomdp_py
 from lab_ur_stack.utils.workspace_utils import sample_block_positions_uniform, workspace_x_lims_default, \
     workspace_y_lims_default, sample_block_positions_from_dists
-from modeling.belief.block_position_belief import BlocksPositionsBelief
+from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
 from modeling.pomdp_problem.agent.agent import Agent
 from modeling.pomdp_problem.env.env import Environment
 from modeling.pomdp_problem.models.policy_model import BeliefModel
@@ -45,7 +45,7 @@ if __name__ == "__main__":
 
     planner = pomdp_py.POUCT(max_depth=8,
                              # planning_time=300,
-                             num_sims=500,
+                             num_sims=2000,
                              discount_factor=1.0,
                              rollout_policy=agent.policy_model,
                              show_progress=True)
@@ -89,19 +89,14 @@ if __name__ == "__main__":
                                 pickup_attempt_points=pickup_attempt_points)
 
         pass
-        # TODO next step is to implement new beleif representation that doesn't resolve overlap and doesn't compute
-        #   normalization factor. Add flag to current belief
-        # TODO we are plotting many cases where we stuck in resampling where block support is really small.
-        #   In that case sample on a grid within this area, need to maintain some kind of new bounds
+
+        # TODO: Handle the case where bounds don't overlap, maybe need to check intersection when adding bounds,
+        # TODO: and if there's no intersection remove some bounds (or don't add the last one)
+        #
 
         # TODO: Use TreeDebuger or visualization
-        # TODO: sample that filters and doesn't try to find other valid points
         # TODO: actions for not all blocks... (sensed positie, low variance)
         # TODO: Save amount of times blocks sensed positive and priortize actions for that block
         # TODO: Run multiple times to find more bugs
-        # TODO: Run on lab computer and check it/s
         # TODO: think how not to call get_all_acti ons on each rollout
-        # TODO: Is there a way to limit max_num_rollouts per node?
-        # TODO: profile
-        # TODO: lab task for tomorrow check pickup success in env
         # TODO: learning? belief will belong to helper only

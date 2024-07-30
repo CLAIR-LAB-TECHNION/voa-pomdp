@@ -1,6 +1,7 @@
 import numpy as np
 from scipy.stats import truncnorm
 from modeling.belief.rectangles_overlap_resolution import resolve_overlaps, add_rectangle_to_decomposed
+from line_profiler_pycharm import profile
 
 
 def get_truncnorm_distribution(bounds, mu, sigma):
@@ -8,8 +9,19 @@ def get_truncnorm_distribution(bounds, mu, sigma):
     return truncnorm(a, b, loc=mu, scale=sigma)
 
 
-class Masked2DTruncNorm:
-    def __init__(self, bounds_x, bounds_y, mu_x, sigma_x, mu_y, sigma_y):
+class UnnormalizedMasked2DTruncNorm:
+    """
+     Unormalized version, useful for action sampling.
+     This is way faster since computing normalization factor and
+     resolving masks overlaps takes most of the time.
+    """
+    def __init__(self, bounds_x, bounds_y, mu_x, sigma_x, mu_y, sigma_y,
+                 build_xy_distributions=True):
+        """
+        if build_xy_distributions is False, the distributions are not built,
+        and this object is not usable until .dist_x and .dist_y are initialized.
+        This is useful for copying...
+        """
         self.bounds_x = bounds_x
         self.bounds_y = bounds_y
         self.mu_x = mu_x
@@ -18,22 +30,41 @@ class Masked2DTruncNorm:
         self.sigma_y = sigma_y
 
         self.masked_areas = []  # [[x,x] [y,y]] of areas that the distribution is zero
-
-        self.dist_x = get_truncnorm_distribution(bounds_x, mu_x, sigma_x)
-        self.dist_y = get_truncnorm_distribution(bounds_y, mu_y, sigma_y)
-
-        self.normalization_constant = None
+        self.bounds_list = []  # List to maintain added bounds
+        if build_xy_distributions:
+            self.dist_x = get_truncnorm_distribution(bounds_x, mu_x, sigma_x)
+            self.dist_y = get_truncnorm_distribution(bounds_y, mu_y, sigma_y)
+        else:
+            self.dist_x = None
+            self.dist_y = None
 
     def add_masked_area(self, mask_bounds):
-        # Add new mask and merge overlapping masks
         self.masked_areas.append(mask_bounds)
-        self.masked_areas = resolve_overlaps(self.masked_areas)
-        self.normalization_constant = self._calculate_normalization_constant()
+
+    def _check_if_bounds_list_legal(self, bounds_list):
+        """
+        check if there's intersection between bounds. If not, that's illegal because the whole space
+        has probability of zero
+        """
+        if not bounds_list:
+            return False
+        if len(bounds_list) == 1:
+            return True
+
+        # Find the overall intersection bounds
+        x_min = max(bound[0][0] for bound in bounds_list)
+        y_min = max(bound[1][0] for bound in bounds_list)
+        x_max = min(bound[0][1] for bound in bounds_list)
+        y_max = min(bound[1][1] for bound in bounds_list)
+
+        return x_min < x_max and y_min < y_max
 
     def add_new_bounds(self, bounds):
-        # add bounds that the blocks must be in, or, the distribution will be zero out of these bounds
-        # just create masked areas out of these bounds, instead of maintaining those bounds
+        if not self._check_if_bounds_list_legal(self.bounds_list + [bounds]):
+            return
+
         new_bounds_x, new_bounds_y = bounds
+        self.bounds_list.append(bounds)
 
         new_masked_areas = [
             [[self.bounds_x[0], new_bounds_x[0]], self.bounds_y],
@@ -41,64 +72,12 @@ class Masked2DTruncNorm:
             [new_bounds_x, [self.bounds_y[0], new_bounds_y[0]]],
             [new_bounds_x, [new_bounds_y[1], self.bounds_y[1]]],
         ]
-
-        # since those areas are usually large, and going to contain other masked areas if there are so,
-        # it's better to add them at the beginning of the list for the overlap resolution algorithm
-        self.masked_areas = new_masked_areas + self.masked_areas
-        self.masked_areas = resolve_overlaps(self.masked_areas)
-        self.normalization_constant = self._calculate_normalization_constant()
+        self.masked_areas.extend(new_masked_areas)
 
     def add_multiple_new_areas(self, masked_areas, new_bounds):
-        """
-        equivalent to calling add_masked_area and add_new_bounds for all areas and abounds, but this one is
-        way more efficient since overlaps is resolved only once for all new areas
-        """
-        # first add all the new bounds at the beginning:
         for bound in new_bounds:
-            new_bounds_x, new_bounds_y = bound
-            masked_areas_from_bounds = [
-                [[self.bounds_x[0], new_bounds_x[0]], self.bounds_y],
-                [[new_bounds_x[1], self.bounds_x[1]], self.bounds_y],
-                [new_bounds_x, [self.bounds_y[0], new_bounds_y[0]]],
-                [new_bounds_x, [new_bounds_y[1], self.bounds_y[1]]], ]
-            self.masked_areas = masked_areas_from_bounds + self.masked_areas
-
-        # now add the new masked areas at the end:
-        self.masked_areas = self.masked_areas + masked_areas
-
-        # now resolve overlaps for all:
-        if len(self.masked_areas) > 0:
-            self.masked_areas = resolve_overlaps(self.masked_areas)
-            self.normalization_constant = self._calculate_normalization_constant()
-
-    def _calculate_normalization_constant(self):
-        """Calculates the normalization constant for the joint PDF."""
-        full_probability = 1  # Assume full probability mass covers the entire normalized range
-        for mask in self.masked_areas:
-            masked_probability = self._calculate_masked_probability(mask, self.bounds_x, self.mu_x, self.sigma_x,
-                                                                    self.bounds_y, self.mu_y, self.sigma_y)
-            full_probability -= masked_probability
-
-        if full_probability == 0:
-            full_probability = 1e-9
-        return full_probability
-
-    def _calculate_probability_mass(self, mask_dim, bounds, mu, sigma):
-        """Calculates the probability mass under the truncated normal curve for a given dimension."""
-        start, end = mask_dim
-        return truncnorm.cdf(end, (bounds[0] - mu) / sigma, (bounds[1] - mu) / sigma, loc=mu, scale=sigma) \
-            - truncnorm.cdf(start, (bounds[0] - mu) / sigma, (bounds[1] - mu) / sigma, loc=mu, scale=sigma)
-
-    def _calculate_masked_probability(self, mask, bounds_x, mu_x, sigma_x, bounds_y, mu_y, sigma_y):
-        """Calculates the probability mass of a masked region for the given dimensions."""
-        # Calculate the probability mass in the x dimension
-        prob_mass_x = self._calculate_probability_mass(mask[0], bounds_x, mu_x, sigma_x)
-
-        # Calculate the probability mass in the y dimension
-        prob_mass_y = self._calculate_probability_mass(mask[1], bounds_y, mu_y, sigma_y)
-
-        # Return the product of the probability masses in both dimensions
-        return prob_mass_x * prob_mass_y
+            self.add_new_bounds(bound)
+        self.masked_areas.extend(masked_areas)
 
     def update_parameters(self, mu_x, sigma_x, mu_y, sigma_y):
         self.mu_x = mu_x
@@ -109,14 +88,7 @@ class Masked2DTruncNorm:
         self.dist_x = get_truncnorm_distribution(self.bounds_x, mu_x, sigma_x)
         self.dist_y = get_truncnorm_distribution(self.bounds_y, mu_y, sigma_y)
 
-        self.normalization_constant = self._calculate_normalization_constant()
-
     def pdf(self, points):
-        # Ensure normalization constant is calculated
-        if self.normalization_constant is None:
-            self.normalization_constant = self._calculate_normalization_constant()
-
-        # Extract x and y coordinates
         points = np.asarray(points)
         if points.ndim == 1:
             points = points.reshape(1, -1)
@@ -124,23 +96,17 @@ class Masked2DTruncNorm:
         x = points[:, 0]
         y = points[:, 1]
 
-        # Vectorized check for masked areas
-        result = (self.dist_x.pdf(x) * self.dist_y.pdf(y)) / self.normalization_constant
+        result = self.dist_x.pdf(x) * self.dist_y.pdf(y)
         for mask in self.masked_areas:
             mask_condition = (mask[0][0] <= x) & (x <= mask[0][1]) & (mask[1][0] <= y) & (y <= mask[1][1])
             result[mask_condition] = 0
         return result
 
     def sample(self, n_samples=1):
-        # Ensure normalization constant is calculated
-        if self.normalization_constant is None:
-            self.normalization_constant = self._calculate_normalization_constant()
-
         samples_x = self.dist_x.rvs(n_samples)
         samples_y = self.dist_y.rvs(n_samples)
         points = np.stack([samples_x, samples_y], axis=1)
 
-        # make sure none of the points are in masked areas:
         while True:
             invalid_samples = np.where(self.pdf(points) == 0)[0]
             if len(invalid_samples) == 0:
@@ -153,30 +119,44 @@ class Masked2DTruncNorm:
 
         return points
 
-    def sample_with_redundency(self, n_samples=1, ratio=2, max_retries=5):
+    def _sample_from_truncnorm(self, n_samples, bounds_x=None, bounds_y=None):
+        if bounds_x is None:
+            samples_x = self.dist_x.rvs(n_samples)
+        else:
+            ax, bx = (bounds_x[0] - self.mu_x) / self.sigma_x, (bounds_x[1] - self.mu_x) / self.sigma_x
+            samples_x = truncnorm.rvs(ax, bx, loc=self.mu_x, scale=self.sigma_x, size=n_samples)
+
+        if bounds_y is None:
+            samples_y = self.dist_y.rvs(n_samples)
+        else:
+            ay, by = (bounds_y[0] - self.mu_y) / self.sigma_y, (bounds_y[1] - self.mu_y) / self.sigma_y
+            samples_y = truncnorm.rvs(ay, by, loc=self.mu_y, scale=self.sigma_y, size=n_samples)
+
+        points = np.stack([samples_x, samples_y], axis=1)
+        return points
+    @profile
+    def sample_with_redundency(self, n_samples=1, ratio=1.5, max_retries=5):
         """
         should be more efficient sampling. start by sampling more points (by ratio), and filter
-        out points that are in masked areas this way the loop of resampling should be ran less time
+        out points that are in masked areas this way the loop of resampling should be ran less time.
         Resampling will happen up to max_retries times
         """
+        bounds_x, bounds_y = None, None
+        if len(self.bounds_list) > 0:
+            # there are bounds we know the block is in. it's smarter to sample there and not
+            # in the entire space. We will only consider the first time we got bounds for sensing
+            # but it's better than nothing TODO: maybe create some smart union of bounds?
+            bounds_x = self.bounds_list[0][0]
+            bounds_y = self.bounds_list[0][1]
 
-        if self.normalization_constant is None:
-            self.normalization_constant = self._calculate_normalization_constant()
-
-        samples_x = self.dist_x.rvs(ratio*n_samples)
-        samples_y = self.dist_y.rvs(ratio*n_samples)
-        points = np.stack([samples_x, samples_y], axis=1)
+        points = self._sample_from_truncnorm(int(ratio*n_samples), bounds_x, bounds_y)
 
         valid_points = points[np.where(self.pdf(points) != 0)[0]]
 
-        # make sure none of the points are in masked areas:
         retries = 0
-        while len(valid_points) and retries < max_retries:
+        while len(valid_points) < n_samples and retries < max_retries:
             retries += 1
-            # print("resampling")
-            new_samples_x = self.dist_x.rvs(ratio * n_samples)
-            new_samples_y = self.dist_y.rvs(ratio * n_samples)
-            new_points = np.stack([new_samples_x, new_samples_y], axis=1)
+            new_points = self._sample_from_truncnorm(int(ratio*n_samples), bounds_x, bounds_y)
             new_valid_points = new_points[np.where(self.pdf(new_points) != 0)[0]]
             valid_points = np.concatenate((valid_points, new_valid_points))
 
@@ -184,24 +164,67 @@ class Masked2DTruncNorm:
 
         return valid_points[:n_samples]
 
-    def sample_max_points(self, n_samples, min_samples):
-        """
-        sample n_samples from the underlying gaussian distribution, remove samples in masked areas
-        and don't sample again until you reach n_samples, just return what is filtered, unless
-        there are less than min_samples in the filtered list, in which case do sample more
-        """
 
-        if self.normalization_constant is None:
+class Masked2DTruncNorm(UnnormalizedMasked2DTruncNorm):
+    def __init__(self, bounds_x, bounds_y, mu_x, sigma_x, mu_y, sigma_y):
+        super().__init__(bounds_x, bounds_y, mu_x, sigma_x, mu_y, sigma_y)
+        self.non_overlapping_masked_areas = []
+        self.normalization_constant = 1
+
+    def add_masked_area(self, mask_bounds):
+        super().add_masked_area(mask_bounds)
+        self.non_overlapping_masked_areas = resolve_overlaps(self.masked_areas)
+        self.normalization_constant = self._calculate_normalization_constant()
+
+    def add_new_bounds(self, bounds):
+        super().add_new_bounds(bounds)
+        self.non_overlapping_masked_areas = resolve_overlaps(self.masked_areas)
+        self.normalization_constant = self._calculate_normalization_constant()
+
+    def add_multiple_new_areas(self, masked_areas, new_bounds):
+        super().add_multiple_new_areas(masked_areas, new_bounds)
+        if len(self.masked_areas) > 0:
+            self.non_overlapping_masked_areas = resolve_overlaps(self.masked_areas)
             self.normalization_constant = self._calculate_normalization_constant()
 
-        samples_x = self.dist_x.rvs(n_samples)
-        samples_y = self.dist_y.rvs(n_samples)
-        points = np.stack([samples_x, samples_y], axis=1)
+    def update_parameters(self, mu_x, sigma_x, mu_y, sigma_y):
+        super().update_parameters(mu_x, sigma_x, mu_y, sigma_y)
+        self.normalization_constant = self._calculate_normalization_constant()
 
-        valid_points = points[np.where(self.pdf(points) != 0)[0]]
+    def _calculate_normalization_constant(self):
+        full_probability = 1
+        for mask in self.non_overlapping_masked_areas:
+            masked_probability = self._calculate_masked_probability(mask, self.bounds_x, self.mu_x, self.sigma_x,
+                                                                    self.bounds_y, self.mu_y, self.sigma_y)
+            full_probability -= masked_probability
 
-        if len(valid_points) < min_samples:
-            valid_points = self.sample(n_samples=min_samples)
+        return max(full_probability, 1e-9)
 
-        return valid_points
+    def _calculate_probability_mass(self, mask_dim, bounds, mu, sigma):
+        start, end = mask_dim
+        return truncnorm.cdf(end, (bounds[0] - mu) / sigma, (bounds[1] - mu) / sigma, loc=mu, scale=sigma) \
+            - truncnorm.cdf(start, (bounds[0] - mu) / sigma, (bounds[1] - mu) / sigma, loc=mu, scale=sigma)
 
+    def _calculate_masked_probability(self, mask, bounds_x, mu_x, sigma_x, bounds_y, mu_y, sigma_y):
+        prob_mass_x = self._calculate_probability_mass(mask[0], bounds_x, mu_x, sigma_x)
+        prob_mass_y = self._calculate_probability_mass(mask[1], bounds_y, mu_y, sigma_y)
+        return prob_mass_x * prob_mass_y
+
+    def pdf(self, points):
+        unnormalized_pdf = super().pdf(points)
+        return unnormalized_pdf / self.normalization_constant
+
+    @profile
+    def create_unnormalized(self):
+        unnormalized = UnnormalizedMasked2DTruncNorm(self.bounds_x, self.bounds_y, self.mu_x,
+                                                     self.sigma_x, self.mu_y, self.sigma_y,
+                                                     build_xy_distributions=False)
+
+        # This is ok to reference  and not copy as it's not going to change in the unnormalized
+        # since it's only used for rollouting
+        unnormalized.dist_x = self.dist_x
+        unnormalized.dist_y = self.dist_y
+
+        unnormalized.masked_areas = self.non_overlapping_masked_areas.copy()
+        unnormalized.bounds_list = self.bounds_list.copy()
+        return unnormalized

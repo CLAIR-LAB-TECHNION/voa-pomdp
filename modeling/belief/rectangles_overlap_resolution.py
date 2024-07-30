@@ -59,8 +59,7 @@ def plot_orig_and_resolved(orig, resolved, xlim, ylim):
 
     plt.show()
 
-from line_profiler_pycharm import profile
-@profile
+
 def decompose_rectilinear_polygon(polygon):
     exterior_coords = np.array(polygon.exterior.coords)
     interior_coords = [np.array(interior.coords) for interior in polygon.interiors]
@@ -91,7 +90,6 @@ def decompose_rectilinear_polygon(polygon):
 
     return rectangles
 
-@profile
 def resolve_overlaps(rectangles):
     boxes = [box(rect[0][0], rect[1][0], rect[0][1], rect[1][1]) for rect in rectangles]
 

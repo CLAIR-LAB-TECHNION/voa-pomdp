@@ -15,7 +15,7 @@ from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default)
 from lab_ur_stack.vision.utils import (lookat_verangle_distance_to_robot_config, detections_plots_no_depth_as_image,
                                        detections_plots_with_depth_as_image)
-from modeling.belief.block_position_belief import BlocksPositionsBelief
+from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 from experiments_lab.fixed_policy_sense_until_positive import FixedSenseUntilPositivePolicy
 
@@ -42,7 +42,7 @@ def main(n_blocks: int = 2,
     env = LabBlockStackingEnv(n_blocks, 10, r1_controller, r2_controller, gt, camera, position_estimator)
     policy = FixedSenseUntilPositivePolicy()
 
-    initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
+    initial_belief = UnnormalizedBlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
                                            initial_positions_mus[:n_blocks], initial_positions_sigmas[:n_blocks])
 
     env.reset_from_distribution(initial_belief.block_beliefs, perform_cleanup=False)

@@ -3,7 +3,7 @@ import random
 from copy import deepcopy
 import numpy as np
 import pomdp_py
-from modeling.belief.block_position_belief import BlocksPositionsBelief
+from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase, DummyAction
 from modeling.belief.block_position_belief import BlocksPositionsBelief
@@ -21,7 +21,7 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
 
     def __new__(cls, *args, **kwargs):
         # Ensure proper creation of the instance using BlocksPositionsBelief's __new__
-        instance = BlocksPositionsBelief.__new__(cls)
+        instance = UnnormalizedBlocksPositionsBelief.__new__(cls)
         return instance
 
     def __deepcopy__(self, memo):
@@ -32,7 +32,7 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
         return new_instance
 
 @profile
-def history_to_belief(initial_belief: BeliefModel, history):
+def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
     # filter to sensing actions with positive sensing, sensing actions with negative sensing
     # and stack attempt actions with success
 
@@ -53,7 +53,7 @@ def history_to_belief(initial_belief: BeliefModel, history):
             else:
                 stack_negative.append((action.x, action.y))
 
-    new_belief = deepcopy(initial_belief)
+    new_belief = initial_belief.create_unnormalized()
     new_belief.update_from_history_of_sensing_and_pick_up(sense_positive,
                                                           sense_negative,
                                                           stack_positive,
@@ -70,7 +70,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         self.sensing_actions_to_sample_per_block = sensing_actions_to_sample_per_block
 
     @profile
-    def get_all_actions(self, state, history, best_points=None):
+    def get_all_actions(self, state, history):
         """
         this actually samples actions
         """
@@ -79,18 +79,16 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
         actions_to_return: list[ActionBase] = []
 
-        belief = history_to_belief(self.initial_blocks_position_belief, history)
+        belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
 
         # first, sample 200 points from each block belief, and compute their pdfs
         per_block_points = []
         per_block_pdfs = []
         for block_dist in belief.block_beliefs:
-            points = block_dist.sample_max_points(self.points_to_sample_for_each_block,
-                                                  min_samples=self.sensing_actions_to_sample_per_block*2)
-            # if len(points) <= 10:
-            #     from modeling.belief.belief_plotting import plot_all_blocks_beliefs
-            #     plot_all_blocks_beliefs(belief, positive_sensing_points=points)
-
+            points = block_dist.sample_with_redundency(self.points_to_sample_for_each_block)
+            if len(points) < 50:
+                from modeling.belief.belief_plotting import plot_all_blocks_beliefs
+                plot_all_blocks_beliefs(belief, positive_sensing_points=points)
             per_block_points.append(points)
             per_block_pdfs.append(block_dist.pdf(points))
 
