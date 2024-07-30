@@ -119,6 +119,7 @@ class UnnormalizedMasked2DTruncNorm:
 
         return points
 
+    @profile
     def _sample_from_truncnorm(self, n_samples, bounds_x=None, bounds_y=None):
         if bounds_x is None:
             samples_x = self.dist_x.rvs(n_samples)
@@ -134,6 +135,7 @@ class UnnormalizedMasked2DTruncNorm:
 
         points = np.stack([samples_x, samples_y], axis=1)
         return points
+
     @profile
     def sample_with_redundency(self, n_samples=1, ratio=1.5, max_retries=5):
         """

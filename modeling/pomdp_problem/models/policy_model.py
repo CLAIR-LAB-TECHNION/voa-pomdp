@@ -31,7 +31,6 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
         new_instance.__dict__ = copy.deepcopy(self.__dict__, memo)
         return new_instance
 
-@profile
 def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
     # filter to sensing actions with positive sensing, sensing actions with negative sensing
     # and stack attempt actions with success

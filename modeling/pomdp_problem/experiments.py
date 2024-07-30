@@ -90,9 +90,12 @@ if __name__ == "__main__":
 
         pass
 
-        # TODO: Handle the case where bounds don't overlap, maybe need to check intersection when adding bounds,
-        # TODO: and if there's no intersection remove some bounds (or don't add the last one)
-        #
+        # TODO: next steps:
+        #   return PDF with samples, noo need to compute twice
+        #   when checking gaussian center don't compute pdf, just check if in mask
+        #   (These two should improve from ~ 50 to ~ 60 it/sec
+        #   add argument to get_all_actions of how many blocks to generate actions for and how many sensing actions
+        #   there will be default, but when rollouting it will be lower? (maybe not for 3 blocks)
 
         # TODO: Use TreeDebuger or visualization
         # TODO: actions for not all blocks... (sensed positie, low variance)
