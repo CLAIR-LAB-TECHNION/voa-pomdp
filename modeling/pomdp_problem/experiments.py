@@ -14,7 +14,7 @@ from pomdp_py.utils import TreeDebugger
 
 def get_positions_and_init_belief():
     mus = [[-0.85, -0.9], [-0.75, -0.75], [-0.65, -0.65]]
-    sigmas = [[0.05, 0.2], [0.25, 0.08], [0.1, 0.15], [0.15, 0.15], [0.02, 0.03]]
+    sigmas = [[0.05, 0.09], [0.25, 0.08], [0.07, 0.07], [0.15, 0.15], [0.02, 0.03]]
     sigmas = sigmas[:3]
     belief = BeliefModel(3, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
 
@@ -28,6 +28,7 @@ stacking_reward = 1
 cost_coeff = 0.0
 finish_ahead_of_time_reward_coeff = 0.1
 points_to_sample_for_each_block = 200
+sensing_actions_to_sample_per_block = 2
 
 if __name__ == "__main__":
     block_positions, belief = get_positions_and_init_belief()
@@ -37,13 +38,14 @@ if __name__ == "__main__":
                   stacking_reward=stacking_reward,
                   cost_coeff=cost_coeff,
                   finish_ahead_of_time_reward_coeff=finish_ahead_of_time_reward_coeff,
-                  points_to_sample_for_each_block=points_to_sample_for_each_block)
+                  points_to_sample_for_each_block=points_to_sample_for_each_block,
+                  sensing_actions_to_sample_per_block=sensing_actions_to_sample_per_block)
 
     actual_init_state = State(steps_left=max_steps,
                               block_positions=block_positions)
     env = Environment.from_agent(agent=agent, init_state=actual_init_state)
 
-    planner = pomdp_py.POUCT(max_depth=8,
+    planner = pomdp_py.POUCT(max_depth=6,
                              # planning_time=300,
                              num_sims=2000,
                              discount_factor=1.0,
@@ -91,12 +93,12 @@ if __name__ == "__main__":
         pass
 
         # TODO: next steps:
-        #   return PDF with samples, noo need to compute twice
-        #   when checking gaussian center don't compute pdf, just check if in mask
-        #   (These two should improve from ~ 50 to ~ 60 it/sec
+        #   fastPDF with numpy, fastSample with numpy when no bounds, maybe sample with low variance with bounds
+        #   think about straight forward rollout policy, smart not random. Test upper improvment bound
         #   add argument to get_all_actions of how many blocks to generate actions for and how many sensing actions
         #   there will be default, but when rollouting it will be lower? (maybe not for 3 blocks)
 
+        # TODO: action prior for sensing
         # TODO: Use TreeDebuger or visualization
         # TODO: actions for not all blocks... (sensed positie, low variance)
         # TODO: Save amount of times blocks sensed positive and priortize actions for that block

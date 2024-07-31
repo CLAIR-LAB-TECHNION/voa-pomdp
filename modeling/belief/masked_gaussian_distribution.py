@@ -88,6 +88,7 @@ class UnnormalizedMasked2DTruncNorm:
         self.dist_x = get_truncnorm_distribution(self.bounds_x, mu_x, sigma_x)
         self.dist_y = get_truncnorm_distribution(self.bounds_y, mu_y, sigma_y)
 
+
     def pdf(self, points):
         points = np.asarray(points)
         if points.ndim == 1:
@@ -101,6 +102,13 @@ class UnnormalizedMasked2DTruncNorm:
             mask_condition = (mask[0][0] <= x) & (x <= mask[0][1]) & (mask[1][0] <= y) & (y <= mask[1][1])
             result[mask_condition] = 0
         return result
+
+    def is_point_masked(self, point):
+        x, y = point
+        for mask in self.masked_areas:
+            if mask[0][0] <= x <= mask[0][1] and mask[1][0] <= y <= mask[1][1]:
+                return True
+        return False
 
     def sample(self, n_samples=1):
         samples_x = self.dist_x.rvs(n_samples)
@@ -137,7 +145,7 @@ class UnnormalizedMasked2DTruncNorm:
         return points
 
     @profile
-    def sample_with_redundency(self, n_samples=1, ratio=1.5, max_retries=5):
+    def sample_with_redundency(self, n_samples=1, ratio=1.5, max_retries=5, return_pdfs=True):
         """
         should be more efficient sampling. start by sampling more points (by ratio), and filter
         out points that are in masked areas this way the loop of resampling should be ran less time.
@@ -152,18 +160,28 @@ class UnnormalizedMasked2DTruncNorm:
             bounds_y = self.bounds_list[0][1]
 
         points = self._sample_from_truncnorm(int(ratio*n_samples), bounds_x, bounds_y)
-
-        valid_points = points[np.where(self.pdf(points) != 0)[0]]
+        pdfs = self.pdf(points)
+        valid_points_indices = np.where(pdfs != 0)[0]
+        valid_points = points[valid_points_indices]
+        valid_pdfs = pdfs[valid_points_indices]
 
         retries = 0
         while len(valid_points) < n_samples and retries < max_retries:
             retries += 1
+
             new_points = self._sample_from_truncnorm(int(ratio*n_samples), bounds_x, bounds_y)
-            new_valid_points = new_points[np.where(self.pdf(new_points) != 0)[0]]
+            new_pdfs = self.pdf(new_points)
+            new_valid_points_indices = np.where(new_pdfs != 0)[0]
+            new_valid_points = np.concatenate((valid_points, new_points[new_valid_points_indices]))
+            new_valid_pdfs = np.concatenate((valid_pdfs, new_pdfs[new_valid_points_indices]))
+
             valid_points = np.concatenate((valid_points, new_valid_points))
+            valid_pdfs = np.concatenate((valid_pdfs, new_valid_pdfs))
 
-            ratio *= 2
+            ratio *= ratio
 
+        if return_pdfs:
+            return valid_points[:n_samples], valid_pdfs[:n_samples]
         return valid_points[:n_samples]
 
 
