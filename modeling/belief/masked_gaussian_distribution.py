@@ -122,8 +122,6 @@ class UnnormalizedMasked2DTruncNorm:
         points = np.asarray(points)
         if points.ndim == 1:
             points = points.reshape(1, -1)
-        if len(self.masked_areas) == 0:
-            return np.zeros(len(points), dtype=bool)
 
         x = points[:, 0]
         y = points[:, 1]
@@ -223,8 +221,6 @@ class UnnormalizedMasked2DTruncNorm:
 
             valid_points = np.concatenate((valid_points, new_valid_points))
             pdfs = np.concatenate((pdfs, new_valid_pdfs))
-
-            ratio *= ratio
 
         if return_pdfs:
             return valid_points[:n_samples], pdfs[:n_samples]

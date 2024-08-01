@@ -14,7 +14,7 @@ from pomdp_py.utils import TreeDebugger
 
 def get_positions_and_init_belief():
     mus = [[-0.85, -0.9], [-0.75, -0.75], [-0.65, -0.65]]
-    sigmas = [[0.05, 0.09], [0.25, 0.08], [0.07, 0.07], [0.15, 0.15], [0.02, 0.03]]
+    sigmas = [[0.05, 0.07], [0.1, 0.08], [0.07, 0.07], [0.15, 0.15], [0.02, 0.03]]
     sigmas = sigmas[:3]
     belief = BeliefModel(3, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
 
@@ -23,7 +23,7 @@ def get_positions_and_init_belief():
     return block_positions, belief
 
 
-max_steps = 10
+max_steps = 20
 stacking_reward = 1
 cost_coeff = 0.0
 finish_ahead_of_time_reward_coeff = 0.1
@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     planner = pomdp_py.POUCT(max_depth=max_planning_depth,
                              # planning_time=300,
-                             num_sims=500,
+                             num_sims=5000,
                              discount_factor=1.0,
                              rollout_policy=agent.policy_model,
                              show_progress=True)
@@ -94,9 +94,6 @@ if __name__ == "__main__":
         pass
 
         # TODO: next steps:
-        #   think about straight forward rollout policy, smart not random. Test upper improvment bound
-        #   add argument to get_all_actions of how many blocks to generate actions for and how many sensing actions
-        #   there will be default, but when rollouting it will be lower? (maybe not for 3 blocks)
         # TODO: actions for not all blocks... (sensed positie, low variance)
         # TODO: Less actions (up to two blocks, will go deeper + faster get all actions)
         # TODO: Test effects of less samples. maybe it has no effect on lab computer
@@ -104,5 +101,4 @@ if __name__ == "__main__":
         # TODO: don't sample pickup if no masks or bounds?
         # TODO: action prior for sensing
         # TODO: Use TreeDebuger or visualization
-        # TODO: think how not to call get_all_acti ons on each rollout
         # TODO: learning? belief will belong to helper only

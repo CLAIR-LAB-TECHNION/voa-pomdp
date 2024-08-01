@@ -90,16 +90,16 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             per_block_points.append(points)
             per_block_pdfs.append(pdfs)
 
-        # take k samples with highest pdf for each block:
-        k = self.sensing_actions_to_sample_per_block
-        per_block_best_points = []
+        # take sample with max likelihood and k more random samples
+        k = self.sensing_actions_to_sample_per_block - 1
+        per_block_sense_points = []
         for pdfs, points in zip(per_block_pdfs, per_block_points):
-            best_points_indices = np.argpartition(pdfs, -k)[-k:]
-            best_points = points[best_points_indices]
-            per_block_best_points.append(best_points)
+            sense_points = [points[np.argmax(pdfs)]]
+            sense_points += random.choices(points, k=k)
+            per_block_sense_points.append(sense_points)
 
         # choose a pickup action for each block. It should be picking up at approximately maximum likelihood position.
-        for block_dist, best_points in zip(belief.block_beliefs, per_block_best_points):
+        for block_dist, best_points in zip(belief.block_beliefs, per_block_sense_points):
             gaussian_center = (block_dist.mu_x, block_dist.mu_y)
             if not block_dist.are_points_masked(gaussian_center) != 0:
                 # easy! this is the maximum likelihood!
@@ -114,7 +114,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             return actions_to_return
 
         # add sensing actions for all best points
-        for best_points in per_block_best_points:
+        for best_points in per_block_sense_points:
             actions_to_return += [ActionSense(point[0], point[1]) for point in best_points]
 
         return actions_to_return
@@ -140,6 +140,9 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
             # sample 10 points and take the one with the highest pdf:
             points, pdfs = block_dist.very_fast_sample(20, max_retries=20, return_pdfs=True)
+            if len(points) == 0:
+                # no points to sample from, just return a random action
+                return random.choice(self.get_all_actions(state, history))
             best_point = points[np.argmax(pdfs)]
 
             return ActionAttemptStack(best_point[0], best_point[1])
@@ -151,6 +154,9 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         # sample 10 points and pick up from the one with highest pdf:
         block_dist = belief.block_beliefs[block_with_least_variance]
         points, pdfs = block_dist.very_fast_sample(10, return_pdfs=True)
+        if len(points) == 0:
+            # no points to sample from, just return a random action
+            return random.choice(self.get_all_actions(state, history))
         best_point = points[np.argmax(pdfs)]
 
         return ActionAttemptStack(best_point[0], best_point[1])
