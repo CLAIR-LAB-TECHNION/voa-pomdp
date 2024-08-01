@@ -100,7 +100,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         # choose a pickup action for each block. It should be picking up at approximately maximum likelihood position.
         for block_dist, best_points in zip(belief.block_beliefs, per_block_best_points):
             gaussian_center = (block_dist.mu_x, block_dist.mu_y)
-            if not block_dist.is_point_masked(gaussian_center) != 0:
+            if not block_dist.are_points_masked(gaussian_center) != 0:
                 # easy! this is the maximum likelihood!
                 actions_to_return.append(ActionAttemptStack(gaussian_center[0], gaussian_center[1]))
             else:
@@ -122,18 +122,18 @@ class PolicyModel(pomdp_py.RolloutPolicy):
     def rollout(self, state, history) -> ActionBase:
         if state.steps_left <= 0:
             return DummyAction()
-
-        belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
-
-        # find the block with the most bounding areas and the num of bounding areas:
-        per_block_n_areas = [len(b.bounds_list) for b in belief.block_beliefs]
-        max_n_areas = max(per_block_n_areas)
-        if max_n_areas == 0:
-            # no block position is known well enough, try to sense:
-            pass #TODO
-
-
-        block_with_most_areas = np.argmax(per_block_n_areas)
+        return random.choice(self.get_all_actions(state, history))
+        # belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
+        #
+        # # find the block with the most bounding areas and the num of bounding areas:
+        # per_block_n_areas = [len(b.bounds_list) for b in belief.block_beliefs]
+        # max_n_areas = max(per_block_n_areas)
+        # if max_n_areas == 0:
+        #     # no block position is known well enough, try to sense:
+        #     pass #TODO
+        #
+        #
+        # block_with_most_areas = np.argmax(per_block_n_areas)
 
         # find union of all areas of the block with the most areas:
 

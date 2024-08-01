@@ -29,6 +29,7 @@ cost_coeff = 0.0
 finish_ahead_of_time_reward_coeff = 0.1
 points_to_sample_for_each_block = 200
 sensing_actions_to_sample_per_block = 2
+max_planning_depth=6
 
 if __name__ == "__main__":
     block_positions, belief = get_positions_and_init_belief()
@@ -45,7 +46,7 @@ if __name__ == "__main__":
                               block_positions=block_positions)
     env = Environment.from_agent(agent=agent, init_state=actual_init_state)
 
-    planner = pomdp_py.POUCT(max_depth=6,
+    planner = pomdp_py.POUCT(max_depth=max_planning_depth,
                              # planning_time=300,
                              num_sims=2000,
                              discount_factor=1.0,
@@ -93,7 +94,8 @@ if __name__ == "__main__":
         pass
 
         # TODO: next steps:
-        #   fastPDF with numpy, fastSample with numpy when no bounds, maybe sample with low variance with bounds
+        #   Another optimization: when there are bounds, sample from uniform within these bounds (maybe more poitns)
+        #       this is most of the time. find union of bounds first.
         #   think about straight forward rollout policy, smart not random. Test upper improvment bound
         #   add argument to get_all_actions of how many blocks to generate actions for and how many sensing actions
         #   there will be default, but when rollouting it will be lower? (maybe not for 3 blocks)
