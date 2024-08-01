@@ -1,5 +1,7 @@
 from copy import deepcopy
 
+import numpy as np
+
 from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
 from modeling.pomdp_problem.domain.state import State
@@ -25,6 +27,12 @@ class Agent(pomdp_py.Agent):
 
         self.max_steps = max_steps
 
+        # cache management of samples from belief:
+        self.need_to_generate_samples = True
+        self.sampled_block_positions = None
+        self.curr_unused_sampled_blockpos = None
+
+        # initialization:
         transition_model = TransitionModel(successful_grasp_offset_x=successful_grasp_offset_x,
                                            successful_grasp_offset_y=successful_grasp_offset_y)
         observation_model = ObservationModel()
@@ -47,7 +55,21 @@ class Agent(pomdp_py.Agent):
     def sample_belief(self):
         # this is override from base agent since we have our different belief model
         steps_left = self.max_steps - len(self.history)
-        block_positions = [block_pos.sample(1)[0] for block_pos in self._cur_belief.block_beliefs]
+
+        if self.need_to_generate_samples:
+            # we don't have samples cached, so we need to generate them, generate 500 and save them
+            block_positions_arrays = [block_dist.sample(500) for block_dist in self._cur_belief.block_beliefs]
+            block_positions_arrays = np.array(block_positions_arrays)  # shape: (num_blocks, 500, 2)
+            self.sampled_block_positions = block_positions_arrays.transpose(1, 0, 2)  # shape: (500, num_blocks, 2)
+
+            self.curr_unused_sampled_blockpos = 0
+            self.need_to_generate_samples = False
+
+        self.curr_unused_sampled_blockpos += 1
+        if self.curr_unused_sampled_blockpos == len(self.sampled_block_positions) - 1:
+            self.need_to_generate_samples = True
+
+        block_positions = self.sampled_block_positions[self.curr_unused_sampled_blockpos]
         return State(steps_left=steps_left,
                      block_positions=block_positions,
                      last_stack_attempt_succeded=None)
@@ -57,6 +79,11 @@ class Agent(pomdp_py.Agent):
         self.update_belief(actual_action, actual_observation)
 
     def update_belief(self, actual_action, actual_observation):
+        # reset cache:
+        self.need_to_generate_samples = True
+        self.sampled_block_positions = None
+        self.curr_unused_sampled_blockpos = None
+
         if isinstance(actual_action, ActionSense):
             x, y = actual_action.x, actual_action.y
             is_occupied = actual_observation.is_occupied
