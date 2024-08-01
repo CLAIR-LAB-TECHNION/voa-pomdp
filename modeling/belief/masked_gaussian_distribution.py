@@ -178,7 +178,7 @@ class UnnormalizedMasked2DTruncNorm:
         return points
 
     @profile
-    def sample_with_redundency(self, n_samples=1, ratio=2, max_retries=5, return_pdfs=True):
+    def very_fast_sample(self, n_samples=1, ratio=2, max_retries=5, return_pdfs=True):
         """
         should be more efficient sampling. start by sampling more points (by ratio), and filter
         out points that are in masked areas this way the loop of resampling should be ran less time.
@@ -187,12 +187,17 @@ class UnnormalizedMasked2DTruncNorm:
         bounds_x, bounds_y = None, None
         if len(self.bounds_list) > 0:
             # there are bounds we know the block is in. it's smarter to sample there and not
-            # in the entire space. We will only consider the first time we got bounds for sensing
-            # but it's better than nothing TODO: maybe create some smart union of bounds?
-            bounds_x = self.bounds_list[0][0]
-            bounds_y = self.bounds_list[0][1]
+            # in the entire space.
+            # find intersection of bounds:
+            x_min = max(bound[0][0] for bound in self.bounds_list)
+            y_min = max(bound[1][0] for bound in self.bounds_list)
+            x_max = min(bound[0][1] for bound in self.bounds_list)
+            y_max = min(bound[1][1] for bound in self.bounds_list)
 
-            points = self._sample_from_truncnorm(int(ratio * n_samples), bounds_x, bounds_y)
+            # Bounded areas are often so small we can sample from uniform in them
+            points_x = np.random.uniform(x_min, x_max, int(ratio * n_samples))
+            points_y = np.random.uniform(y_min, y_max, int(ratio * n_samples))
+            points = np.stack([points_x, points_y], axis=1)
         elif self.mu_x > 1 or self.mu_y > 1:
             # no bounds, but most of the samples from normal gaussian will be outside workspace, thus
             # it's better to sample from truncated normal...
@@ -290,5 +295,5 @@ class Masked2DTruncNorm(UnnormalizedMasked2DTruncNorm):
         unnormalized.bounds_list = self.bounds_list.copy()
         return unnormalized
 
-    def sample_with_redundency(self, n_samples=1, ratio=1.5, max_retries=5, return_pdfs=True):
+    def very_fast_sample(self, n_samples=1, ratio=1.5, max_retries=5, return_pdfs=True):
         raise NotImplementedError("This is not implemented for normalized version because it's optimized")

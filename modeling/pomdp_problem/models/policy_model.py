@@ -84,8 +84,8 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         per_block_points = []
         per_block_pdfs = []
         for block_dist in belief.block_beliefs:
-            points, pdfs = block_dist.sample_with_redundency(self.points_to_sample_for_each_block,
-                                                             return_pdfs=True)
+            points, pdfs = block_dist.very_fast_sample(self.points_to_sample_for_each_block,
+                                                       return_pdfs=True)
             per_block_points.append(points)
             per_block_pdfs.append(pdfs)
 
@@ -123,6 +123,8 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         if state.steps_left <= 0:
             return DummyAction()
         return random.choice(self.get_all_actions(state, history))
+
+        # TODO: get just pickup actions
         # belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
         #
         # # find the block with the most bounding areas and the num of bounding areas:

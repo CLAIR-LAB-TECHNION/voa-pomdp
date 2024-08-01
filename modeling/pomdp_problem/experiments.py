@@ -27,9 +27,9 @@ max_steps = 10
 stacking_reward = 1
 cost_coeff = 0.0
 finish_ahead_of_time_reward_coeff = 0.1
-points_to_sample_for_each_block = 200
+points_to_sample_for_each_block = 150
 sensing_actions_to_sample_per_block = 2
-max_planning_depth=6
+max_planning_depth = 6
 
 if __name__ == "__main__":
     block_positions, belief = get_positions_and_init_belief()
@@ -48,7 +48,7 @@ if __name__ == "__main__":
 
     planner = pomdp_py.POUCT(max_depth=max_planning_depth,
                              # planning_time=300,
-                             num_sims=2000,
+                             num_sims=500,
                              discount_factor=1.0,
                              rollout_policy=agent.policy_model,
                              show_progress=True)
@@ -94,16 +94,15 @@ if __name__ == "__main__":
         pass
 
         # TODO: next steps:
-        #   Another optimization: when there are bounds, sample from uniform within these bounds (maybe more poitns)
-        #       this is most of the time. find union of bounds first.
         #   think about straight forward rollout policy, smart not random. Test upper improvment bound
         #   add argument to get_all_actions of how many blocks to generate actions for and how many sensing actions
         #   there will be default, but when rollouting it will be lower? (maybe not for 3 blocks)
+        # TODO: actions for not all blocks... (sensed positie, low variance)
+        # TODO: Less actions (up to two blocks, will go deeper + faster get all actions)
+        # TODO: Test effects of less samples. maybe it has no effect on lab computer
 
+        # TODO: don't sample pickup if no masks or bounds?
         # TODO: action prior for sensing
         # TODO: Use TreeDebuger or visualization
-        # TODO: actions for not all blocks... (sensed positie, low variance)
-        # TODO: Save amount of times blocks sensed positive and priortize actions for that block
-        # TODO: Run multiple times to find more bugs
         # TODO: think how not to call get_all_acti ons on each rollout
         # TODO: learning? belief will belong to helper only
