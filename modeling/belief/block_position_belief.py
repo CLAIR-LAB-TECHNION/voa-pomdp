@@ -112,6 +112,7 @@ class UnnormalizedBlocksPositionsBelief:
         for block_belief in self.block_beliefs:
             block_belief.add_masked_area(np.array([area_x_bounds, area_y_bounds]))
 
+    @profile
     def update_from_history_of_sensing_and_pick_up(self, positive_sensing_points, negative_sensing_points,
                                                    successful_pickup_points, non_successful_pickup_points,
                                                    no_update_margin=0.005):
@@ -122,12 +123,18 @@ class UnnormalizedBlocksPositionsBelief:
         self._update_blocks_from_history(per_block_positive_sensing_points, masked_areas,
                                          successful_pickup_points, no_update_margin)
 
+    @profile
     def _associate_positive_sensing_points(self, positive_sensing_points):
+        # We use gaussian pdf here, without normalization, this is wrong but faster
         per_block_positive_sensing_points = [[] for _ in range(self.n_blocks_on_table)]
-        for point in positive_sensing_points:
-            blocks_probs = [b.pdf((point[0], point[1])) for b in self.block_beliefs]
-            block_to_update_id = np.argmax(blocks_probs)
+        for point in np.asarray(positive_sensing_points):
+            # find potential blocks, where the point is not masked:
+            potential_blocks = [i for i, b in enumerate(self.block_beliefs) if not b.are_points_masked(point)]
+            potential_block_probs = [self.block_beliefs[i].gaussian_pdf(point.reshape(1, -1))
+                                     for i in potential_blocks]
+            block_to_update_id = potential_blocks[np.argmax(potential_block_probs)]
             per_block_positive_sensing_points[block_to_update_id].append(point)
+
         return per_block_positive_sensing_points
 
     def _calculate_masked_areas(self, negative_sensing_points, successful_pickup_points,
@@ -151,9 +158,11 @@ class UnnormalizedBlocksPositionsBelief:
 
     def _update_blocks_from_history(self, per_block_positive_sensing_points, masked_areas,
                                     successful_pickup_points, no_update_margin):
+        # might be less accurate than with normal pdf, but faster
         is_block_picked_up = [False] * self.n_blocks_on_table
         for point in successful_pickup_points:
-            blocks_probs = [b.pdf((point[0], point[1])) for b in self.block_beliefs]
+            blocks_probs = [b.gaussian_pdf(np.array([point]))
+                            for b in self.block_beliefs]
             block_to_update_id = np.argmax(blocks_probs)
             is_block_picked_up[block_to_update_id] = True
 
@@ -177,6 +186,23 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
                              init_mus[i][0], init_sigmas[i][0],
                              init_mus[i][1], init_sigmas[i][1])
                 for i in range(self.n_blocks_orig)]
+
+    def _associate_positive_sensing_points(self, positive_sensing_points):
+        # Don't use the fast gaussian pdf here, it doesn't consider normalizations...
+        per_block_positive_sensing_points = [[] for _ in range(self.n_blocks_on_table)]
+        for point in positive_sensing_points:
+            # find potential blocks, where the point is not masked:
+            potential_blocks = [i for i, b in enumerate(self.block_beliefs) if not b.are_points_masked(point)]
+            potential_block_probs = [self.block_beliefs[i].pdf(point) for i in potential_blocks]
+            block_to_update_id = potential_blocks[np.argmax(potential_block_probs)]
+            per_block_positive_sensing_points[block_to_update_id].append(point)
+        return per_block_positive_sensing_points
+
+    def _update_blocks_from_history(self, per_block_positive_sensing_points, masked_areas,
+                                    successful_pickup_points, no_update_margin):
+        # The implementation in the base class uses the fast gaussian pdf which is not normalized
+        # need to implement it with normal pdf
+        raise NotImplementedError("This method is not implemented for the normalized version")
 
     def create_unnormalized(self):
         unnormalized = UnnormalizedBlocksPositionsBelief(self.n_blocks_orig,

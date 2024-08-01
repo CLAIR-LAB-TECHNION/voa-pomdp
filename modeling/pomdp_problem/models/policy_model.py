@@ -31,6 +31,7 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
         new_instance.__dict__ = copy.deepcopy(self.__dict__, memo)
         return new_instance
 
+@profile
 def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
     # filter to sensing actions with positive sensing, sensing actions with negative sensing
     # and stack attempt actions with success
@@ -122,23 +123,37 @@ class PolicyModel(pomdp_py.RolloutPolicy):
     def rollout(self, state, history) -> ActionBase:
         if state.steps_left <= 0:
             return DummyAction()
-        return random.choice(self.get_all_actions(state, history))
+        # return random.choice(self.get_all_actions(state, history))
 
-        # TODO: get just pickup actions
-        # belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
-        #
-        # # find the block with the most bounding areas and the num of bounding areas:
-        # per_block_n_areas = [len(b.bounds_list) for b in belief.block_beliefs]
-        # max_n_areas = max(per_block_n_areas)
-        # if max_n_areas == 0:
-        #     # no block position is known well enough, try to sense:
-        #     pass #TODO
-        #
-        #
-        # block_with_most_areas = np.argmax(per_block_n_areas)
+        # when rolling out, we will allways try a pick up since we should be quite deep in the tree
+        # and have a really short rollout
 
-        # find union of all areas of the block with the most areas:
+        belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
 
+        # find the block with the most bounding areas and the num of bounding areas:
+        per_block_n_areas = [len(b.bounds_list) for b in belief.block_beliefs]
+        max_n_areas = max(per_block_n_areas)
+        if max_n_areas > 1:
+            # try to pick up that block
+            block_with_most_areas = np.argmax(per_block_n_areas)
+            block_dist = belief.block_beliefs[block_with_most_areas]
+
+            # sample 10 points and take the one with the highest pdf:
+            points, pdfs = block_dist.very_fast_sample(20, max_retries=20, return_pdfs=True)
+            best_point = points[np.argmax(pdfs)]
+
+            return ActionAttemptStack(best_point[0], best_point[1])
+
+        # if no block position is known well enough, choose the one with lowest variance
+        # and try to pick it up
+        per_block_sigma = [np.sqrt(b.sigma_x + b.sigma_y) for b in belief.block_beliefs]
+        block_with_least_variance = np.argmin(per_block_sigma)
+        # sample 10 points and pick up from the one with highest pdf:
+        block_dist = belief.block_beliefs[block_with_least_variance]
+        points, pdfs = block_dist.very_fast_sample(10, return_pdfs=True)
+        best_point = points[np.argmax(pdfs)]
+
+        return ActionAttemptStack(best_point[0], best_point[1])
 
 
 
