@@ -63,9 +63,11 @@ def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
 class PolicyModel(pomdp_py.RolloutPolicy):
     def __init__(self,
                  initial_blocks_position_belief: BeliefModel,
+                 n_blocks_for_actions=2,
                  points_to_sample_for_each_block=200,
                  sensing_actions_to_sample_per_block=2):
         self.initial_blocks_position_belief = initial_blocks_position_belief
+        self.n_blocks_for_actions = n_blocks_for_actions
         self.points_to_sample_for_each_block = points_to_sample_for_each_block
         self.sensing_actions_to_sample_per_block = sensing_actions_to_sample_per_block
 
@@ -80,11 +82,12 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         actions_to_return: list[ActionBase] = []
 
         belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
+        focused_blocks = self.choose_focused_blocks(belief)
 
         # first, sample 200 points from each block belief, and compute their pdfs
         per_block_points = []
         per_block_pdfs = []
-        for block_dist in belief.block_beliefs:
+        for block_dist in focused_blocks:
             points, pdfs = block_dist.very_fast_sample(self.points_to_sample_for_each_block,
                                                        return_pdfs=True)
 
@@ -105,7 +108,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
                 per_block_sense_points.append(sense_points)
 
         # choose a pickup action for each block. It should be picking up at approximately maximum likelihood position.
-        for block_dist, best_points in zip(belief.block_beliefs, per_block_sense_points):
+        for block_dist, best_points in zip(focused_blocks, per_block_sense_points):
             gaussian_center = (block_dist.mu_x, block_dist.mu_y)
             if not block_dist.are_points_masked(gaussian_center) != 0:
                 # easy! this is the maximum likelihood!
@@ -124,6 +127,47 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             actions_to_return += [ActionSense(point[0], point[1]) for point in best_points]
 
         return actions_to_return
+
+    def choose_focused_blocks(self, belief):
+        """
+        Choose self.n_blocks_for_actions blocks to sample actions for given the belief.
+        Prioritize blocks with the most bounding areas. If on par,
+        choose the blocks with the lowest variance and add score for
+        nearby masked areas. Return their BlockDists.
+        """
+        block_scores = []
+        for i, block_dist in enumerate(belief.block_beliefs):
+            n_areas = len(block_dist.bounds_list)
+
+            # Secondary score: inverse of variance (higher for lower variance)
+            variance = block_dist.sigma_x + block_dist.sigma_y
+            inverse_variance = 1 / (variance + 1e-10)
+
+            # another score nearby masked areas
+            nearby_masked_area_score = self._calculate_nearby_masked_area_score(block_dist)
+
+            total_score = n_areas * 100 + inverse_variance + nearby_masked_area_score
+            block_scores.append((i, total_score))
+
+        sorted_blocks = sorted(block_scores, key=lambda x: x[1], reverse=True)
+        selected_indices = [idx for idx, _ in sorted_blocks[:self.n_blocks_for_actions]]
+
+        return [belief.block_beliefs[i] for i in selected_indices]
+
+    def _calculate_nearby_masked_area_score(self, block_dist):
+        score = 0
+        center = (block_dist.mu_x, block_dist.mu_y)
+        for masked_area in block_dist.masked_areas:
+            # Calculate distance from block center to masked area center
+            masked_center = ((masked_area[0][0] + masked_area[0][1]) / 2,
+                             (masked_area[1][0] + masked_area[1][1]) / 2)
+            distance = ((center[0] - masked_center[0]) ** 2 +
+                        (center[1] - masked_center[1]) ** 2) ** 0.5
+
+            # Add to score based on proximity (closer areas have higher score)
+            score += 1 / (distance + 1e-10)
+
+        return score
 
     @profile
     def rollout(self, state, history) -> ActionBase:

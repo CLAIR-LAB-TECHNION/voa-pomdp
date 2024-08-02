@@ -19,6 +19,7 @@ class Agent(pomdp_py.Agent):
                  max_steps,
                  successful_grasp_offset_x=0.015,
                  successful_grasp_offset_y=0.015,
+                 n_blocks_for_actions=2,
                  points_to_sample_for_each_block=200,
                  sensing_actions_to_sample_per_block=2,
                  stacking_reward=1,
@@ -39,6 +40,7 @@ class Agent(pomdp_py.Agent):
         reward_model = RewardModel(stacking_reward=stacking_reward, cost_coeff=cost_coeff,
                                    finish_ahead_of_time_reward_coeff=finish_ahead_of_time_reward_coeff)
         policy_model = PolicyModel(initial_blocks_position_belief=initial_blocks_position_belief,
+                                   n_blocks_for_actions=n_blocks_for_actions,
                                    points_to_sample_for_each_block=points_to_sample_for_each_block,
                                    sensing_actions_to_sample_per_block=sensing_actions_to_sample_per_block)
 

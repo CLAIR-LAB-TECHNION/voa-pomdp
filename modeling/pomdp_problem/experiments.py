@@ -27,6 +27,7 @@ max_steps = 20
 stacking_reward = 1
 cost_coeff = 0.0
 finish_ahead_of_time_reward_coeff = 0.1
+n_blocks_for_actions = 2
 points_to_sample_for_each_block = 150
 sensing_actions_to_sample_per_block = 2
 max_planning_depth = 6
@@ -39,6 +40,7 @@ if __name__ == "__main__":
                   stacking_reward=stacking_reward,
                   cost_coeff=cost_coeff,
                   finish_ahead_of_time_reward_coeff=finish_ahead_of_time_reward_coeff,
+                  n_blocks_for_actions=n_blocks_for_actions,
                   points_to_sample_for_each_block=points_to_sample_for_each_block,
                   sensing_actions_to_sample_per_block=sensing_actions_to_sample_per_block)
 
@@ -48,7 +50,7 @@ if __name__ == "__main__":
 
     planner = pomdp_py.POUCT(max_depth=max_planning_depth,
                              # planning_time=300,
-                             num_sims=5000,
+                             num_sims=2000,
                              discount_factor=1.0,
                              rollout_policy=agent.policy_model,
                              show_progress=True)
