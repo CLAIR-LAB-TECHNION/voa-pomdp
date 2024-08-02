@@ -87,6 +87,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         for block_dist in belief.block_beliefs:
             points, pdfs = block_dist.very_fast_sample(self.points_to_sample_for_each_block,
                                                        return_pdfs=True)
+
             per_block_points.append(points)
             per_block_pdfs.append(pdfs)
 
@@ -94,9 +95,14 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         k = self.sensing_actions_to_sample_per_block - 1
         per_block_sense_points = []
         for pdfs, points in zip(per_block_pdfs, per_block_points):
-            sense_points = [points[np.argmax(pdfs)]]
-            sense_points += random.choices(points, k=k)
-            per_block_sense_points.append(sense_points)
+            if len(points) == 0:
+                # if no point sample after all attempts, belief maybe wrong due to wrong block accusation
+                # of positive sensing. Nothing to do in that case...
+                per_block_sense_points.append([])
+            else:
+                sense_points = [points[np.argmax(pdfs)]]
+                sense_points += random.choices(points, k=k)
+                per_block_sense_points.append(sense_points)
 
         # choose a pickup action for each block. It should be picking up at approximately maximum likelihood position.
         for block_dist, best_points in zip(belief.block_beliefs, per_block_sense_points):
@@ -104,7 +110,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             if not block_dist.are_points_masked(gaussian_center) != 0:
                 # easy! this is the maximum likelihood!
                 actions_to_return.append(ActionAttemptStack(gaussian_center[0], gaussian_center[1]))
-            else:
+            elif len(best_points) > 0:
                 # find the best point
                 best_point = best_points[-1]
                 actions_to_return.append(ActionAttemptStack(best_point[0], best_point[1]))

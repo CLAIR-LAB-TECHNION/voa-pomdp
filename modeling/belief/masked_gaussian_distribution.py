@@ -197,6 +197,7 @@ class UnnormalizedMasked2DTruncNorm:
             points_y = np.random.uniform(y_min, y_max, int(ratio * n_samples))
             points = np.stack([points_x, points_y], axis=1)
         elif self.mu_x > 1 or self.mu_y > 1:
+            raise NotImplementedError("Just make the small modifications for that case if you wanna use this")
             # no bounds, but most of the samples from normal gaussian will be outside workspace, thus
             # it's better to sample from truncated normal...
             points = self._sample_from_truncnorm(int(ratio * n_samples), bounds_x, bounds_y)
@@ -212,7 +213,10 @@ class UnnormalizedMasked2DTruncNorm:
         while len(valid_points) < n_samples and retries < max_retries:
             retries += 1
             if len(self.bounds_list) > 0 or self.mu_x > 1 or self.mu_y > 1:
-                new_points = self._sample_from_truncnorm(int(ratio * n_samples), bounds_x, bounds_y)
+                # Bounded areas are often so small we can sample from uniform in them
+                new_points_x = np.random.uniform(x_min, x_max, int(ratio * n_samples))
+                new_points_y = np.random.uniform(y_min, y_max, int(ratio * n_samples))
+                new_points = np.stack([new_points_x, new_points_y], axis=1)
             else:
                 new_points = self.sample_from_gaussian(int(ratio * n_samples))
             new_are_masked = self.are_points_masked(new_points, validate_in_workspace=True)
@@ -221,7 +225,7 @@ class UnnormalizedMasked2DTruncNorm:
 
             valid_points = np.concatenate((valid_points, new_valid_points))
             pdfs = np.concatenate((pdfs, new_valid_pdfs))
-
+            ratio = min(ratio * ratio, 10000)  # increase ratio exponentially but dont exaggerate
         if return_pdfs:
             return valid_points[:n_samples], pdfs[:n_samples]
         return valid_points[:n_samples]
