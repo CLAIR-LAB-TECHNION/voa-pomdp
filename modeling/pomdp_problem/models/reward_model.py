@@ -24,7 +24,10 @@ class RewardModel(pomdp_py.RewardModel):
         reward = 0
 
         if isinstance(action, ActionAttemptStack):
-            reward -= self.stacking_cost_coeff * np.linalg.norm(next_state.robot_position - state.robot_position)
+            pick_up_pos = np.array([action.x, action.y])
+            pickup_movement_distance = np.linalg.norm(pick_up_pos - state.robot_position)
+            put_down_movement_distance = np.linalg.norm(next_state.robot_position - pick_up_pos)
+            reward -= self.stacking_cost_coeff * (pickup_movement_distance + put_down_movement_distance)
 
             if next_state.last_stack_attempt_succeded:
                 reward += self.stacking_reward

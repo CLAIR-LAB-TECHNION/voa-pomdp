@@ -27,8 +27,8 @@ def get_positions_and_init_belief():
 max_steps = 20
 
 stacking_reward = 1
-sensing_cost_coeff = 0.0
-stacking_cost_coeff = 0.0
+sensing_cost_coeff = 0.1
+stacking_cost_coeff = 0.2  # stack takes much more time than sensing
 finish_ahead_of_time_reward_coeff = 0.1
 
 n_blocks_for_actions = 2
