@@ -6,8 +6,9 @@ from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
 
 
 class ObservationModel(pomdp_py.ObservationModel):
-    def __init__(self, block_size=0.04):
+    def __init__(self, tower_position, block_size=0.04):
         self.block_size = block_size
+        self.tower_position = tower_position
 
     def sample(self, next_state, action):
         if isinstance(action, DummyAction):
@@ -16,7 +17,9 @@ class ObservationModel(pomdp_py.ObservationModel):
         if isinstance(action, ActionAttemptStack):
             # for simplicity, right now we assume that the robot can accurately sense if block is picked
             # We can make this probabilistic if we see this is not accurate enough
-            return ObservationStackAttemptResult(next_state.last_stack_attempt_succeded, next_state.steps_left)
+            return ObservationStackAttemptResult(next_state.last_stack_attempt_succeded,
+                                                 steps_left=next_state.steps_left,
+                                                 robot_position=next_state.robot_position)
         elif isinstance(action, ActionSense):
             return self.sample_sense(next_state, action)
 
@@ -25,9 +28,13 @@ class ObservationModel(pomdp_py.ObservationModel):
         # if there is, it is occupied
         for block_pos in next_state.block_positions:
             if np.abs(block_pos[0] - action.x) < self.block_size and np.abs(block_pos[1] - action.y) < self.block_size:
-                return ObservationSenseResult(action.x, action.y, True, next_state.steps_left)
+                return ObservationSenseResult(True,
+                                              steps_left=next_state.steps_left,
+                                              robot_position=next_state.robot_position)
 
-        return ObservationSenseResult(action.x, action.y, False, next_state.steps_left)
+        return ObservationSenseResult(False,
+                                      steps_left=next_state.steps_left,
+                                      robot_position=next_state.robot_position)
 
     def probability(self, observation, next_state, action):
         raise NotImplementedError  # don't need this for sampling based methods?

@@ -44,9 +44,9 @@ def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
     for (action, observation) in history:
         if isinstance(action, ActionSense):
             if observation.is_occupied:
-                sense_positive.append((observation.x, observation.y))
+                sense_positive.append((action.x, action.y))
             else:
-                sense_negative.append((observation.x, observation.y))
+                sense_negative.append((action.x, action.y))
         elif isinstance(action, ActionAttemptStack):
             if observation.is_object_picked:
                 stack_positive.append((action.x, action.y))

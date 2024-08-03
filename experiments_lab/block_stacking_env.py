@@ -6,7 +6,7 @@ from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_from_block_
     distribute_blocks_in_positions, to_canonical_config
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
-                                                workspace_y_lims_default)
+                                                workspace_y_lims_default, goal_tower_position)
 import numpy as np
 import logging
 
@@ -18,7 +18,6 @@ from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot
 
 class LabBlockStackingEnv:
     cleared_blocks_position = [-0.25, -1.15]
-    goal_tower_position = [-0.45, -1.15]
 
     def __init__(self,
                  n_blocks,
@@ -94,8 +93,8 @@ class LabBlockStackingEnv:
             self.r2_controller.pick_up(x, y, 0.12)
             # success = self.r2_controller.measure_weight() TODO
             pick_success = True  # assume now success
-            self.r2_controller.put_down(self.goal_tower_position[0],
-                                        self.goal_tower_position[1],
+            self.r2_controller.put_down(goal_tower_position[0],
+                                        goal_tower_position[1],
                                         0,
                                         start_height=self.n_blocks*0.04 + 0.1)
             observation = (pick_success, steps_left)
@@ -111,8 +110,8 @@ class LabBlockStackingEnv:
         tower_height_blocks = self.sense_tower_height()
         for i in range(tower_height_blocks):
             start_height = 0.04 * (tower_height_blocks - i) + 0.12
-            self.r2_controller.pick_up(self.goal_tower_position[0],
-                                       self.goal_tower_position[1],
+            self.r2_controller.pick_up(goal_tower_position[0],
+                                       goal_tower_position[1],
                                        0,
                                        start_height)
             self.r2_controller.plan_and_move_to_xyzrz(self.cleared_blocks_position[0],
@@ -160,8 +159,8 @@ class LabBlockStackingEnv:
         max_height = 0.04 * self.n_blocks
         start_heigh = max_height + 0.12
 
-        height = self.r2_controller.sense_height_tilted(self.goal_tower_position[0],
-                                                        self.goal_tower_position[1],
+        height = self.r2_controller.sense_height_tilted(goal_tower_position[0],
+                                                        goal_tower_position[1],
                                                         start_heigh)
 
         # first block should be at about 0.0395, then 0.04 for every other block
