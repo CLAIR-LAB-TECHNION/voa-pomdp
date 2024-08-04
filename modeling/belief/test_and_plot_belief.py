@@ -59,13 +59,13 @@ def multiple_blocks():
     belief.update_from_pickup_attempt(*pickup_points[0], observed_success=True)
     plot_all_blocks_beliefs(belief, grid_size=200)
 
-    # should be equivalent to:
-    belief2 = deepcopy(init_belief)
-    belief2.update_from_history_of_sensing_and_pick_up(positive_sensing_points,
-                                                       negative_sensing_points,
-                                                       pickup_points,
-                                                       [])
-    plot_all_blocks_beliefs(belief2, grid_size=200)
+    # # should be equivalent to:
+    # belief2 = deepcopy(init_belief)
+    # belief2.update_from_history_of_sensing_and_pick_up(positive_sensing_points,
+    #                                                    negative_sensing_points,
+    #                                                    pickup_points,
+    #                                                    [])
+    # plot_all_blocks_beliefs(belief2, grid_size=200)
 
 
 
