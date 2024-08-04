@@ -1,6 +1,6 @@
 import numpy as np
 
-from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
+from modeling.belief.block_position_belief import BlocksPositionsBelief
 
 
 
@@ -8,7 +8,7 @@ class FixedSenseUntilPositivePolicy:
     def __init__(self, ):
         self.prev_action = None
 
-    def policy(self, positions_belief: UnnormalizedBlocksPositionsBelief, prev_observation):
+    def policy(self, positions_belief: BlocksPositionsBelief, prev_observation):
         """
         This is a fixed policy that tries to sense the block until it's positive then stack it up.
         At the last step it will try to stack at maximum likelihood position.
@@ -40,5 +40,5 @@ class FixedSenseUntilPositivePolicy:
         max_likelihood_position = points[max_likelihood_idx]
         return max_likelihood_position
 
-    def __call__(self, positions_belief: UnnormalizedBlocksPositionsBelief, prev_observation):
+    def __call__(self, positions_belief: BlocksPositionsBelief, prev_observation):
         return self.policy(positions_belief, prev_observation)
