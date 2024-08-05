@@ -103,12 +103,3 @@ if __name__ == "__main__":
 
         pass
 
-        # TODO: next steps:
-        # TODO: actions for not all blocks... (sensed positie, low variance)
-        # TODO: Less actions (up to two blocks, will go deeper + faster get all actions)
-        # TODO: Test effects of less samples. maybe it has no effect on lab computer
-
-        # TODO: don't sample pickup if no masks or bounds?
-        # TODO: action prior for sensing
-        # TODO: Use TreeDebuger or visualization
-        # TODO: learning? belief will belong to helper only
