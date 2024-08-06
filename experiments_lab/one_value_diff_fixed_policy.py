@@ -63,7 +63,7 @@ def main(n_blocks: int = 2,
         plt.title(f"Action: \n {action[0]}, ({action[1]:.4f}, {action[2]:.4f}) \n Steps left: {steps_left}")
         plt.show()
 
-        observation = env.step(*action)
+        observation, reward = env.step(*action)
         steps_left = observation[1]
 
         if action[0] == "sense":

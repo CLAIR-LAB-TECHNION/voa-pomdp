@@ -1,7 +1,8 @@
 import numpy as np
 import pomdp_py
 from modeling.pomdp_problem.domain.state import State
-from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
+from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult,\
+    ObservationReachedTerminal
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, DummyAction
 
 
@@ -11,8 +12,9 @@ class ObservationModel(pomdp_py.ObservationModel):
         self.tower_position = tower_position
 
     def sample(self, next_state, action):
-        if isinstance(action, DummyAction):
-            return
+        if isinstance(action, DummyAction) or next_state.steps_left == 0 or\
+                len(next_state.block_positions) == 0:
+            return ObservationReachedTerminal()
 
         if isinstance(action, ActionAttemptStack):
             # for simplicity, right now we assume that the robot can accurately sense if block is picked

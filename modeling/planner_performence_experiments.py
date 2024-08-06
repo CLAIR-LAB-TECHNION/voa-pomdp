@@ -11,10 +11,12 @@ from lab_ur_stack.utils.workspace_utils import sample_block_positions_uniform, w
     workspace_y_lims_default, sample_block_positions_from_dists, goal_tower_position
 from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
 from modeling.pomdp_problem.agent.agent import Agent
+from modeling.pomdp_problem.domain.observation import ObservationReachedTerminal
 from modeling.pomdp_problem.env.env import Environment
 from modeling.pomdp_problem.models.policy_model import BeliefModel
 from modeling.pomdp_problem.domain.state import State
 import pomdp_py
+
 
 app = typer.Typer()
 
@@ -51,6 +53,9 @@ def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial
         actual_observation = env.provide_observation(agent.observation_model, actual_action)
 
         total_reward += actual_reward
+
+        if isinstance(actual_observation, ObservationReachedTerminal):
+            break
 
         planner.update(agent, actual_action, actual_observation)  # updates tree but not belief
         agent.update(actual_action, actual_observation)

@@ -89,7 +89,7 @@ class LabBlockStackingEnv:
     def step(self, action: ActionBase):
         if self.steps >= self.max_steps:
             print("reached max steps, episode is already done")
-            return None
+            return ObservationReachedTerminal(), 0
 
         self.steps += 1
         steps_left = self.max_steps - self.steps
@@ -136,7 +136,7 @@ class LabBlockStackingEnv:
         else:
             raise ValueError(f"unknown action type: {type(action)}")
 
-        return observation
+        return observation, reward
 
     def clean_workspace_for_next_experiment(self):
         """
