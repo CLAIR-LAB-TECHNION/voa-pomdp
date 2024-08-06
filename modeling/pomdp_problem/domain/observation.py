@@ -45,3 +45,17 @@ class ObservationStackAttemptResult(ObservationBase):
     def __str__(self):
         return f"(attempt_stack_res, robot_position={self.robot_position}, " \
                f"is_object_picked={self.is_object_picked}, steps_left={self.steps_left})"
+
+
+class EpisodeEndObservation(ObservationBase):
+    def __init__(self):
+        super().__init__(robot_position=None, steps_left=0)
+
+    def __eq__(self, other):
+        return isinstance(other, EpisodeEndObservation)
+
+    def __hash__(self):
+        return hash("EpisodeEndObservation")
+
+    def __str__(self):
+        return "EpisodeEndObservation"

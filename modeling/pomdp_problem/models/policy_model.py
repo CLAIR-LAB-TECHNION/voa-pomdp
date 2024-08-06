@@ -120,11 +120,14 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
         if state.steps_left == 1:
             # no use for sensing
-            return actions_to_return
+            return actions_to_return if actions_to_return else [DummyAction()]
 
         # add sensing actions for all best points
         for best_points in per_block_sense_points:
             actions_to_return += [ActionSense(point[0], point[1]) for point in best_points]
+
+        if actions_to_return == []:
+            return [DummyAction()]
 
         return actions_to_return
 

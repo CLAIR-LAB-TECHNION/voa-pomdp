@@ -12,7 +12,7 @@ class ObservationModel(pomdp_py.ObservationModel):
 
     def sample(self, next_state, action):
         if isinstance(action, DummyAction):
-            return None
+            return
 
         if isinstance(action, ActionAttemptStack):
             # for simplicity, right now we assume that the robot can accurately sense if block is picked

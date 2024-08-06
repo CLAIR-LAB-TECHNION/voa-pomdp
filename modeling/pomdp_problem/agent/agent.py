@@ -64,6 +64,9 @@ class Agent(pomdp_py.Agent):
         # this is override from base agent since we have our different belief model
         steps_left = self.max_steps - len(self.history)
 
+        if steps_left <= 0 or len(self._cur_belief.block_beliefs) <= 0:
+            raise ValueError("can't plan from terminal state")
+
         if self.need_to_generate_samples:
             # we don't have samples cached, so we need to generate them, generate 500 and save them
             block_positions_arrays = [block_dist.sample(500) for block_dist in self._cur_belief.block_beliefs]
@@ -105,4 +108,5 @@ class Agent(pomdp_py.Agent):
             self._cur_belief.update_from_pickup_attempt(x, y, actual_observation.is_object_picked)
             self.set_belief(self._cur_belief)  # due to weird cpython stuff
         else:
-            raise NotImplementedError
+            # dummy action... do nothing
+            pass
