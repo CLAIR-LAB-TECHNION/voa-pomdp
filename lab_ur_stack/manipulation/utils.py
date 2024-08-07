@@ -2,6 +2,7 @@ from lab_ur_stack.utils.workspace_utils import (sample_block_positions_uniform, 
                                                 workspace_x_lims_default, workspace_y_lims_default,
                                                 sample_block_positions_from_dists)
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+import numpy as np
 
 
 def to_canonical_config(clean_up_sensor_config):
