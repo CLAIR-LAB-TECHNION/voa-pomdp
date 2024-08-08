@@ -86,7 +86,7 @@ class LabBlockStackingEnv:
         self.r1_controller.plan_and_move_home()
         self.current_tower_height_blocks = 0
 
-    def step(self, action: ActionBase):
+    def step(self, action: ActionBase) -> tuple[ObservationBase, float]:
         if self.steps >= self.max_steps:
             print("reached max steps, episode is already done")
             return ObservationReachedTerminal(), 0

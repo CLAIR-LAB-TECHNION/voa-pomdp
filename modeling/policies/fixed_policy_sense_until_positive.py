@@ -1,32 +1,36 @@
 import numpy as np
-
+from modeling.pomdp_problem.domain.action import *
+from modeling.pomdp_problem.domain.observation import *
 from modeling.belief.block_position_belief import BlocksPositionsBelief
+from modeling.policies.abstract_policy import AbastractPolicy
 
 
-
-class FixedSenseUntilPositivePolicy:
+class FixedSenseUntilPositivePolicy(AbastractPolicy):
     def __init__(self, ):
-        self.prev_action = None
+        super().__init__()
 
-    def policy(self, positions_belief: BlocksPositionsBelief, prev_observation):
+    def sample_action(self,
+                      positions_belief: BlocksPositionsBelief,
+                      history: list[tuple[ActionBase, ObservationBase]]):
         """
         This is a fixed policy that tries to sense the block until it's positive then stack it up.
         At the last step it will try to stack at maximum likelihood position.
         """
-        if self.prev_action is not None:
+        prev_action = history[-1][0] if history else None
+        prev_observation = history[-1][1] if history else None
+
+        if prev_action is not None:
             # if this is the last step, or in previous step we sensed positive, attempt pick up:
-            if prev_observation[1] == 1 or \
-                    (self.prev_action[0] == "sense" and prev_observation[0] == True):
+            if prev_observation.steps_left == 1 or \
+                    (isinstance(prev_observation, ObservationSenseResult) and prev_observation.is_occupied == True):
                 pick_up_position = self.max_likelihood_position(positions_belief)
-                action = ("attempt_stack", pick_up_position[0], pick_up_position[1])
-                self.prev_action = action
+                action = ActionAttemptStack(pick_up_position[0], pick_up_position[1])
                 return action
 
         # otherwise, sense for the first block in sampled place from belief
         first_block_belief = positions_belief.block_beliefs[0]
         sense_point = first_block_belief.sample()[0]
-        action = ("sense", sense_point[0], sense_point[1])
-        self.prev_action = action
+        action = ActionSense(sense_point[0], sense_point[1])
         return action
 
     def max_likelihood_position(self, positions_belief, grid_size=200):
@@ -40,5 +44,3 @@ class FixedSenseUntilPositivePolicy:
         max_likelihood_position = points[max_likelihood_idx]
         return max_likelihood_position
 
-    def __call__(self, positions_belief: BlocksPositionsBelief, prev_observation):
-        return self.policy(positions_belief, prev_observation)

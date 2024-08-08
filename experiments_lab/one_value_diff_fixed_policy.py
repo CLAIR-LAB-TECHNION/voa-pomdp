@@ -1,5 +1,4 @@
 from copy import deepcopy
-import numpy as np
 import typer
 from matplotlib import pyplot as plt
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
@@ -9,15 +8,14 @@ from lab_ur_stack.manipulation.manipulation_controller import ManipulationContro
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
-from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_from_block_positions_dists, \
-    ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default)
-from lab_ur_stack.vision.utils import (lookat_verangle_distance_to_robot_config, detections_plots_no_depth_as_image,
-                                       detections_plots_with_depth_as_image)
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
-from experiments_lab.fixed_policy_sense_until_positive import FixedSenseUntilPositivePolicy
+from modeling.policies.fixed_policy_sense_until_positive import FixedSenseUntilPositivePolicy
+from modeling.pomdp_problem.domain.action import *
+from modeling.pomdp_problem.domain.observation import *
+
 
 initial_positions_mus = [[-0.8, -0.75], [-0.6, -0.65]]
 initial_positions_sigmas = [[0.04, 0.02], [0.05, 0.07]]
@@ -50,9 +48,9 @@ def main(n_blocks: int = 2,
 
     current_belief = deepcopy(initial_belief)
     steps_left = env.max_steps
-    prev_observation = (False, steps_left)
+    history = []
     while steps_left > 0 and current_belief.n_blocks_on_table > 0:
-        action = policy(current_belief, prev_observation)
+        action = policy(current_belief, history)
 
         plot_im = plot_all_blocks_beliefs(current_belief,
                                           actual_states=secret_block_pos,
@@ -60,18 +58,20 @@ def main(n_blocks: int = 2,
         plt.figure(figsize=(5, 4*env.n_blocks), dpi=512)
         plt.imshow(plot_im)
         plt.axis("off")
-        plt.title(f"Action: \n {action[0]}, ({action[1]:.4f}, {action[2]:.4f}) \n Steps left: {steps_left}")
+        plt.title(f"Action: {str(action)}")
         plt.show()
 
-        observation, reward = env.step(*action)
-        steps_left = observation[1]
+        observation, reward = env.step(action)
+        steps_left = observation.steps_left
 
-        if action[0] == "sense":
-            current_belief.update_from_point_sensing_observation(action[1], action[2], observation[0])
-        elif action[0] == "attempt_stack":
-            current_belief.update_from_pickup_attempt(action[1], action[2], observation[0])
+        history.append((action, observation))
 
-        prev_observation = observation
+        if isinstance(observation, ObservationSenseResult):
+            current_belief.update_from_point_sensing_observation(action.x, action.y, observation.is_occupied)
+        elif isinstance(observation, ObservationStackAttemptResult):
+            current_belief.update_from_pickup_attempt(action.x, action.y, observation.is_object_picked)
+
+        history += [(action, observation)]
 
     env.reset_from_positions(secret_block_pos)
 
