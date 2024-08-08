@@ -4,12 +4,17 @@ from copy import deepcopy
 import numpy as np
 import pomdp_py
 from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
-from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
+from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult, \
+    ObservationReachedTerminal
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase, DummyAction
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.pomdp_problem.domain.state import State
 from line_profiler_pycharm import profile
 
+
+import copy
+from modeling.belief.block_position_belief import BlocksPositionsBelief
+import pomdp_py
 
 class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
     """
@@ -17,17 +22,24 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
     so it can be used as belief by agent and policy
     """
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)  # calls only BlocksPositionsBelief initializer
+        BlocksPositionsBelief.__init__(self, *args, **kwargs)
 
     def __new__(cls, *args, **kwargs):
-        # Ensure proper creation of the instance using BlocksPositionsBelief's __new__
-        instance = UnnormalizedBlocksPositionsBelief.__new__(cls)
-        return instance
+        return BlocksPositionsBelief.__new__(cls)
+
+    def __reduce__(self):
+        # This method tells Python how to pickle the object
+        return (BeliefModel._unpickle, (self.__dict__,))
+
+    @staticmethod
+    def _unpickle(state):
+        # This method tells Python how to unpickle the object
+        self = BeliefModel.__new__(BeliefModel)
+        self.__dict__.update(state)
+        return self
 
     def __deepcopy__(self, memo):
-        # Create a new instance without calling __init__
-        new_instance = self.__class__.__new__(self.__class__)
-        # Perform a deep copy of the instance's dictionary and update the new instance
+        new_instance = BeliefModel.__new__(BeliefModel)
         new_instance.__dict__ = copy.deepcopy(self.__dict__, memo)
         return new_instance
 
@@ -42,6 +54,9 @@ def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
     stack_negative = []  # points where we tried to stack from but failed
 
     for (action, observation) in history:
+        if isinstance(action, DummyAction) or isinstance(observation, ObservationReachedTerminal):
+            break
+
         if isinstance(action, ActionSense):
             if observation.is_occupied:
                 sense_positive.append((action.x, action.y))
@@ -76,13 +91,17 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         """
         this actually samples actions
         """
-        if state.steps_left <= 0:
+        if state.steps_left <= 0 or len(state.block_positions) == 0:
             return [DummyAction()]
 
-        actions_to_return: list[ActionBase] = []
 
         belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
+        if belief.block_beliefs == []:
+            return [DummyAction()]
+
         focused_blocks = self.choose_focused_blocks(belief)
+
+        actions_to_return: list[ActionBase] = []
 
         # first, sample 200 points from each block belief, and compute their pdfs
         per_block_points = []
@@ -174,7 +193,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
     @profile
     def rollout(self, state, history) -> ActionBase:
-        if state.steps_left <= 0:
+        if state.steps_left <= 0 or len(state.block_positions) == 0:
             return DummyAction()
         # return random.choice(self.get_all_actions(state, history))
 
@@ -182,6 +201,8 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         # and have a really short rollout
 
         belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
+        if belief.block_beliefs == []:
+            return DummyAction()
 
         # find the block with the most bounding areas and the num of bounding areas:
         per_block_n_areas = [len(b.bounds_list) for b in belief.block_beliefs]
@@ -192,7 +213,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             block_dist = belief.block_beliefs[block_with_most_areas]
 
             # sample 10 points and take the one with the highest pdf:
-            points, pdfs = block_dist.very_fast_sample(20, max_retries=20, return_pdfs=True)
+            points, pdfs = block_dist.very_fast_sample(20, max_retries=10, return_pdfs=True)
             if len(points) == 0:
                 # no points to sample from, just return a random action
                 return random.choice(self.get_all_actions(state, history))

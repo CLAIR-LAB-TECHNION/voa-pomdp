@@ -135,22 +135,38 @@ class UnnormalizedMasked2DTruncNorm:
 
         return masked
 
-    def sample(self, n_samples=1):
+    # def sample(self, n_samples=1):
+    #     samples_x = self.dist_x.rvs(n_samples)
+    #     samples_y = self.dist_y.rvs(n_samples)
+    #     points = np.stack([samples_x, samples_y], axis=1)
+    #
+    #     while True:
+    #         invalid_samples = np.where(self.pdf(points) == 0)[0]
+    #         if len(invalid_samples) == 0:
+    #             break
+    #
+    #         new_samples_x = self.dist_x.rvs(len(invalid_samples))
+    #         new_samples_y = self.dist_y.rvs(len(invalid_samples))
+    #         new_points = np.stack([new_samples_x, new_samples_y], axis=1)
+    #         points[invalid_samples] = new_points
+    #
+    #     return points
+    def sample(self, n_samples=1, ratio=2, max_retries=10):
         samples_x = self.dist_x.rvs(n_samples)
         samples_y = self.dist_y.rvs(n_samples)
         points = np.stack([samples_x, samples_y], axis=1)
 
-        while True:
-            invalid_samples = np.where(self.pdf(points) == 0)[0]
-            if len(invalid_samples) == 0:
-                break
-
-            new_samples_x = self.dist_x.rvs(len(invalid_samples))
-            new_samples_y = self.dist_y.rvs(len(invalid_samples))
+        valid_points = points[self.are_points_masked(points) == 0]
+        retries = 0
+        while len(valid_points) < n_samples and retries < max_retries:
+            retries += 1
+            new_samples_x = self.dist_x.rvs(n_samples)
+            new_samples_y = self.dist_y.rvs(n_samples)
             new_points = np.stack([new_samples_x, new_samples_y], axis=1)
-            points[invalid_samples] = new_points
+            new_valid_points = new_points[self.are_points_masked(new_points) == 0]
+            valid_points = np.concatenate((valid_points, new_valid_points))
 
-        return points
+        return valid_points[:n_samples]
 
     @profile
     def _sample_from_truncnorm(self, max_n_samples, bounds_x=None, bounds_y=None):
@@ -225,7 +241,7 @@ class UnnormalizedMasked2DTruncNorm:
 
             valid_points = np.concatenate((valid_points, new_valid_points))
             pdfs = np.concatenate((pdfs, new_valid_pdfs))
-            ratio = min(ratio * ratio, 10000)  # increase ratio exponentially but dont exaggerate
+            ratio = min(ratio * ratio, 100)  # increase ratio exponentially but dont exaggerate
         if return_pdfs:
             return valid_points[:n_samples], pdfs[:n_samples]
         return valid_points[:n_samples]

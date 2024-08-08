@@ -67,20 +67,24 @@ class Agent(pomdp_py.Agent):
         if steps_left <= 0 or len(self._cur_belief.block_beliefs) <= 0:
             raise ValueError("can't plan from terminal state")
 
-        if self.need_to_generate_samples:
-            # we don't have samples cached, so we need to generate them, generate 500 and save them
-            block_positions_arrays = [block_dist.sample(500) for block_dist in self._cur_belief.block_beliefs]
-            block_positions_arrays = np.array(block_positions_arrays)  # shape: (num_blocks, 500, 2)
-            self.sampled_block_positions = block_positions_arrays.transpose(1, 0, 2)  # shape: (500, num_blocks, 2)
+        if len(self._cur_belief.block_beliefs) <= 0:
+            block_positions = []
+        else:
+            if self.need_to_generate_samples:
+                # we don't have samples cached, so we need to generate them, generate and save them
+                block_positions_arrays = [block_dist.sample(1000) for block_dist in self._cur_belief.block_beliefs]
+                self.block_positions_arrays = block_positions_arrays
+                self.need_to_generate_samples = False
 
-            self.curr_unused_sampled_blockpos = 0
-            self.need_to_generate_samples = False
-
-        self.curr_unused_sampled_blockpos += 1
-        if self.curr_unused_sampled_blockpos == len(self.sampled_block_positions) - 1:
-            self.need_to_generate_samples = True
-
-        block_positions = self.sampled_block_positions[self.curr_unused_sampled_blockpos]
+            # choose random block positions from samples:
+            block_positions = []
+            for i, block_dist_samples in enumerate(self.block_positions_arrays):
+                # choose  random sample index:
+                if len(block_dist_samples) == 0:
+                    continue
+                sample_index = np.random.randint(0, len(block_dist_samples))
+                block_pos = block_dist_samples[sample_index]
+                block_positions.append(block_pos)
 
         robot_position = self.history[-1][1].robot_position if len(self.history) > 0 else self.tower_position
         return State(steps_left=steps_left,
