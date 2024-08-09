@@ -9,7 +9,6 @@ from modeling.pomdp_problem.domain.observation import ObservationSenseResult, Ob
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase, DummyAction
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.pomdp_problem.domain.state import State
-from line_profiler_pycharm import profile
 
 
 import copy
@@ -51,8 +50,6 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
         return new_instance
 
 
-
-@profile
 def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
     # filter to sensing actions with positive sensing, sensing actions with negative sensing
     # and stack attempt actions with success
@@ -95,7 +92,6 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         self.points_to_sample_for_each_block = points_to_sample_for_each_block
         self.sensing_actions_to_sample_per_block = sensing_actions_to_sample_per_block
 
-    @profile
     def get_all_actions(self, state, history):
         """
         this actually samples actions
@@ -200,7 +196,6 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
         return score
 
-    @profile
     def rollout(self, state, history) -> ActionBase:
         if state.steps_left <= 0 or len(state.block_positions) == 0:
             return DummyAction()

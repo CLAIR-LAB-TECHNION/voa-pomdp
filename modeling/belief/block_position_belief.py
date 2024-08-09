@@ -1,6 +1,6 @@
 import numpy as np
 from modeling.belief.masked_gaussian_distribution import Masked2DTruncNorm, UnnormalizedMasked2DTruncNorm
-from line_profiler_pycharm import profile
+
 
 BlockPosDist = Masked2DTruncNorm
 UnnormalizedBlockPosDist = UnnormalizedMasked2DTruncNorm
@@ -112,7 +112,6 @@ class UnnormalizedBlocksPositionsBelief:
         for block_belief in self.block_beliefs:
             block_belief.add_masked_area(np.array([area_x_bounds, area_y_bounds]))
 
-    @profile
     def update_from_history_of_sensing_and_pick_up(self, positive_sensing_points, negative_sensing_points,
                                                    successful_pickup_points, non_successful_pickup_points,
                                                    no_update_margin=0.005):
@@ -123,7 +122,6 @@ class UnnormalizedBlocksPositionsBelief:
         self._update_blocks_from_history(per_block_positive_sensing_points, masked_areas,
                                          successful_pickup_points, no_update_margin)
 
-    @profile
     def _associate_positive_sensing_points(self, positive_sensing_points):
         # We use gaussian pdf here, without normalization, this is wrong but faster
         per_block_positive_sensing_points = [[] for _ in range(self.n_blocks_on_table)]

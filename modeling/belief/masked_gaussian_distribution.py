@@ -1,7 +1,6 @@
 import numpy as np
 from scipy.stats import truncnorm
 from modeling.belief.rectangles_overlap_resolution import resolve_overlaps, add_rectangle_to_decomposed
-from line_profiler_pycharm import profile
 
 
 def get_truncnorm_distribution(bounds, mu, sigma):
@@ -168,7 +167,6 @@ class UnnormalizedMasked2DTruncNorm:
 
         return valid_points[:n_samples]
 
-    @profile
     def _sample_from_truncnorm(self, max_n_samples, bounds_x=None, bounds_y=None):
         if bounds_x is None:
             samples_x = self.dist_x.rvs(max_n_samples)
@@ -191,7 +189,6 @@ class UnnormalizedMasked2DTruncNorm:
         points = np.stack([samples_x, samples_y], axis=1)
         return points
 
-    @profile
     def very_fast_sample(self, n_samples=1, ratio=2, max_retries=5, return_pdfs=True):
         """
         should be more efficient sampling. start by sampling more points (by ratio), and filter
@@ -296,7 +293,6 @@ class Masked2DTruncNorm(UnnormalizedMasked2DTruncNorm):
         unnormalized_pdf = super().pdf(points)
         return unnormalized_pdf / self.normalization_constant
 
-    @profile
     def create_unnormalized(self):
         unnormalized = UnnormalizedMasked2DTruncNorm(self.bounds_x, self.bounds_y, self.mu_x,
                                                      self.sigma_x, self.mu_y, self.sigma_y,
