@@ -208,5 +208,3 @@ class LabBlockStackingEnv:
 
         return n_blocks
 
-    def _get_action_cost(self, action_type, x, y):
-        return 0  # TODO, need to model that in the pomdp as well, maybe create cost model...

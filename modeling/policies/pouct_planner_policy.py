@@ -45,6 +45,8 @@ class POUCTPolicy(AbastractPolicy):
                                       rollout_policy=self.agent.policy_model,
                                       show_progress=show_progress)
 
+        self.num_sims = num_sims
+
         logging.info(f"POUCTPolicy initialized with the following parameters: "
                      f"max_steps={max_steps},"
                      f" tower_position={tower_position},"
@@ -83,3 +85,16 @@ class POUCTPolicy(AbastractPolicy):
         logging.info(f"Planned action: {actual_action}")
 
         return actual_action
+
+    def get_params(self) -> dict:
+        return dict(max_steps=self.agent.max_steps,
+                    tower_position=self.agent.tower_position,
+                    max_planning_depth=self.planner.max_depth,
+                    stacking_reward=self.agent.reward_model.stacking_reward,
+                    sensing_cost_coeff=self.agent.reward_model.sensing_cost_coeff,
+                    stacking_cost_coeff=self.agent.reward_model.stacking_cost_coeff,
+                    finish_ahead_of_time_reward_coeff=self.agent.reward_model.finish_ahead_of_time_reward_coeff,
+                    n_blocks_for_actions=self.agent.policy_model.n_blocks_for_actions,
+                    points_to_sample_for_each_block=self.agent.policy_model.points_to_sample_for_each_block,
+                    sensing_actions_to_sample_per_block=self.agent.policy_model.sensing_actions_to_sample_per_block,
+                    num_sims=self.num_sims,)

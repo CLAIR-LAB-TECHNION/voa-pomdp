@@ -44,3 +44,6 @@ class FixedSenseUntilPositivePolicy(AbastractPolicy):
         max_likelihood_position = points[max_likelihood_idx]
         return max_likelihood_position
 
+    def get_params(self) -> dict:
+        return {}
+

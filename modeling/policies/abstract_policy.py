@@ -15,5 +15,10 @@ class AbastractPolicy:
                       history: list[tuple[ActionBase, ObservationBase]]) -> ActionBase:
         raise NotImplementedError
 
+    @abstractmethod
+    def get_params(self) -> dict:
+        pass
+
     def __call__(self, belief: BlocksPositionsBelief, history: list = None) -> ActionBase:
         return self.sample_action(belief, history)
+
