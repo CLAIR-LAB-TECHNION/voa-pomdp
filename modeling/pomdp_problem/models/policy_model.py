@@ -24,6 +24,13 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
     def __init__(self, *args, **kwargs):
         BlocksPositionsBelief.__init__(self, *args, **kwargs)
 
+    @classmethod
+    def from_block_positions_belief(cls, belief: BlocksPositionsBelief):
+        # deepcopy all attributes:
+        new_belief = cls.__new__(cls)
+        new_belief.__dict__ = copy.deepcopy(belief.__dict__)
+        return new_belief
+
     def __new__(cls, *args, **kwargs):
         return BlocksPositionsBelief.__new__(cls)
 
@@ -42,6 +49,8 @@ class BeliefModel(BlocksPositionsBelief, pomdp_py.GenerativeDistribution):
         new_instance = BeliefModel.__new__(BeliefModel)
         new_instance.__dict__ = copy.deepcopy(self.__dict__, memo)
         return new_instance
+
+
 
 @profile
 def history_to_unnormalized_belief(initial_belief: BeliefModel, history):
