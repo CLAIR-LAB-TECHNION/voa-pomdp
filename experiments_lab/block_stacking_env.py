@@ -17,8 +17,6 @@ from modeling.pomdp_problem.domain.action import *
 
 
 class LabBlockStackingEnv:
-    cleared_blocks_position = [-0.25, -1.15]
-
     def __init__(self,
                  n_blocks,
                  max_steps,
@@ -53,38 +51,17 @@ class LabBlockStackingEnv:
         self.current_robot_position = None
         self.current_tower_height_blocks = 0
 
-        # will update at first reset:
-        self._block_positions = None  # should be hidden from the agent!
-
-    def reset_from_distribution(self, block_positions_distributions, perform_cleanup=True):
-        logging.info("reseting env")
-        self._reset(perform_cleanup)
-        self._block_positions = ur5e_2_distribute_blocks_from_block_positions_dists(block_positions_distributions,
-                                                                                    self.r2_controller)
-        self.r1_controller.plan_and_move_home()
-        self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[1], workspace_y_lims_default[0], 0.15, 0)
-        self.current_robot_position = (workspace_x_lims_default[1], workspace_y_lims_default[0])
-        logging.info(f"env rested, blocks are put at positions: {self._block_positions}")
-
-    def reset_from_positions(self, block_positions, perform_cleanup=True):
-        logging.info("reseting env")
-        self._reset(perform_cleanup)
-        self._block_positions = block_positions
-        distribute_blocks_in_positions(block_positions, self.r2_controller)
-        self.r1_controller.plan_and_move_home()
-        self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[1], workspace_y_lims_default[0], 0.15, 0)
-        self.current_robot_position = (workspace_x_lims_default[1], workspace_y_lims_default[0])
-        logging.info(f"env rested, blocks are put at positions: {self._block_positions}")
-
-    def _reset(self, perform_cleanup=True):
+    def reset(self,):
         self.steps = 0
-
-        if perform_cleanup:
-            self.clean_workspace_for_next_experiment()
-
-        # clear r1 if it's not home
-        self.r1_controller.plan_and_move_home()
         self.current_tower_height_blocks = 0
+
+        # for safety, just make sure r1 is clear enough
+        r1_position = self.r1_controller.getActualQ()[:3]
+        assert r1_position[0] > -0.3 and r1_position[1] > -0.3, "r1 is not in a safe position"
+
+        # move r2 to start position
+        self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[1], workspace_y_lims_default[0], 0.15, 0)
+        self.current_robot_position = (workspace_x_lims_default[1], workspace_y_lims_default[0])
 
     def step(self, action: ActionBase) -> tuple[ObservationBase, float]:
         if self.steps >= self.max_steps:
@@ -137,60 +114,6 @@ class LabBlockStackingEnv:
             raise ValueError(f"unknown action type: {type(action)}")
 
         return observation, reward
-
-    def clean_workspace_for_next_experiment(self):
-        """
-        right now it's simple, throw the blocks in the workspace after picturing from one fixed sensor config
-        # TODO, this is what Adi is working on, it should be another module: ExperimentMgr
-        """
-        # first, clean the tower:
-        tower_height_blocks = self.sense_tower_height()
-        for i in range(tower_height_blocks):
-            start_height = 0.04 * (tower_height_blocks - i) + 0.12
-            self.r2_controller.pick_up(goal_tower_position[0],
-                                       goal_tower_position[1],
-                                       0,
-                                       start_height)
-            self.r2_controller.plan_and_move_to_xyzrz(self.cleared_blocks_position[0],
-                                                      self.cleared_blocks_position[1],
-                                                      z=0,
-                                                      rz=0)
-            self.r2_controller.release_grasp()
-
-        # now clean other blocks that remain on the table, first detect them:
-        lookat = [np.mean(self.ws_x_lims), np.mean(self.ws_y_lims), 0]
-        lookat[0] += 0.15
-        lookat[1] += 0.15
-        clean_up_sensor_config = lookat_verangle_horangle_distance_to_robot_config(lookat,
-                                                                                   vertical_angle=60,
-                                                                                   horizontal_angle=30,
-                                                                                   distance=0.7,
-                                                                                   gt=self.r1_controller.gt,
-                                                                                   robot_name="ur5e_1")
-        clean_up_sensor_config = to_canonical_config(clean_up_sensor_config)
-
-        self.r1_controller.plan_and_moveJ(clean_up_sensor_config)
-        im, depth = self.camera.get_frame_rgb()
-        positions, annotations = self.position_estimator.get_block_positions_depth(im, depth, clean_up_sensor_config)
-        plot_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
-                                                       workspace_x_lims_default, workspace_y_lims_default,
-                                                       actual_positions=self._block_positions)
-        plt.figure(figsize=(12, 12), dpi=512)
-        plt.imshow(plot_im)
-        plt.axis('off')
-        plt.title("cleanup")
-        plt.tight_layout()
-        plt.show()
-        self.r1_controller.plan_and_move_home()
-
-        # now clean the blocks:
-        for p in positions:
-            self.r2_controller.pick_up(p[0], p[1], 0, start_height=0.15)
-            self.r2_controller.plan_and_move_to_xyzrz(self.cleared_blocks_position[0],
-                                                      self.cleared_blocks_position[1],
-                                                      z=0,
-                                                      rz=0)
-            self.r2_controller.release_grasp()
 
     def sense_tower_height(self):
         max_height = 0.04 * self.n_blocks
