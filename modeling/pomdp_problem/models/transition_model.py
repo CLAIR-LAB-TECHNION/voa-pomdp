@@ -28,6 +28,12 @@ class TransitionModel(pomdp_py.TransitionModel):
     def sample_stack_attempt(self, state, action):
         next_state = deepcopy(state)
         next_state.steps_left -= 1
+        # after pickup, the robot position is always at the tower position:
+        next_state.robot_position = self.tower_position
+
+        if len(next_state.block_positions) == 0:
+            next_state.last_stack_attempt_succeded = False
+            return next_state
 
         pick_pos = np.array([action.x, action.y])
         nearest_block = np.argmin(np.linalg.norm(state.block_positions - pick_pos, axis=1))
@@ -45,8 +51,6 @@ class TransitionModel(pomdp_py.TransitionModel):
 
         next_state.last_stack_attempt_succeded = success
 
-        # after pickup, the robot position is always at the tower position:
-        next_state.robot_position = self.tower_position
 
 
         return next_state
