@@ -17,6 +17,9 @@ class AbastractPolicy:
 
     @abstractmethod
     def get_params(self) -> dict:
+        return {}
+
+    def reset(self, initial_belief: BlocksPositionsBelief):
         pass
 
     def __call__(self, belief: BlocksPositionsBelief, history: list = None) -> ActionBase:

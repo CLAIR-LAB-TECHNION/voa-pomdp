@@ -1,4 +1,5 @@
 import logging
+from copy import deepcopy
 
 import numpy as np
 from frozendict import frozendict
@@ -11,9 +12,11 @@ from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTran
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, goal_tower_position
 from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot_config, \
     detections_plots_with_depth_as_image
-from modeling.belief.block_position_belief import BlockPosDist
+from modeling.belief.block_position_belief import BlockPosDist, BlocksPositionsBelief
 from modeling.policies.abstract_policy import AbastractPolicy
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
+from modeling.pomdp_problem.domain.observation import ObservationReachedTerminal, ObservationSenseResult, \
+    ObservationStackAttemptResult
 
 default_rewards = frozendict(stacking_reward=1,
                              finish_ahead_of_time_reward_coeff=0.1,
@@ -48,7 +51,8 @@ class ExperimentManager:
                     rewards: dict = default_rewards, ):
         raise NotImplementedError
 
-    def run_single_experiment(self, init_block_positions, init_block_belief) -> ExperimentResults:
+    def run_single_experiment(self, init_block_positions,
+                              init_block_belief: BlocksPositionsBelief) -> ExperimentResults:
         """
         perform a single experiment with given inital block positions and belief.
         This method places the blocks in the positions from the pile, but it assumes the workspace
@@ -64,11 +68,47 @@ class ExperimentManager:
 
         results = ExperimentResults(policy_type=self.policy.__class__.__name__,
                                     agent_params=self.policy.get_params(), )
+        results.actual_initial_block_positions = init_block_positions
+        results.beliefs.append(init_block_belief)
 
         self.env.reset()
-        # TODO
+        self.policy.reset(init_block_belief)
+
+        current_belief = deepcopy(init_block_belief)
+        history = []
+        accumulated_reward = 0
+        for i in range(self.env.max_steps):
+            action = self.policy.sample_action(current_belief, history)
+            observation, reward = self.env.step(action)
+
+            accumulated_reward += reward
+
+            history.append((action, observation))
+            current_belief = self.update_belief(current_belief, action, observation)
+
+            results.beliefs.append(current_belief)
+            results.actions.append(action)
+            results.observations.append(observation)
+            results.rewards.append(reward)
+
+            if isinstance(observation, ObservationReachedTerminal) or len(current_belief.block_beliefs) == 0\
+                    or observation.steps_left <= 0:
+                break
+
+        results.total_reward = accumulated_reward
 
         return results
+
+    @staticmethod
+    def update_belief(belief, action, observation):
+        """ doesn't change inplace! """
+        updated_belief = deepcopy(belief)
+        if isinstance(observation, ObservationSenseResult):
+            updated_belief.update_from_point_sensing_observation(action.x, action.y, observation.is_occupied)
+        elif isinstance(observation, ObservationStackAttemptResult):
+            updated_belief.update_from_pickup_attempt(action.x, action.y, observation.is_object_picked)
+        return updated_belief
+
 
     def clear_robot1(self):
         """ make sure robot1 is in a configuration it can never collide with robot2 while it works"""
