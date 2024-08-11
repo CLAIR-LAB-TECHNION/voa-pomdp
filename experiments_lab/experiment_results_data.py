@@ -11,11 +11,17 @@ from modeling.pomdp_problem.domain.observation import *
 
 
 class ExperimentResults:
-    def __init__(self, policy_type: str, agent_params: Dict[str, Any]):
+    def __init__(self, policy_type: str,
+                 agent_params: Dict[str, Any],
+                 help_config):
         self.policy_information: Dict[str, Any] = {"type": policy_type, "params": agent_params}
 
         self.actual_initial_block_positions: List[List[float]] = []
         self.total_reward = 0
+
+        self.is_with_help = help_config is not None
+        self.help_config = help_config
+        self.belief_before_help = None
 
         self.beliefs: List[BlocksPositionsBelief] = []
         self.actions: List[Any] = []

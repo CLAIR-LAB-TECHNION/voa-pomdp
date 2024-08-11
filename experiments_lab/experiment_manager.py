@@ -1,6 +1,8 @@
 import logging
 from copy import deepcopy
+from datetime import time
 
+import cv2
 import numpy as np
 from frozendict import frozendict
 
@@ -49,10 +51,14 @@ class ExperimentManager:
                     ws_x_lims=workspace_x_lims_default,
                     ws_y_lims=workspace_y_lims_default,
                     rewards: dict = default_rewards, ):
+        # TODO for convenience
         raise NotImplementedError
 
-    def run_single_experiment(self, init_block_positions,
-                              init_block_belief: BlocksPositionsBelief) -> ExperimentResults:
+    def run_single_experiment(self,
+                              init_block_positions,
+                              init_block_belief: BlocksPositionsBelief,
+                              help_config=None,
+                              help_detections_filename=None) -> ExperimentResults:
         """
         perform a single experiment with given inital block positions and belief.
         This method places the blocks in the positions from the pile, but it assumes the workspace
@@ -60,6 +66,8 @@ class ExperimentManager:
 
         @param init_block_positions:
         @param init_block_belief:
+        @param help_config: config of robot1 to take image from to help. if None, there is no help in that experiment
+        @param help_detections_filename: if help_config is not None, this is the filename to save the detections to
         @return: ExperimentResults object with the experiment trajectory and data
         """
         logging.info("running an experiment")
@@ -69,6 +77,14 @@ class ExperimentManager:
         results = ExperimentResults(policy_type=self.policy.__class__.__name__,
                                     agent_params=self.policy.get_params(), )
         results.actual_initial_block_positions = init_block_positions
+        if help_config is not None:
+            results.is_with_help = True
+            results.help_config = help_config
+            results.belief_before_help = deepcopy(init_block_belief)
+            detections_im = self.update_belief_from_help(init_block_belief, help_config)
+            if help_detections_filename is not None:
+                cv2.imwrite(help_detections_filename, detections_im)
+
         results.beliefs.append(init_block_belief)
 
         self.env.reset()
@@ -91,13 +107,22 @@ class ExperimentManager:
             results.observations.append(observation)
             results.rewards.append(reward)
 
-            if isinstance(observation, ObservationReachedTerminal) or len(current_belief.block_beliefs) == 0\
+            if isinstance(observation, ObservationReachedTerminal) or len(current_belief.block_beliefs) == 0 \
                     or observation.steps_left <= 0:
                 break
 
         results.total_reward = accumulated_reward
 
         return results
+
+    def update_belief_from_help(self, init_block_belief, help_config) -> np.ndarray:
+        """
+        takes image with robot1 from help config, detects blocks and uses the detections to update
+        the belief **inplace**. An image of the detections is returned.
+        """
+        # TODO
+        pass
+        return detections_im
 
     @staticmethod
     def update_belief(belief, action, observation):
@@ -109,6 +134,48 @@ class ExperimentManager:
             updated_belief.update_from_pickup_attempt(action.x, action.y, observation.is_object_picked)
         return updated_belief
 
+    def run_value_difference_experiments(self,
+                                         init_block_positions,
+                                         init_block_belief: BlocksPositionsBelief,
+                                         helper_config,
+                                         dirname):
+        """
+        run two experiments, one with help and one without, and save results to directory with dirname,
+        in an internal directory with datetime stamp
+        both experiments start with the same start state, but the belief in the experiment with help
+        is updated after taking image from helper_config before the experiment starts.
+
+        It is assumed the workspace is clear before the experiment starts and that there are enough blocks
+        in the pile
+        @param init_block_positions:
+        @param init_block_belief:
+        @param helper_config:
+        @param dirname:
+        @return:
+        """
+        datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+
+        logging.info(f"starting value diff experiment {datetime_stamp}")
+
+        resutls_no_help = self.run_single_experiment(init_block_positions, init_block_belief, None)
+        resutls_no_help.save(f"{dirname}/{datetime_stamp}/no_help.pkl")
+
+        no_help_cleanup_detections = self.clean_up_workspace()
+        cv2.imwrite(f"{dirname}/{datetime_stamp}/no_help_cleanup.png", no_help_cleanup_detections)
+
+        results_with_help = self.run_single_experiment(init_block_positions, init_block_belief, helper_config,
+                                                       f"{dirname}/{datetime_stamp}/help_detections.png")
+        results_with_help.save(f"{dirname}/{datetime_stamp}/with_help.pkl")
+
+        with_help_cleanup_detections = self.clean_up_workspace()
+        cv2.imwrite(f"{dirname}/{datetime_stamp}/with_help_cleanup.png", with_help_cleanup_detections)
+
+        logging.info(f"value difference experiment is over, all data saved {datetime_stamp}")
+
+    def sample_value_difference_experiments(self):
+        # TODO: complete args
+        # TODO: sample beleif and start state and run value difference experiment
+        pass
 
     def clear_robot1(self):
         """ make sure robot1 is in a configuration it can never collide with robot2 while it works"""
