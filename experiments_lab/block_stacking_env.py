@@ -56,8 +56,8 @@ class LabBlockStackingEnv:
         self.current_tower_height_blocks = 0
 
         # for safety, just make sure r1 is clear enough
-        r1_position = self.r1_controller.getActualQ()[:3]
-        assert r1_position[0] > -0.3 and r1_position[1] > -0.3, "r1 is not in a safe position"
+        r1_position = self.r1_controller.getActualTCPPose()[:3]
+        assert r1_position[0] > -0.5 and r1_position[1] > -0.5, "r1 is not in a safe position"
 
         # move r2 to start position
         self.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[1], workspace_y_lims_default[0], 0.15, 0)
@@ -106,7 +106,7 @@ class LabBlockStackingEnv:
             reward -= self.stacking_cost_coeff * \
                         np.linalg.norm(np.asarray(self.current_robot_position) - np.array((action.x, action.y)))
             reward -= self.stacking_cost_coeff * \
-                        np.linalg.norm(np.arrary(action.x, action.y) - np.asarray(goal_tower_position))
+                        np.linalg.norm(np.array(action.x, action.y) - np.asarray(goal_tower_position))
 
             self.current_robot_position = goal_tower_position
 

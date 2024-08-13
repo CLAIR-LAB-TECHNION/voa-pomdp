@@ -114,3 +114,10 @@ class Agent(pomdp_py.Agent):
         else:
             # dummy action... do nothing
             pass
+
+    def set_full_history(self, history):
+        self._history = tuple(history)
+
+    @property # need to override this property that is defined in cython to make the above method work.
+    def history(self):
+        return self._history

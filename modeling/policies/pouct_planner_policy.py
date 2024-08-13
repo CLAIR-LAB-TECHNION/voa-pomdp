@@ -19,9 +19,9 @@ class POUCTPolicy(AbastractPolicy):
                  sensing_cost_coeff: float,
                  stacking_cost_coeff: float,
                  finish_ahead_of_time_reward_coeff: float,
-                 n_blocks_for_actions: int,
-                 points_to_sample_for_each_block: int,
-                 sensing_actions_to_sample_per_block: int,
+                 n_blocks_for_actions: int = 2,
+                 points_to_sample_for_each_block: int = 150,
+                 sensing_actions_to_sample_per_block: int = 2,
                  num_sims=2000,
                  show_progress=False):
 
@@ -67,8 +67,9 @@ class POUCTPolicy(AbastractPolicy):
         belief_model = BeliefModel.from_block_positions_belief(positions_belief)
         self.agent._cur_belief = belief_model
         self.agent.set_belief(self.agent._cur_belief)  # only work this way due to weird cython stuff
-        self.agent.update_history(history[-1][0], history[-1][1])
-        self.planner.update(self.agent, history[-1][0], history[-1][1])  # updates tree but not belief
+        self.agent.set_full_history(history)
+        if len(history) > 0:
+            self.planner.update(self.agent, history[-1][0], history[-1][1])  # updates tree but not belief
 
         for i in range(3):
             try:

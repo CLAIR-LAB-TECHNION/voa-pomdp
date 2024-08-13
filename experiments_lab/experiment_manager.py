@@ -9,11 +9,12 @@ from frozendict import frozendict
 from experiments_lab.experiment_results_data import ExperimentResults
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.manipulation.utils import to_canonical_config, distribute_blocks_in_positions, \
-    ur5e_2_distribute_blocks_from_block_positions_dists
+    ur5e_2_distribute_blocks_from_block_positions_dists, ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, goal_tower_position
 from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot_config, \
     detections_plots_with_depth_as_image
+from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 from modeling.belief.block_position_belief import BlockPosDist, BlocksPositionsBelief
 from modeling.policies.abstract_policy import AbastractPolicy
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
@@ -58,7 +59,8 @@ class ExperimentManager:
                               init_block_positions,
                               init_block_belief: BlocksPositionsBelief,
                               help_config=None,
-                              help_detections_filename=None) -> ExperimentResults:
+                              help_detections_filename=None,
+                              plot_beliefs=False) -> ExperimentResults:
         """
         perform a single experiment with given inital block positions and belief.
         This method places the blocks in the positions from the pile, but it assumes the workspace
@@ -68,6 +70,7 @@ class ExperimentManager:
         @param init_block_belief:
         @param help_config: config of robot1 to take image from to help. if None, there is no help in that experiment
         @param help_detections_filename: if help_config is not None, this is the filename to save the detections to
+        @param plot_beliefs: if True, plot the belief at each step
         @return: ExperimentResults object with the experiment trajectory and data
         """
         logging.info("running an experiment")
@@ -75,7 +78,8 @@ class ExperimentManager:
         self.distribute_blocks_from_positions(init_block_positions)
 
         results = ExperimentResults(policy_type=self.policy.__class__.__name__,
-                                    agent_params=self.policy.get_params(), )
+                                    agent_params=self.policy.get_params(),
+                                    help_config=help_config)
         results.actual_initial_block_positions = init_block_positions
         if help_config is not None:
             results.is_with_help = True
@@ -94,6 +98,8 @@ class ExperimentManager:
         history = []
         accumulated_reward = 0
         for i in range(self.env.max_steps):
+            if plot_beliefs:
+                self.plot_belief(current_belief, history)
             action = self.policy.sample_action(current_belief, history)
             observation, reward = self.env.step(action)
 
@@ -208,7 +214,7 @@ class ExperimentManager:
 
         return block_positions
 
-    def clean_up_workspace(self) -> np.ndarray:
+    def clean_up_workspace(self, put_back_to_stack=False) -> np.ndarray:
         """
         returns plot of the detections and images of the workspace for block collection
         right now it's simple, throw the blocks in the workspace after taking image from one fixed sensor config
@@ -255,14 +261,37 @@ class ExperimentManager:
         logging.info(f"detected {len(positions)} blocks")
 
         # now clean the blocks:
-        for p in positions:
-            self.env.r2_controller.pick_up(p[0], p[1], 0, start_height=0.15)
-            self.env.r2_controller.plan_and_move_to_xyzrz(self.cleared_blocks_position[0],
-                                                          self.cleared_blocks_position[1],
-                                                          z=0,
-                                                          rz=0)
-            self.env.r2_controller.release_grasp()
+        if put_back_to_stack:
+            ur5e_2_collect_blocks_from_positions(positions, self.env.r2_controller)
+        else:
+            for p in positions:
+                self.env.r2_controller.pick_up(p[0], p[1], 0, start_height=0.15)
+                self.env.r2_controller.plan_and_move_to_xyzrz(self.cleared_blocks_position[0],
+                                                              self.cleared_blocks_position[1],
+                                                              z=0,
+                                                              rz=0)
+                self.env.r2_controller.release_grasp()
 
         logging.info("workspace cleaning procedure finished")
 
         return plot_im
+
+    def plot_belief(self, current_belief, history=[]):
+        # use the history for points
+        positive_sens = []
+        negative_sens = []
+        failed_pickups = []
+        for a, o in history:
+            if isinstance(o, ObservationSenseResult):
+                if o.is_occupied:
+                    positive_sens.append((a.x, a.y))
+                else:
+                    negative_sens.append((a.x, a.y))
+            elif isinstance(o, ObservationStackAttemptResult):
+                if not o.is_object_picked:
+                    failed_pickups.append((a.x, a.y))
+
+        plot_all_blocks_beliefs(current_belief,
+                                positive_sensing_points=positive_sens,
+                                negative_sensing_points=negative_sens,
+                                pickup_attempt_points=failed_pickups)

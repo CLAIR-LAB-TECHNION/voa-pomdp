@@ -96,9 +96,9 @@ class PolicyModel(pomdp_py.RolloutPolicy):
         """
         this actually samples actions
         """
-        if state.steps_left <= 0 or len(state.block_positions) == 0:
+        if (len(history) > 0 and (history[-1][1].steps_left <= 0)
+                or len(state.block_positions) == 0):
             return [DummyAction()]
-
 
         belief = history_to_unnormalized_belief(self.initial_blocks_position_belief, history)
         if belief.block_beliefs == []:
