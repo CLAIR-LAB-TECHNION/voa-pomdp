@@ -17,10 +17,20 @@ from modeling.policies.pouct_planner_policy import POUCTPolicy
 from modeling.pomdp_problem.domain.action import *
 from modeling.pomdp_problem.domain.observation import *
 from experiments_lab.experiment_manager import ExperimentManager
+from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot_config
+import numpy as np
 
 
 initial_positions_mus = [[-0.8, -0.75], [-0.6, -0.65]]
 initial_positions_sigmas = [[0.04, 0.02], [0.05, 0.07]]
+
+# fixed help config:
+lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]
+lookat[1] -=0.2
+help_verangle = 50
+help_horangle = 55
+help_distance = 1.15
+
 
 app = typer.Typer()
 
@@ -49,13 +59,17 @@ def main(n_blocks: int = 2,
                          finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff, max_planning_depth=6,
                          show_progress=True)
 
+    help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, help_verangle, help_horangle,
+                                                                    help_distance, gt, "ur5e_1")
+
     experiment_mgr = ExperimentManager(env=env, policy=policy, )
 
     init_block_positions = [b.sample(1)[0] for b in initial_belief.block_beliefs]
 
-    results = experiment_mgr.run_single_experiment(init_block_positions, initial_belief, plot_beliefs=True)
-    pass
-    im = experiment_mgr.clean_up_workspace()
+    experiment_mgr.run_value_difference_experiments(init_block_positions,
+                                                    initial_belief,
+                                                    helper_config=help_config,
+                                                    dirname="experiments/2blocks/")
 
 
 if __name__ == "__main__":

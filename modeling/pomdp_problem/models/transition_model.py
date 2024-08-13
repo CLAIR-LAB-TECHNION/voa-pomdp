@@ -51,8 +51,6 @@ class TransitionModel(pomdp_py.TransitionModel):
 
         next_state.last_stack_attempt_succeded = success
 
-
-
         return next_state
 
     def sample_sense(self, state, action):

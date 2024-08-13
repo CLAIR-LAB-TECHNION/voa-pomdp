@@ -1,11 +1,11 @@
 import logging
+import os
 from copy import deepcopy
-from datetime import time
+import time
 
 import cv2
 import numpy as np
 from frozendict import frozendict
-
 from experiments_lab.experiment_results_data import ExperimentResults
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.manipulation.utils import to_canonical_config, distribute_blocks_in_positions, \
@@ -20,6 +20,7 @@ from modeling.policies.abstract_policy import AbastractPolicy
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
 from modeling.pomdp_problem.domain.observation import ObservationReachedTerminal, ObservationSenseResult, \
     ObservationStackAttemptResult
+from modeling.sensor_distribution import detections_to_distributions
 
 default_rewards = frozendict(stacking_reward=1,
                              finish_ahead_of_time_reward_coeff=0.1,
@@ -85,7 +86,7 @@ class ExperimentManager:
             results.is_with_help = True
             results.help_config = help_config
             results.belief_before_help = deepcopy(init_block_belief)
-            detections_im = self.update_belief_from_help(init_block_belief, help_config)
+            detections_im = self.help_and_update_belief(init_block_belief, help_config)
             if help_detections_filename is not None:
                 cv2.imwrite(help_detections_filename, detections_im)
 
@@ -121,14 +122,28 @@ class ExperimentManager:
 
         return results
 
-    def update_belief_from_help(self, init_block_belief, help_config) -> np.ndarray:
+    def help_and_update_belief(self, block_belief: BlocksPositionsBelief, help_config)\
+            -> (np.ndarray, np.ndarray, np.ndarray):
         """
         takes image with robot1 from help config, detects blocks and uses the detections to update
-        the belief **inplace**. An image of the detections is returned.
+        the belief **inplace**. This method also returns the expectations and stds of the detections,
+        along with an image of the detections
         """
-        # TODO
-        pass
-        return detections_im
+        # make sure robot2 is clear:
+        self.clear_robot2()
+
+        self.env.r1_controller.plan_and_moveJ(help_config)
+        im, depth = self.env.camera.get_frame_rgb()
+        positions, annotations = self.env.position_estimator.get_block_positions_depth(im, depth, help_config)
+        detections_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
+                                                       workspace_x_lims_default, workspace_y_lims_default)
+
+        camera_position = self.env.r1_controller.getActualTCPPose()[:3]
+        mus, sigmas = detections_to_distributions(positions, camera_position)
+
+        block_belief.
+
+        return mus, sigmas, detections_im
 
     @staticmethod
     def update_belief(belief, action, observation):
@@ -160,6 +175,7 @@ class ExperimentManager:
         @return:
         """
         datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        os.makedirs(f"{dirname}/{datetime_stamp}")
 
         logging.info(f"starting value diff experiment {datetime_stamp}")
 
