@@ -146,6 +146,7 @@ class AbstractMotionPlanner:
         """
         plan from a start and a goal that are given in 6d configuration space
         """
+        goal_config = self.fix_loop_config(goal_config)
         start_config_klampt = self.config6d_to_klampt(start_config)
         goal_config_klampt = self.config6d_to_klampt(goal_config)
 
@@ -343,6 +344,19 @@ class AbstractMotionPlanner:
         robot.setConfig(curr_config)
 
         return res_config
+
+    def fix_loop_config(self, config):
+        """
+        fix the loop in the configuration space
+        """
+        for i in [4, 5]:
+            while config[i] > 2 * np.pi:
+                config[i] -= 2 * np.pi
+            while config[i] < 0:
+                config[i] += 2 * np.pi
+
+        return config
+
 
     @abstractmethod
     def _get_klampt_world_path(self):

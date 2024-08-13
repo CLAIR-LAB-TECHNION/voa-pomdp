@@ -1,30 +1,40 @@
-import numpy as np
+from copy import deepcopy
 import typer
 from matplotlib import pyplot as plt
+# from scipy.special import result
+
+from experiments_lab.block_stacking_env import LabBlockStackingEnv
+from lab_ur_stack.manipulation.utils import ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
-from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_in_workspace_uniform, \
-    ur5e_2_collect_blocks_from_positions, to_canonical_config
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
-                                                workspace_y_lims_default)
-from lab_ur_stack.vision.utils import (lookat_verangle_distance_to_robot_config, detections_plots_no_depth_as_image,
-                                       detections_plots_with_depth_as_image,
-                                       lookat_verangle_horangle_distance_to_camera_transform)
+                                                workspace_y_lims_default, goal_tower_position)
+from modeling.belief.block_position_belief import BlocksPositionsBelief
+from modeling.belief.belief_plotting import plot_all_blocks_beliefs
+from modeling.policies.fixed_policy_sense_until_positive import FixedSenseUntilPositivePolicy
+from modeling.policies.pouct_planner_policy import POUCTPolicy
+from modeling.pomdp_problem.domain.action import *
+from modeling.pomdp_problem.domain.observation import *
+from experiments_lab.experiment_manager import ExperimentManager
+from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot_config, \
+    detections_plots_no_depth_as_image, detections_plots_with_depth_as_image
+import numpy as np
 
-# camera pose:
-lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]  # middle of the workspace
-lookat[0] += 0.0  # move a bit from the window
-lookat[1] += 0.0
-# lookat = np.array([-0.5, -0.8, 0.0])
-vertical_angle = 55
-horizontal_angle = 40
-rotation_angle = 0
-distance = 0.55
-y_offset = 0.2
+
+initial_positions_mus = [[-0.8, -0.75], [-0.6, -0.65]]
+initial_positions_sigmas = [[0.04, 0.02], [0.05, 0.07]]
+
+# fixed help config:
+lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]
+lookat[1] +=0.05
+vertical_angle = 50
+horizontal_angle = 35
+distance = 0.9
+
 
 app = typer.Typer()
 
@@ -43,86 +53,84 @@ def main(n_blocks: int = 3,
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
     r2_controller.speed, r2_controller.acceleration = 2, 1.2
 
-    # todo (adi): add angles to the camera pose
-    r1_sensing_config, camera_position = lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle, horizontal_angle, distance, rotation_angle)
-    # todo (adi): add a function to get the canonical
-    r1_updated_sensing_config = to_canonical_config(r1_sensing_config)
-    if r1_sensing_config is None:
-        print("Could not find a valid robot configuration for the camera")
-        return
-    motion_planner.vis_config(ur5e_1["name"], r1_updated_sensing_config)
+    env = LabBlockStackingEnv(n_blocks, 5, r1_controller, r2_controller, gt, camera, position_estimator)
+    help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, vertical_angle, horizontal_angle,
+                                                                    distance, gt, "ur5e_1")
 
-    r1_controller.plan_and_move_home(speed=2, acceleration=1)
-    r2_controller.plan_and_move_home(speed=2, acceleration=1)
 
-    # r2 distribute blocks and clear out
-    # actual_block_positions = ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks, r2_controller)
-    # r2_controller.plan_and_move_home(speed=2, acceleration=1)
+    env.r1_controller.plan_and_move_home(speed=2, acceleration=1)
+    env.r2_controller.plan_and_move_home(speed=2, acceleration=1)
 
-    # r1 take image
-    r1_controller.plan_and_moveJ(r1_sensing_config)
-
-    im, depth = camera.get_frame_rgb()
-    if use_depth:
-        positions, annotations = position_estimator.get_block_positions_depth(im, depth, r1_sensing_config)
-        plot_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
-                                                       workspace_x_lims_default, workspace_y_lims_default)
-    else:
-        positions, annotations = position_estimator.get_block_position_plane_projection(im, r1_sensing_config,
-                                                                                        plane_z=-0.02)
-        plot_im = detections_plots_no_depth_as_image(annotations[0], annotations[1], positions,
-                                                     workspace_x_lims_default, workspace_y_lims_default)
-
-    # plot in hires:
-    plt.figure(figsize=(12, 12), dpi=512)
-    plt.imshow(plot_im)
-    plt.axis('off')
-    plt.tight_layout()
-    plt.show()
-
-    # r1 clear out
-    r1_controller.plan_and_move_home(speed=2, acceleration=1)
+    positions = sensing(env, use_depth, help_config)
 
     # r2 collect blocks
-    ur5e_2_collect_blocks_from_positions(positions, r2_controller)
+    manipulation(env, positions)
 
     test = True
     if test:
         predicted_n_blocks = len(positions)
         if predicted_n_blocks == n_blocks:
             print("Test passed")
-
+    test_num = 1
     while len(positions) > 0:
-        positions = sensing(r1_controller, r1_sensing_config, use_depth, position_estimator, camera)
-        manipulation(positions, r2_controller, r1_controller)
+        if test_num == 1:
+            # help_config = change_help_config(env)
+            env.r1_controller.plan_and_moveJ(help_config)
+            help_config = change_help_config(env, 2)
+            test_num = 2
+        positions = sensing(env, use_depth, help_config)
+        pos_num = manipulation(env, positions)
+        if pos_num == 0:
+            break
 
 
-def sensing(r1_controller, r1_sensing_config, use_depth, position_estimator, camera):
-    r1_controller.plan_and_moveJ(r1_sensing_config)
-    im, depth = camera.get_frame_rgb()
+
+
+def sensing(env, use_depth, help_config):
+    env.r1_controller.plan_and_moveJ(help_config)
+    im, depth = env.camera.get_frame_rgb()
     if use_depth:
-        positions, annotations = position_estimator.get_block_positions_depth(im, depth, r1_sensing_config)
+        positions, annotations = env.position_estimator.get_block_positions_depth(im, depth, help_config)
         plot_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
                                                        workspace_x_lims_default, workspace_y_lims_default)
     else:
-        positions, annotations = position_estimator.get_block_position_plane_projection(im, r1_sensing_config,
-                                                                                        plane_z=-0.02)
+        positions, annotations = env.position_estimator.get_block_position_plane_projection(im, help_config, plane_z=-0.02)
         plot_im = detections_plots_no_depth_as_image(annotations[0], annotations[1], positions,
                                                      workspace_x_lims_default, workspace_y_lims_default)
-
     # plot in hires:
     plt.figure(figsize=(12, 12), dpi=512)
     plt.imshow(plot_im)
     plt.axis('off')
     plt.tight_layout()
     plt.show()
+    env.r1_controller.plan_and_move_home(speed=2, acceleration=1.2)
     return positions
 
 
-def manipulation(positions, r2_controller, r1_controller):
-    r1_controller.plan_and_move_home(speed=2, acceleration=1.2)
-    ur5e_2_collect_blocks_from_positions(positions, r2_controller)
-    return
+def manipulation(env, positions):
+    if len(positions) > 0:
+        print("No blocks detected")
+        return len(positions)
+    ur5e_2_collect_blocks_from_positions(positions, env.r2_controller)
+    return None
+
+
+def change_help_config(env, pos_num=1):
+    global vertical_angle, horizontal_angle, distance, lookat
+    if pos_num == 1:
+        vertical_angle = 40
+        horizontal_angle = 27
+        distance = 0.5
+        help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, vertical_angle, horizontal_angle, distance,
+                                                                    env.gt, "ur5e_1")
+    elif pos_num == 2:
+        vertical_angle = 25
+        horizontal_angle = 0
+        distance = 0.7
+        help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, vertical_angle, horizontal_angle,
+                                                                        distance,
+                                                                        env.gt, "ur5e_1")
+    return help_config
 
 
 if __name__ == "__main__":
