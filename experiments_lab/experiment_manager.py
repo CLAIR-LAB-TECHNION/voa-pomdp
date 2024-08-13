@@ -86,9 +86,13 @@ class ExperimentManager:
             results.is_with_help = True
             results.help_config = help_config
             results.belief_before_help = deepcopy(init_block_belief)
-            detections_im = self.help_and_update_belief(init_block_belief, help_config)
+            detection_muss, detections_sigmas, detections_im =\
+                self.help_and_update_belief(init_block_belief, help_config)
             if help_detections_filename is not None:
-                cv2.imwrite(help_detections_filename, detections_im)
+                cv2.imwrite(help_detections_filename, cv2.cvtColor(detections_im, cv2.COLOR_RGB2BGR))
+
+            results.help_detections_mus = detection_muss
+            results.help_detections_sigmas = detections_sigmas
 
         results.beliefs.append(init_block_belief)
 
@@ -141,9 +145,10 @@ class ExperimentManager:
         camera_position = self.env.r1_controller.getActualTCPPose()[:3]
         mus, sigmas = detections_to_distributions(positions, camera_position)
 
-        block_belief.
+        ordered_detection_mus, ordered_detection_sigmas = \
+            block_belief.update_from_image_detections_position_distribution(mus, sigmas)
 
-        return mus, sigmas, detections_im
+        return ordered_detection_mus, ordered_detection_sigmas, detections_im
 
     @staticmethod
     def update_belief(belief, action, observation):
@@ -205,8 +210,8 @@ class ExperimentManager:
 
     def clear_robot2(self):
         """ make sure robot2 is in a configuration it can never collide with robot1 while it works"""
-        self.env.r2_controller.plan_and_move_to_xyzrz(workspace_x_lims_default[1], workspace_y_lims_default[0],
-                                                      0.15, 0)
+        self.env.r2_controller.plan_and_move_to_xyzrz(goal_tower_position[0], goal_tower_position[1],
+                                                      (self.env.n_blocks + 2) * 0.04, 0)
 
     def distribute_blocks_from_positions(self, block_positions):
         """ distribute blocks from given positions """

@@ -22,6 +22,8 @@ class ExperimentResults:
         self.is_with_help = help_config is not None
         self.help_config = help_config
         self.belief_before_help = None
+        self.help_detection_mus = None
+        self.help_detection_sigmas = None
 
         self.beliefs: List[BlocksPositionsBelief] = []
         self.actions: List[Any] = []
@@ -55,11 +57,15 @@ class ExperimentResults:
         with open(filename, 'rb') as f:
             data = pickle.load(f)
 
-        results = cls()
+        policy_type = data.get('policy_information', {}).get('type', '')
+        agent_params = data.get('policy_information', {}).get('params', {})
+        help_config = data.get('help_config', None)
+
+        results = cls(policy_type, agent_params, help_config)
         for key, value in data.items():
             if key != '_metadata':
                 setattr(results, key, value)
-        results._metadata = data['_metadata']
+        results._metadata = data.get('_metadata', {})
         return results
 
     def visualize_beliefs(self, start_idx: int = 0, end_idx: Optional[int] = None, step: int = 1):
@@ -97,6 +103,7 @@ def updated_belief(belief, action, observation):
 
 # Example usage
 if __name__ == "__main__":
+
     initial_belief = BlocksPositionsBelief(n_blocks=3,
                                            ws_x_lims=[-1, 1],
                                            ws_y_lims=[-1, 1],
