@@ -145,6 +145,9 @@ class ExperimentManager:
         camera_position = self.env.r1_controller.getActualTCPPose()[:3]
         mus, sigmas = detections_to_distributions(positions, camera_position)
 
+        if len(mus) == 0:
+            return [], [], detections_im
+
         ordered_detection_mus, ordered_detection_sigmas = \
             block_belief.update_from_image_detections_position_distribution(mus, sigmas)
 
