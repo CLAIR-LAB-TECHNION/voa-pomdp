@@ -7,6 +7,8 @@ import numpy as np
 from lab_ur_stack.camera.configurations_and_params import color_camera_intrinsic_matrix
 import logging
 
+from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
+
 
 def project_points_to_image(points, gt: GeometryAndTransforms, robot_name, robot_config):
     """
@@ -146,10 +148,6 @@ def detections_plots_with_depth_as_image(cropped_image, orig_image, depth_image,
     plt.close(fig)
 
     return img_np
-
-
-def sample_sensor_configs(workspace_limits_x, workspace_limits_y, z=-0.0, num_samples=10):
-    pass
 
 
 def lookat_verangle_distance_to_camera_transform(lookat, vertical_angle, distance, y_offset=0.3, up_vector=(1, 0, 0)):

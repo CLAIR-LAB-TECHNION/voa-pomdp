@@ -11,7 +11,8 @@ from lab_ur_stack.manipulation.manipulation_controller import ManipulationContro
 from lab_ur_stack.manipulation.utils import to_canonical_config, distribute_blocks_in_positions, \
     ur5e_2_distribute_blocks_from_block_positions_dists, ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
-from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, goal_tower_position
+from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, goal_tower_position, \
+    sample_block_positions_from_dists
 from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot_config, \
     detections_plots_with_depth_as_image
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
@@ -86,7 +87,7 @@ class ExperimentManager:
             results.is_with_help = True
             results.help_config = help_config
             results.belief_before_help = deepcopy(init_block_belief)
-            detection_muss, detections_sigmas, detections_im =\
+            detection_muss, detections_sigmas, detections_im = \
                 self.help_and_update_belief(init_block_belief, help_config)
             if help_detections_filename is not None:
                 cv2.imwrite(help_detections_filename, cv2.cvtColor(detections_im, cv2.COLOR_RGB2BGR))
@@ -126,7 +127,7 @@ class ExperimentManager:
 
         return results
 
-    def help_and_update_belief(self, block_belief: BlocksPositionsBelief, help_config)\
+    def help_and_update_belief(self, block_belief: BlocksPositionsBelief, help_config) \
             -> (np.ndarray, np.ndarray, np.ndarray):
         """
         takes image with robot1 from help config, detects blocks and uses the detections to update
@@ -140,7 +141,7 @@ class ExperimentManager:
         im, depth = self.env.camera.get_frame_rgb()
         positions, annotations = self.env.position_estimator.get_block_positions_depth(im, depth, help_config)
         detections_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
-                                                       workspace_x_lims_default, workspace_y_lims_default)
+                                                             workspace_x_lims_default, workspace_y_lims_default)
 
         camera_position = self.env.r1_controller.getActualTCPPose()[:3]
         mus, sigmas = detections_to_distributions(positions, camera_position)
@@ -202,10 +203,84 @@ class ExperimentManager:
 
         logging.info(f"value difference experiment is over, all data saved {datetime_stamp}")
 
-    def sample_value_difference_experiments(self):
-        # TODO: complete args
-        # TODO: sample beleif and start state and run value difference experiment
-        pass
+    def sample_value_difference_experiments(self,
+                                            n_blocks,
+                                            min_prior_std,
+                                            max_prior_std,
+                                            dirname,
+                                            ):
+        """
+        Run two experiment from the same initial belief and start state, once with help, and once without.
+        The initial belief is sampled from a truncated gaussian belief space, where the location is sample
+        uniformly in the workspace for each block, and the scale is sampled from [max_prior_std, min_prior_std]
+        and initial state is sampled from that belief.
+        This method assumes workspace is clear at the beginning, and tries to clean up after the experiments
+        are done.
+        @param n_blocks: number of blocks in the experiment, which determines how many blocks will be in the
+            initial belief and initial state
+        @param min_prior_std: minimal std for the prior belief for each block
+        @param max_prior_std: maximal std for the prior belief for each block
+        @param dirname: directory to save the results to, everything will be saved in a
+            subdirectory with datetime stamp
+        @return: Nothing
+        """
+
+        # sample blocks mus and sigmas:
+        # mus for x y between workspace limits
+        block_pos_mu = np.random.uniform(low=[self.ws_x_lims[0], self.ws_y_lims[0]],
+                                         high=[self.ws_x_lims[1], self.ws_y_lims[1]],
+                                         size=(n_blocks, 2))
+        block_pos_sigma = np.random.uniform(low=min_prior_std, high=max_prior_std, size=(n_blocks, 2))
+
+        init_block_belief = BlocksPositionsBelief(n_blocks, self.ws_x_lims, self.ws_y_lims,
+                                                  init_mus=block_pos_mu, init_sigmas=block_pos_sigma)
+        init_block_positions = sample_block_positions_from_dists(init_block_belief.block_beliefs)
+
+        help_config = self.sample_help_config()
+
+        self.run_value_difference_experiments(init_block_positions=init_block_positions,
+                                              init_block_belief=init_block_belief,
+                                              helper_config=help_config,
+                                              dirname=dirname)
+
+    def sample_help_config(self):
+        """
+        sample config for robot1 to take image from to help.
+        The config is sampled according to the rules described in the implementation
+        @return: Configuration for robot1, with canonical joint angels (between -pi and pi)
+        """
+        logging.info("sampling help config")
+        help_config = None
+
+        # sample camera poses until one that is reachable by the robot is found:
+        while help_config is None:
+            # first sample point to look at (center of image axis),
+            # it will be uniformly distributed around the workspace center
+            lookat_x = np.random.uniform(self.ws_x_lims[0] + 0.1, self.ws_x_lims[1] - 0.1)
+            lookat_y = np.random.uniform(self.ws_y_lims[0] + 0.1, self.ws_y_lims[1] - 0.1)
+            lookat = [lookat_x, lookat_y, 0]
+
+            # sample horizontal and vertical angles to look from,
+            # uniform around the intervals of angles that maybe reachable
+            verangle = np.random.uniform(20, 80)
+            horangle = np.random.uniform(0, 60)
+
+            # sample distance from lookat, below 0.5 depth camera doesn't work
+            distance = np.random.uniform(0.5, 2.0)
+
+            # will return None if no valid config is found in these settings, it will look at different
+            # rotations angles around camera axis
+            logging.info(f"trying to find a valid config for lookat {lookat}, verangle {verangle},"
+                         f" horangle {horangle}, distance {distance}")
+            help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, verangle, horangle, distance,
+                                                                            self.env.gt, "ur5e_1")
+
+        helper_config = to_canonical_config(help_config)
+        logging.info(f"found valid config for lookat {lookat}, verangle {verangle},"
+                     f" horangle {horangle}, distance {distance}."
+                     f" config: {help_config}")
+        return help_config
+
 
     def clear_robot1(self):
         """ make sure robot1 is in a configuration it can never collide with robot2 while it works"""
