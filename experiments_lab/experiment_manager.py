@@ -39,8 +39,8 @@ class ExperimentManager:
         self.ws_x_lims = env.ws_x_lims
         self.ws_y_lims = env.ws_y_lims
 
+        self.help_configs = None
         # TODO block piles managements
-        # TODO clean up from here, env just manages one experiment
 
     @classmethod
     def from_params(cls,
@@ -246,41 +246,17 @@ class ExperimentManager:
     def sample_help_config(self):
         """
         sample config for robot1 to take image from to help.
-        The config is sampled according to the rules described in the implementation
+        the config is sampled from a file of configs that were sampled according to a heuristic
+        where the camera looks at some point at the workspace from different angles and distances
         @return: Configuration for robot1, with canonical joint angels (between -pi and pi)
         """
-        logging.info("sampling help config")
-        help_config = None
+        if self.help_configs is None:
+            self.help_configs = np.load("help_configs.npy")
+            logging.debug(f"{len(self.help_configs)} help configs loaded")
 
-        # sample camera poses until one that is reachable by the robot is found:
-        while help_config is None:
-            # first sample point to look at (center of image axis),
-            # it will be uniformly distributed around the workspace center
-            lookat_x = np.random.uniform(self.ws_x_lims[0] + 0.1, self.ws_x_lims[1] - 0.1)
-            lookat_y = np.random.uniform(self.ws_y_lims[0] + 0.1, self.ws_y_lims[1] - 0.1)
-            lookat = [lookat_x, lookat_y, 0]
+        help_config = self.help_configs[np.random.randint(len(self.help_configs))]
 
-            # sample horizontal and vertical angles to look from,
-            # uniform around the intervals of angles that maybe reachable
-            verangle = np.random.uniform(20, 80)
-            horangle = np.random.uniform(0, 60)
-
-            # sample distance from lookat, below 0.5 depth camera doesn't work
-            distance = np.random.uniform(0.5, 2.0)
-
-            # will return None if no valid config is found in these settings, it will look at different
-            # rotations angles around camera axis
-            logging.info(f"trying to find a valid config for lookat {lookat}, verangle {verangle},"
-                         f" horangle {horangle}, distance {distance}")
-            help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, verangle, horangle, distance,
-                                                                            self.env.gt, "ur5e_1")
-
-        helper_config = to_canonical_config(help_config)
-        logging.info(f"found valid config for lookat {lookat}, verangle {verangle},"
-                     f" horangle {horangle}, distance {distance}."
-                     f" config: {help_config}")
         return help_config
-
 
     def clear_robot1(self):
         """ make sure robot1 is in a configuration it can never collide with robot2 while it works"""

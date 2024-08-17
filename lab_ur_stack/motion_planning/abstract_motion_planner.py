@@ -334,7 +334,7 @@ class AbstractMotionPlanner:
         ik_objective = ik.objective(robot.link("ee_link"), R=ee_transform[0], t=ee_transform[1])
         res = ik.solve(ik_objective, tol=1e-5, iters=5000)
         if not res:
-            print("ik not solved")
+            # print("ik not solved")
             robot.setConfig(curr_config)
             return None
 

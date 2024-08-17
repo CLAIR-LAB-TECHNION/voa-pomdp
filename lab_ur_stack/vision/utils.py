@@ -275,8 +275,8 @@ def lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle
 
 
 def lookat_verangle_horangle_distance_to_robot_config(lookat, vertical_angle, horizontal_angle,
-                                                      distance, gt, robot_name, ):
-    camera_rotations = np.linspace(0, 270, 27)
+                                                      distance, gt, robot_name, camera_rotations_to_try=27):
+    camera_rotations = np.linspace(0, 270, camera_rotations_to_try)
     for rot in camera_rotations:
         camera_transform = lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle,
                                                                                  horizontal_angle, distance,
