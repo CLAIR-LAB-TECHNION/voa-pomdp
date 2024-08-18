@@ -4,8 +4,6 @@ import typer
 # matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
-# from scipy.special import result
-
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
 from lab_ur_stack.manipulation.utils import ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
@@ -16,13 +14,7 @@ from lab_ur_stack.camera.realsense_camera import RealsenseCamera
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default, goal_tower_position)
-from modeling.belief.block_position_belief import BlocksPositionsBelief
-from modeling.belief.belief_plotting import plot_all_blocks_beliefs
-from modeling.policies.fixed_policy_sense_until_positive import FixedSenseUntilPositivePolicy
-from modeling.policies.pouct_planner_policy import POUCTPolicy
-from modeling.pomdp_problem.domain.action import *
-from modeling.pomdp_problem.domain.observation import *
-from experiments_lab.experiment_manager import ExperimentManager
+
 from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot_config, \
     detections_plots_no_depth_as_image, detections_plots_with_depth_as_image
 import numpy as np
@@ -34,9 +26,9 @@ initial_positions_sigmas = [[0.04, 0.02], [0.05, 0.07]]
 # fixed help config:
 lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]
 lookat[1] +=0.05
-vertical_angle = 50
-horizontal_angle = 35
-distance = 0.9
+vertical_angle = 35
+horizontal_angle = 20
+distance = 1
 
 
 app = typer.Typer()
@@ -77,8 +69,6 @@ def main(n_blocks: int = 3,
     test_num = 1
     while len(positions) > 0:
         if test_num == 1:
-            # help_config = change_help_config(env)
-            env.r1_controller.plan_and_moveJ(help_config)
             help_config = change_help_config(env, 2)
             test_num = 2
         positions = sensing(env, use_depth, help_config)
