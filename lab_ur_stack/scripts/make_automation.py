@@ -1,7 +1,7 @@
 from copy import deepcopy
 import typer
-import matplotlib
-matplotlib.use('Qt5Agg')
+# import matplotlib
+# matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 
 # from scipy.special import result
@@ -105,7 +105,7 @@ def sensing(env, use_depth, help_config):
     plt.imshow(plot_im)
     plt.axis('off')
     plt.tight_layout()
-    plt.show()
+    plt.show(block=True)
     env.r1_controller.plan_and_move_home(speed=2, acceleration=1.2)
     return positions
 

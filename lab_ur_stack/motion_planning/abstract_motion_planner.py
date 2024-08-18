@@ -50,26 +50,24 @@ class AbstractMotionPlanner:
             self._set_ee_offset(robot)
         self._add_attachments(self.ur5e_1, attachments["ur5e_1"])
         self._add_attachments(self.ur5e_2, attachments["ur5e_2"])
-
         self.world_collider = collide.WorldCollider(self.world)
-
         self.settings = frozendict(self.default_settings)
 
-    def is_pyqt5_available(self):
-        try:
-            import PyQt5
-            return True
-        except ImportError:
-            return False
+    # def is_pyqt5_available(self):
+    #     try:
+    #         import PyQt5
+    #         return True
+    #     except ImportError:
+    #         return False
 
     def visualize(self, backend=None, window_name=None):
         """
         open visualization window
         """
-        if backend is None:
-            backend = "PyQt5" if self.is_pyqt5_available() else "GLUT"
+        # if backend is None:
+        #     backend = "PyQt5" if self.is_pyqt5_available() else "GLUT"
 
-        vis.init(backend)
+        vis.init("GLUT")
 
         # Check if vis is already initialized
         if not AbstractMotionPlanner.vis_initialized:
