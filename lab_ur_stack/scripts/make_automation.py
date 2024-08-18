@@ -1,6 +1,9 @@
 from copy import deepcopy
 import typer
-from matplotlib import pyplot as plt
+import matplotlib
+matplotlib.use('Qt5Agg')
+import matplotlib.pyplot as plt
+
 # from scipy.special import result
 
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
@@ -108,7 +111,7 @@ def sensing(env, use_depth, help_config):
 
 
 def manipulation(env, positions):
-    if len(positions) > 0:
+    if len(positions) == 0:
         print("No blocks detected")
         return len(positions)
     ur5e_2_collect_blocks_from_positions(positions, env.r2_controller)
