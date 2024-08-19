@@ -7,7 +7,9 @@ import pomdp_py
 
 
 class TransitionModel(pomdp_py.TransitionModel):
-    def __init__(self, block_size=0.04, successful_grasp_offset_x=0.015, successful_grasp_offset_y=0.015):
+    def __init__(self, tower_position, block_size=0.04, successful_grasp_offset_x=0.015,
+                 successful_grasp_offset_y=0.015):
+        self.tower_position = np.asarray(tower_position)
         self.block_size = block_size
         self.successful_grasp_offset_x = successful_grasp_offset_x
         self.successful_grasp_offset_y = successful_grasp_offset_y
@@ -26,6 +28,12 @@ class TransitionModel(pomdp_py.TransitionModel):
     def sample_stack_attempt(self, state, action):
         next_state = deepcopy(state)
         next_state.steps_left -= 1
+        # after pickup, the robot position is always at the tower position:
+        next_state.robot_position = self.tower_position
+
+        if len(next_state.block_positions) == 0:
+            next_state.last_stack_attempt_succeded = False
+            return next_state
 
         pick_pos = np.array([action.x, action.y])
         nearest_block = np.argmin(np.linalg.norm(state.block_positions - pick_pos, axis=1))
@@ -50,6 +58,7 @@ class TransitionModel(pomdp_py.TransitionModel):
         next_state = deepcopy(state)
         next_state.steps_left -= 1
         next_state.last_stack_attempt_succeded = None
+        next_state.robot_position = np.array([action.x, action.y])
         return next_state
 
     def probability(self, next_state, state, action):

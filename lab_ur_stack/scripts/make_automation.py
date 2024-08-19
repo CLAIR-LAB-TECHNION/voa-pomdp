@@ -20,8 +20,9 @@ lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 
 lookat[0] += 0.0  # move a bit from the window
 lookat[1] += 0.0
 # lookat = np.array([-0.5, -0.8, 0.0])
-verangle = 55
-
+vertical_angle = 55
+horizontal_angle = 40
+rotation_angle = 0
 distance = 0.55
 y_offset = 0.2
 
@@ -43,13 +44,13 @@ def main(n_blocks: int = 3,
     r2_controller.speed, r2_controller.acceleration = 2, 1.2
 
     # todo (adi): add angles to the camera pose
-    r1_sensing_config = lookat_verangle_horangle_distance_to_camera_transform(lookat, verangle, distance, gt, ur5e_1["name"])
+    r1_sensing_config, camera_position = lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle, horizontal_angle, distance, rotation_angle)
     # todo (adi): add a function to get the canonical
     r1_updated_sensing_config = to_canonical_config(r1_sensing_config)
     if r1_sensing_config is None:
         print("Could not find a valid robot configuration for the camera")
         return
-    motion_planner.vis_config(ur5e_1["name"], r1_sensing_config)
+    motion_planner.vis_config(ur5e_1["name"], r1_updated_sensing_config)
 
     r1_controller.plan_and_move_home(speed=2, acceleration=1)
     r2_controller.plan_and_move_home(speed=2, acceleration=1)

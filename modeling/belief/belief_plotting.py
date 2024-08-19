@@ -3,10 +3,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
-from modeling.belief.block_position_belief import BlocksPositionsBelief, BlockPosDist
+from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief, BlockPosDist
 
 
-def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
+def plot_block_belief(block_pos_belief: UnnormalizedBlocksPositionsBelief,
                       block_id,
                       actual_state=None,
                       positive_sensing_points=None,
@@ -35,7 +35,7 @@ def plot_block_belief(block_pos_belief: BlocksPositionsBelief,
                                    ret_as_image=ret_as_image)
 
 
-def plot_all_blocks_beliefs(block_pos_belief: BlocksPositionsBelief,
+def plot_all_blocks_beliefs(block_pos_belief: UnnormalizedBlocksPositionsBelief,
                             actual_states=None,
                             positive_sensing_points=None,
                             negative_sensing_points=None,

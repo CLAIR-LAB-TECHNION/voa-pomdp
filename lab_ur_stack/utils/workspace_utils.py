@@ -7,6 +7,8 @@ stack_position_r2frame = (-0.3614, 0.1927)
 workspace_x_lims_default = (-0.9, -0.54)
 workspace_y_lims_default = (-1.0, -0.55)
 
+goal_tower_position = [-0.45, -1.15]
+
 
 def valid_position(x, y, block_positions, min_dist):
     """

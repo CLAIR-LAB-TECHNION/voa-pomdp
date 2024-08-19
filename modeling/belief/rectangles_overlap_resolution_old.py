@@ -32,6 +32,41 @@ def is_polygon_box(polygon):
     return np.isclose(side1, side3) and np.isclose(side2, side4)
 
 
+def decompose_to_rectangles(polygon):
+    curr_polygon = polygon
+    rectangles = []
+
+    while curr_polygon.area > 0 and not is_polygon_box(curr_polygon):
+        # Decompose the polygon to rectangles
+        curr_polygon_vertices = list(curr_polygon.exterior.coords)
+        curr_polygon_vertices = curr_polygon_vertices[:-1]  # remove the last point which is the same as the first one
+
+        # sort the vertices by x, then by y:
+        curr_polygon_vertices.sort(key=lambda x: (x[0], x[1]), reverse=False)
+
+        # take the leftmost point
+        left_down = curr_polygon_vertices.pop(0)
+        # there should be another point with the same x coordinate
+        left_up = curr_polygon_vertices.pop(0)
+
+        # find second leftmost point, has to be different than left_up x coordinate
+        for i, vertex in enumerate(curr_polygon_vertices):
+            if vertex[0] != left_up[0]:
+                right_down = curr_polygon_vertices.pop(i)
+                break
+
+        # those three points define a rectangle
+        right_up = [right_down[0], left_up[1]]
+        rectangles.append(box(left_down[0], left_down[1], right_up[0], right_up[1]))
+
+        curr_polygon = curr_polygon.difference(rectangles[-1])
+
+    if curr_polygon.area > 0:
+        rectangles.append(curr_polygon)
+
+    return rectangles
+
+
 def plot_polygon_from_coords(coords):
     coords = np.array(coords)
     plt.plot(coords[:, 0], coords[:, 1], 'r-')
@@ -39,6 +74,71 @@ def plot_polygon_from_coords(coords):
     plt.gca().set_aspect('equal')
     plt.show()
 
+
+def add_box_to_merged_list(merged_boxes, box_to_add):
+    new_boxes = [box_to_add]
+    final_boxes_to_add = []
+
+    while new_boxes:
+        current_box = new_boxes.pop(0)
+        any_intersection = False
+
+        for merged_box in merged_boxes:
+            if merged_box.intersects(current_box):
+                intersection = merged_box.intersection(current_box)
+                if not (isinstance(intersection, Polygon) or isinstance(intersection, MultiPolygon)):
+                    # that's point or line, which is not really an intersection
+                    continue
+
+                any_intersection = True
+                difference = current_box.difference(intersection)
+
+                if difference.area < 1e-10:
+                    # in practice, this is probably a line with numerical errors
+                    continue
+
+                if isinstance(difference, Polygon):
+                    if is_polygon_box(difference):
+                        new_boxes.append(difference)
+                    else:
+                        new_boxes.extend(decompose_to_rectangles(difference))
+
+                if isinstance(difference, MultiPolygon):
+                    for part in difference.geoms:
+                        if is_polygon_box(part):
+                            new_boxes.append(part)
+                        else:
+                            new_boxes.extend(decompose_to_rectangles(part))
+
+                break  # we already processed this one and it got decomposed
+
+        if not any_intersection:
+            final_boxes_to_add.append(current_box)
+
+    merged_boxes.extend(final_boxes_to_add)
+
+
+def resolve_overlaps(rectangles):
+    boxes = [rect_to_shaply_box(rect) for rect in rectangles]
+    merged_boxes = [boxes[0]]
+
+    for box in boxes[1:]:
+        add_box_to_merged_list(merged_boxes, box)
+
+    return [shapely_box_to_rect(box) for box in merged_boxes]
+
+
+def resolve_overlaps_only_for_new(resolved_rectangles, new_rectangles):
+    if len(resolved_rectangles) == 0:
+        return resolve_overlaps(new_rectangles)
+
+    new_boxes = [rect_to_shaply_box(rect) for rect in new_rectangles]
+    merged_boxes = [rect_to_shaply_box(rect) for rect in resolved_rectangles]
+
+    for box in new_boxes:
+        add_box_to_merged_list(merged_boxes, box)
+
+    return [shapely_box_to_rect(box) for box in merged_boxes]
 
 
 def plot_orig_and_resolved(orig, resolved, xlim, ylim):
@@ -58,80 +158,6 @@ def plot_orig_and_resolved(orig, resolved, xlim, ylim):
         ax.set_aspect('equal')
 
     plt.show()
-
-
-def decompose_rectilinear_polygon(polygon):
-    exterior_coords = np.array(polygon.exterior.coords)
-    interior_coords = [np.array(interior.coords) for interior in polygon.interiors]
-
-    all_coords = np.vstack([exterior_coords] + interior_coords)
-    x_coords = sorted(set(all_coords[:, 0]))
-    y_coords = sorted(set(all_coords[:, 1]))
-
-    rectangles = []
-
-    for i in range(len(x_coords) - 1):
-        for j in range(len(y_coords) - 1):
-            rect = Polygon([
-                (x_coords[i], y_coords[j]),
-                (x_coords[i + 1], y_coords[j]),
-                (x_coords[i + 1], y_coords[j + 1]),
-                (x_coords[i], y_coords[j + 1])
-            ])
-            if polygon.contains(rect):
-                rectangles.append(rect)
-            elif polygon.intersects(rect):
-                intersection = polygon.intersection(rect)
-                if intersection.area > 0:
-                    if intersection.geom_type == 'Polygon':
-                        rectangles.append(intersection)
-                    elif intersection.geom_type == 'MultiPolygon':
-                        rectangles.extend(list(intersection.geoms))
-
-    return rectangles
-
-def resolve_overlaps(rectangles):
-    boxes = [box(rect[0][0], rect[1][0], rect[0][1], rect[1][1]) for rect in rectangles]
-
-    union = unary_union(boxes)
-    result_boxes = []
-    if isinstance(union, MultiPolygon):
-        for part in union.geoms:
-            if is_polygon_box(part):
-                result_boxes.append(part)
-            else:
-                result_boxes.extend(decompose_rectilinear_polygon(part))
-    else:
-        if is_polygon_box(union):
-            result_boxes.append(union)
-        else:
-            result_boxes.extend(decompose_rectilinear_polygon(union))
-
-    return [[[box.bounds[0], box.bounds[2]], [box.bounds[1], box.bounds[3]]] for box in result_boxes]
-
-
-def add_rectangle_to_decomposed(existing_rectangles, new_rectangle):
-    new_box = box(new_rectangle[0][0], new_rectangle[1][0], new_rectangle[0][1], new_rectangle[1][1])
-    intersecting_rectangles = []
-    non_intersecting_rectangles = []
-
-    for rect in existing_rectangles:
-        existing_box = box(rect[0][0], rect[1][0], rect[0][1], rect[1][1])
-        if new_box.intersects(existing_box):
-            intersecting_rectangles.append(existing_box)
-        else:
-            non_intersecting_rectangles.append(rect)
-
-    if intersecting_rectangles:
-        # Only decompose the intersecting area
-        union = unary_union([new_box] + intersecting_rectangles)
-        decomposed = decompose_rectilinear_polygon(union)
-        result_boxes = [shapely_box_to_rect(box) for box in decomposed]
-        return non_intersecting_rectangles + result_boxes
-    else:
-        # If no intersections, simply add the new rectangle
-        return existing_rectangles + [new_rectangle]
-
 
 
 if __name__ == '__main__':
@@ -181,13 +207,6 @@ if __name__ == '__main__':
             [[6, 8], [2, 5]],
             [[7, 9], [3, 5]]
         ],
-        "Hole": [
-            [[1, 5], [1, 2]],
-            [[1, 5], [3, 4]],
-            [[1, 2], [1, 4]],
-            [[3, 4], [1, 4]],
-            [[2.5, 3.5], [2.5, 3.5]]
-        ],
         "custom test case": [
             [[-0.85, -0.77], [-0.73, -0.65]],
             [[-0.89, -0.81], [-0.75, -0.67]]
@@ -206,6 +225,3 @@ if __name__ == '__main__':
         x_lim = [min(rect[0][0] for rect in rects) - 0.5, max(rect[0][1] for rect in rects) + 0.5]
         y_lim = [min(rect[1][0] for rect in rects) - 0.5, max(rect[1][1] for rect in rects) + 0.5]
         plot_orig_and_resolved(rects, resolved_rectangles, x_lim, y_lim)
-
-    # TODO: optimizations:
-        # 1. adding one polygon to existing list

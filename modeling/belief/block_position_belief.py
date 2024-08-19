@@ -1,11 +1,13 @@
 import numpy as np
-from modeling.belief.masked_gaussian_distribution import Masked2DTruncNorm
+from modeling.belief.masked_gaussian_distribution import Masked2DTruncNorm, UnnormalizedMasked2DTruncNorm
+
 
 BlockPosDist = Masked2DTruncNorm
+UnnormalizedBlockPosDist = UnnormalizedMasked2DTruncNorm
 
 
-class BlocksPositionsBelief:
-    sigma_for_uniform = 10  # this is std of 10 meters, almost uniform for our scales
+class UnnormalizedBlocksPositionsBelief:
+    sigma_for_uniform = 10
     block_size = 0.04
 
     def __init__(self, n_blocks,
@@ -14,20 +16,44 @@ class BlocksPositionsBelief:
                  init_mus=None,
                  init_sigmas=None,
                  successful_grasp_margin_x=0.015,
-                 successful_grasp_margin_y=0.015):
+                 successful_grasp_margin_y=0.015,
+                 build_block_beliefs=True):
+        """
+        build_block_beliefs - if False, additional intialization of block beliefs is required.
+        the object is not usable until it's done. usefull for copying...
+        """
+
         self.n_blocks_orig = n_blocks
         self.ws_x_lims = ws_x_lims
         self.ws_y_lims = ws_y_lims
         self.successful_grasp_margin_x = successful_grasp_margin_x
         self.successful_grasp_margin_y = successful_grasp_margin_y
 
+        init_mus, init_sigmas = self._initialize_mus_sigmas(n_blocks, ws_x_lims, ws_y_lims, init_mus, init_sigmas)
+
+        if build_block_beliefs:
+            self.block_beliefs = self._create_block_beliefs(init_mus, init_sigmas)
+            self.block_beliefs_original_position = [b for b in self.block_beliefs]
+        else:
+            self.block_beliefs = None
+            self.block_beliefs_original_position = None
+
+        self.n_blocks_on_table = n_blocks
+
+    def _create_block_beliefs(self, init_mus, init_sigmas):
+        return [UnnormalizedBlockPosDist(self.ws_x_lims, self.ws_y_lims,
+                                         init_mus[i][0], init_sigmas[i][0],
+                                         init_mus[i][1], init_sigmas[i][1])
+                for i in range(self.n_blocks_orig)]
+
+    def _initialize_mus_sigmas(self, n_blocks, ws_x_lims, ws_y_lims, init_mus, init_sigmas):
         if init_mus is None:
             init_mus = [np.mean(ws_x_lims), np.mean(ws_y_lims)]
         if init_sigmas is None:
             init_sigmas = [self.sigma_for_uniform, self.sigma_for_uniform]
 
-        init_mus = np.array(init_mus)
-        init_sigmas = np.array(init_sigmas)
+        init_mus = np.asarray(init_mus)
+        init_sigmas = np.asarray(init_sigmas)
 
         if init_mus.ndim == 1:
             init_mus = np.tile(init_mus, (n_blocks, 1))
@@ -37,50 +63,158 @@ class BlocksPositionsBelief:
         assert len(init_mus) == n_blocks
         assert len(init_sigmas) == n_blocks
 
-        self.block_beliefs = [BlockPosDist(ws_x_lims, ws_y_lims, init_mus[i][0], init_sigmas[i][0],
-                                           init_mus[i][1], init_sigmas[i][1])
-                              for i in range(n_blocks)]
-
-        # maintain a list where blocks are in the same position, useful for plotting. blocks that are removed
-        # are replaced by None:
-        self.block_beliefs_original_position = [b for b in self.block_beliefs]
-        self.n_blocks_on_table = n_blocks
+        return init_mus, init_sigmas
 
     def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.005):
-        """
-        We update the area within block_size distance from the point, minus a margin of no_update_margin.
-        the no update margin reflects that we have an error from the desired sensing point.
-        """
         if not is_occupied:
-            area_to_update = [[point_x - self.block_size + no_update_margin,
-                               point_x + self.block_size - no_update_margin],
-                              [point_y - self.block_size + no_update_margin,
-                               point_y + self.block_size - no_update_margin]]
-            # x and y is not occupied by a block. that means that there isn't a block withing
-            # the block_size distance for each direction.
-            area_to_update = [[point_x - self.block_size + no_update_margin,
-                               point_x + self.block_size - no_update_margin],
-                              [point_y - self.block_size + no_update_margin,
-                               point_y + self.block_size - no_update_margin]]
-
-            for block_belief in self.block_beliefs:
-                block_belief.add_masked_area(area_to_update)
+            self._update_negative_sensing(point_x, point_y, no_update_margin)
         else:
-            area_to_update = [[point_x - self.block_size, point_x + self.block_size],
-                              [point_y - self.block_size, point_y + self.block_size]]
+            self._update_positive_sensing(point_x, point_y, no_update_margin)
 
-            # x and y is occupied by a block. that means that there is a block withing
-            # the block_size distance for each direction.
-            # we associate it with the block that has the highest probability of being there
-            blocks_probs = [b.pdf((point_x, point_y)) for b in self.block_beliefs]
+    def _update_negative_sensing(self, point_x, point_y, no_update_margin):
+        area_to_update = self._calculate_sensing_area(point_x, point_y, no_update_margin)
+        for block_belief in self.block_beliefs:
+            block_belief.add_masked_area(area_to_update)
+
+    def _update_positive_sensing(self, point_x, point_y, no_update_margin):
+        blocks_probs = [b.pdf((point_x, point_y)) for b in self.block_beliefs]
+        block_to_update_id = np.argmax(blocks_probs)
+        block_to_update = self.block_beliefs[block_to_update_id]
+
+        area_to_update = self._calculate_sensing_area(point_x, point_y, -no_update_margin)
+        block_to_update.add_new_bounds(area_to_update)
+
+    def _calculate_sensing_area(self, point_x, point_y, margin):
+        return [[point_x - self.block_size + margin, point_x + self.block_size - margin],
+                [point_y - self.block_size + margin, point_y + self.block_size - margin]]
+
+    def update_from_pickup_attempt(self, pick_x, pick_y, observed_success):
+        if observed_success:
+            self._update_successful_pickup(pick_x, pick_y)
+        else:
+            self._update_failed_pickup(pick_x, pick_y)
+
+    def _update_successful_pickup(self, pick_x, pick_y):
+        block_to_remove_id = np.argmax([b.pdf((pick_x, pick_y)) for b in self.block_beliefs])
+        self.block_beliefs.pop(block_to_remove_id)
+        self.block_beliefs_original_position[block_to_remove_id] = None
+        self.n_blocks_on_table -= 1
+
+        half_block_size = self.block_size / 2
+        self._add_empty_area([pick_x - half_block_size, pick_x + half_block_size],
+                             [pick_y - half_block_size, pick_y + half_block_size])
+
+    def _update_failed_pickup(self, pick_x, pick_y):
+        self._add_empty_area([pick_x - self.successful_grasp_margin_x, pick_x + self.successful_grasp_margin_x],
+                             [pick_y - self.successful_grasp_margin_y, pick_y + self.successful_grasp_margin_y])
+
+    def _add_empty_area(self, area_x_bounds, area_y_bounds):
+        for block_belief in self.block_beliefs:
+            block_belief.add_masked_area(np.array([area_x_bounds, area_y_bounds]))
+
+    def update_from_history_of_sensing_and_pick_up(self, positive_sensing_points, negative_sensing_points,
+                                                   successful_pickup_points, non_successful_pickup_points,
+                                                   no_update_margin=0.005):
+        per_block_positive_sensing_points = self._associate_positive_sensing_points(positive_sensing_points)
+        masked_areas = self._calculate_masked_areas(negative_sensing_points, successful_pickup_points,
+                                                    non_successful_pickup_points, no_update_margin)
+
+        self._update_blocks_from_history(per_block_positive_sensing_points, masked_areas,
+                                         successful_pickup_points, no_update_margin)
+
+    def _associate_positive_sensing_points(self, positive_sensing_points):
+        # We use gaussian pdf here, without normalization, this is wrong but faster
+        per_block_positive_sensing_points = [[] for _ in range(self.n_blocks_on_table)]
+        for point in np.asarray(positive_sensing_points):
+            # find potential blocks, where the point is not masked:
+            potential_blocks = [i for i, b in enumerate(self.block_beliefs) if not b.are_points_masked(point)]
+            potential_block_probs = [self.block_beliefs[i].gaussian_pdf(point.reshape(1, -1))
+                                     for i in potential_blocks]
+            block_to_update_id = potential_blocks[np.argmax(potential_block_probs)]
+            per_block_positive_sensing_points[block_to_update_id].append(point)
+
+        return per_block_positive_sensing_points
+
+    def _calculate_masked_areas(self, negative_sensing_points, successful_pickup_points,
+                                non_successful_pickup_points, no_update_margin):
+        masked_areas = []
+        for point in negative_sensing_points:
+            masked_areas.append(self._calculate_sensing_area(point[0], point[1], no_update_margin))
+
+        for point in successful_pickup_points:
+            half_block_size = self.block_size / 2
+            masked_areas.append([[point[0] - half_block_size, point[0] + half_block_size],
+                                 [point[1] - half_block_size, point[1] + half_block_size]])
+
+        for point in non_successful_pickup_points:
+            masked_areas.append([[point[0] - self.successful_grasp_margin_x,
+                                  point[0] + self.successful_grasp_margin_x],
+                                 [point[1] - self.successful_grasp_margin_y,
+                                  point[1] + self.successful_grasp_margin_y]])
+
+        return masked_areas
+
+    def _update_blocks_from_history(self, per_block_positive_sensing_points, masked_areas,
+                                    successful_pickup_points, no_update_margin):
+        # might be less accurate than with normal pdf, but faster
+        is_block_picked_up = [False] * self.n_blocks_on_table
+        for point in successful_pickup_points:
+            blocks_probs = [b.gaussian_pdf(np.array([point]))
+                            for b in self.block_beliefs]
             block_to_update_id = np.argmax(blocks_probs)
-            block_to_update = self.block_beliefs[block_to_update_id]
+            is_block_picked_up[block_to_update_id] = True
 
-            area_to_update = [[point_x - self.block_size - no_update_margin,
-                               point_x + self.block_size + no_update_margin],
-                              [point_y - self.block_size - no_update_margin,
-                               point_y + self.block_size + no_update_margin]]
-            block_to_update.add_new_bounds(area_to_update)
+        for i in range(self.n_blocks_on_table):
+            if not is_block_picked_up[i]:
+                new_bounds_list = []
+                for pos_point in per_block_positive_sensing_points[i]:
+                    new_bounds_list.append(self._calculate_sensing_area(pos_point[0], pos_point[1], -no_update_margin))
+                self.block_beliefs[i].add_multiple_new_areas(masked_areas, new_bounds_list)
+
+        self.block_beliefs = [b for i, b in enumerate(self.block_beliefs) if not is_block_picked_up[i]]
+        self.n_blocks_on_table = len(self.block_beliefs)
+        for i, is_picked in enumerate(is_block_picked_up):
+            if is_picked:
+                self.block_beliefs_original_position[i] = None
+
+
+class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
+    def _create_block_beliefs(self, init_mus, init_sigmas):
+        return [BlockPosDist(self.ws_x_lims, self.ws_y_lims,
+                             init_mus[i][0], init_sigmas[i][0],
+                             init_mus[i][1], init_sigmas[i][1])
+                for i in range(self.n_blocks_orig)]
+
+    def _associate_positive_sensing_points(self, positive_sensing_points):
+        # Don't use the fast gaussian pdf here, it doesn't consider normalizations...
+        per_block_positive_sensing_points = [[] for _ in range(self.n_blocks_on_table)]
+        for point in positive_sensing_points:
+            # find potential blocks, where the point is not masked:
+            potential_blocks = [i for i, b in enumerate(self.block_beliefs) if not b.are_points_masked(point)]
+            potential_block_probs = [self.block_beliefs[i].pdf(point) for i in potential_blocks]
+            block_to_update_id = potential_blocks[np.argmax(potential_block_probs)]
+            per_block_positive_sensing_points[block_to_update_id].append(point)
+        return per_block_positive_sensing_points
+
+    def _update_blocks_from_history(self, per_block_positive_sensing_points, masked_areas,
+                                    successful_pickup_points, no_update_margin):
+        # The implementation in the base class uses the fast gaussian pdf which is not normalized
+        # need to implement it with normal pdf
+        raise NotImplementedError("This method is not implemented for the normalized version")
+
+    def create_unnormalized(self):
+        unnormalized = UnnormalizedBlocksPositionsBelief(self.n_blocks_orig,
+                                                         self.ws_x_lims,
+                                                         self.ws_y_lims,
+                                                         successful_grasp_margin_x=self.successful_grasp_margin_x,
+                                                         successful_grasp_margin_y=self.successful_grasp_margin_y,
+                                                         build_block_beliefs=False)
+        unnormalized.block_beliefs_original_position = [b.create_unnormalized()
+                                                        for b in self.block_beliefs_original_position if b is not None]
+        unnormalized.block_beliefs = [b for b in unnormalized.block_beliefs_original_position if b is not None]
+
+        unnormalized.n_blocks_on_table = self.n_blocks_on_table
+        return unnormalized
 
     def update_from_image_detections_position_distribution(self, detection_mus, detection_sigmas):
         """
@@ -113,127 +247,6 @@ class BlocksPositionsBelief:
 
         return mus_and_sigmas
 
-    def update_from_pickup_attempt(self, pick_x, pick_y, observed_success):
-        """
-        Update the belief after a successful pickup. The block is not on the workspace anymore
-        """
-        if observed_success:
-            # remove the nearest block:
-            block_to_remove_id = np.argmax([b.pdf((pick_x, pick_y)) for b in self.block_beliefs])
-
-            self.block_beliefs.pop(block_to_remove_id)
-            self.block_beliefs_original_position[block_to_remove_id] = None
-            self.n_blocks_on_table -= 1
-
-            # there is nothing around this point anymore. Can use this information but carefully
-            half_block_size = self.block_size / 2
-            self.add_empty_area([pick_x - half_block_size, pick_x + half_block_size],
-                                [pick_y - half_block_size, pick_y + half_block_size])
-
-        else:
-            # add very small mask around the block area, where it should have been for successful pickup:
-            self.add_empty_area([pick_x - self.successful_grasp_margin_x, pick_x + self.successful_grasp_margin_x],
-                                [pick_y - self.successful_grasp_margin_y, pick_y + self.successful_grasp_margin_y], )
-
-    def update_from_history_of_sensing_and_pick_up(self,
-                                                   positive_sensing_points,
-                                                   negative_sensing_points,
-                                                   successful_pickup_points,
-                                                   non_successful_pickup_points,
-                                                   no_update_margin=0.005):
-        """
-        This is almost equivalent to calls for update_from_point_sensing_observation for the positive
-        and the negative sensing points and update_from_successful_pick for the successful picks.
-        This is way more efficient since the masked areas overlap is happening once, this is usefull for
-        rollouting during planning and it approximates the new belief after a history.
-        The difference is that we don't consider order of observations, this can cause small changes
-        in association of blocks with positive sensing or successful pickups, but most of the time it will
-        generate the same result.
-        """
-        # first associate sensing with blocks
-        per_block_positive_sensing_points = [[] for _ in range(self.n_blocks_on_table)]
-        for point in positive_sensing_points:
-            blocks_probs = [b.pdf((point[0], point[1])) for b in self.block_beliefs]
-            block_to_update_id = np.argmax(blocks_probs)
-            per_block_positive_sensing_points[block_to_update_id].append(point)
-
-        # now address negative sensing, generate a list of all the new masked areas
-        masked_areas = []
-        for point in negative_sensing_points:
-            point_x, point_y = point
-            area_to_mask = [[point_x - self.block_size + no_update_margin,
-                             point_x + self.block_size - no_update_margin],
-                            [point_y - self.block_size + no_update_margin,
-                             point_y + self.block_size - no_update_margin]]
-            masked_areas.append(area_to_mask)
-
-        is_block_picked_up = [False] * self.n_blocks_on_table
-        # now associate successful pickups points with blocks, and add the masked areas
-        for point in successful_pickup_points:
-            blocks_probs = [b.pdf((point[0], point[1])) for b in self.block_beliefs]
-            block_to_update_id = np.argmax(blocks_probs)
-            is_block_picked_up[block_to_update_id] = True
-            # add small masked area:
-            half_block_size = self.block_size / 2
-            masked_areas.append([[point[0] - half_block_size, point[0] + half_block_size],
-                                 [point[1] - half_block_size, point[1] + half_block_size]])
-
-        # now non-successful pickups adds the smaller mask:
-        for point in non_successful_pickup_points:
-            masked_areas.append([[point[0] - self.successful_grasp_margin_x,
-                                  point[0] + self.successful_grasp_margin_x],
-                                 [point[1] - self.successful_grasp_margin_y,
-                                  point[1] + self.successful_grasp_margin_y]])
-
-        # now update all the blocks.
-        for i in range(self.n_blocks_on_table):
-            # update just blocks that shouldn't be removed:
-            if not is_block_picked_up[i]:
-                new_bounds_list = []
-                for pos_point in per_block_positive_sensing_points[i]:
-                    point_x, point_y = pos_point
-                    new_bounds_list.append([[point_x - self.block_size - no_update_margin,
-                                             point_x + self.block_size + no_update_margin],
-                                            [point_y - self.block_size - no_update_margin,
-                                             point_y + self.block_size + no_update_margin]])
-                self.block_beliefs[i].add_multiple_new_areas(masked_areas, new_bounds_list)
-
-        # now remove the blocks that were picked up:
-        self.block_beliefs = [b for i, b in enumerate(self.block_beliefs) if not is_block_picked_up[i]]
-        self.n_blocks_on_table = len(self.block_beliefs)
-        for i, is_picked in enumerate(is_block_picked_up):
-            if is_picked:
-                self.block_beliefs_original_position[i] = None
-
-
-    def _associate_detection_mus_with_blocks(self, detection_mus):
-        # Calculate likelihoods for each detection across all blocks
-        per_detection_likelihoods = np.array([block_belief.pdf(detection_mus) for block_belief in self.block_beliefs])
-
-        # Initially associate each detection with the block that has the highest likelihood
-        detections_to_blocks = np.argmax(per_detection_likelihoods, axis=0)  # n_blocks x n_detections
-
-        # Ensure unique association: resolve conflicts
-        unique, counts = np.unique(detections_to_blocks, return_counts=True)
-        while np.any(counts > 1):
-            for block in unique[counts > 1]:
-                # Indices of all detections currently assigned to this block
-                conflicting_detections = np.where(detections_to_blocks == block)[0]
-                best_conflicting_detection_id = np.argmax(
-                    per_detection_likelihoods[block, conflicting_detections], axis=0)
-                # Zero out likelihoods for all other blocks for this detection
-                conflicting_detections_without_best = np.setdiff1d(
-                    conflicting_detections, best_conflicting_detection_id)
-                per_detection_likelihoods[block, conflicting_detections_without_best] = 0
-                # now reassign the conflicting detections to the second-best block, which is now the best
-                # one in the table
-                detections_to_blocks[conflicting_detections_without_best] = np.argmax(
-                    per_detection_likelihoods[:, conflicting_detections_without_best], axis=0)
-
-            unique, counts = np.unique(detections_to_blocks, return_counts=True)
-
-        return detections_to_blocks
-
     def update_belief_block_from_detection(self, block_id, mu_detection, sigma_detection):
         """
         Bayesian filter update where the initial belief is a gaussian defined by the expectation and std
@@ -264,6 +277,30 @@ class BlocksPositionsBelief:
 
         block_belief.update_parameters(updated_mu_x, updated_sigma_x, updated_mu_y, updated_sigma_y)
 
-    def add_empty_area(self, area_x_bounds, area_y_bounds):
-        for block_belief in self.block_beliefs:
-            block_belief.add_masked_area(np.array([area_x_bounds, area_y_bounds]))
+    def _associate_detection_mus_with_blocks(self, detection_mus):
+        # Calculate likelihoods for each detection across all blocks
+        per_detection_likelihoods = np.array([block_belief.pdf(detection_mus) for block_belief in self.block_beliefs])
+
+        # Initially associate each detection with the block that has the highest likelihood
+        detections_to_blocks = np.argmax(per_detection_likelihoods, axis=0)  # n_blocks x n_detections
+
+        # Ensure unique association: resolve conflicts
+        unique, counts = np.unique(detections_to_blocks, return_counts=True)
+        while np.any(counts > 1):
+            for block in unique[counts > 1]:
+                # Indices of all detections currently assigned to this block
+                conflicting_detections = np.where(detections_to_blocks == block)[0]
+                best_conflicting_detection_id = np.argmax(
+                    per_detection_likelihoods[block, conflicting_detections], axis=0)
+                # Zero out likelihoods for all other blocks for this detection
+                conflicting_detections_without_best = np.setdiff1d(
+                    conflicting_detections, best_conflicting_detection_id)
+                per_detection_likelihoods[block, conflicting_detections_without_best] = 0
+                # now reassign the conflicting detections to the second-best block, which is now the best
+                # one in the table
+                detections_to_blocks[conflicting_detections_without_best] = np.argmax(
+                    per_detection_likelihoods[:, conflicting_detections_without_best], axis=0)
+
+            unique, counts = np.unique(detections_to_blocks, return_counts=True)
+
+        return detections_to_blocks
