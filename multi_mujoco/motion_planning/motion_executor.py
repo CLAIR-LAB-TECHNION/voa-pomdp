@@ -1,12 +1,13 @@
 import numpy as np
-from klampt import vis
+from scipy.spatial.transform import Rotation as R
 
 from .simulation_motion_planner import SimulationMotionPlanner
+from .pid_controller import PIDController
 from ..mujoco_env.voa_world import WorldVoA
 
-FACING_DOWN_R = [[0, 0, -1],
-                 [0, 1, 0],
-                 [1, 0, 0]]
+FACING_DOWN_R = [[1, 0, 0],
+                 [0, -1, 0],
+                 [0, 0, -1]]
 
 
 def compose_transformation_matrix(rotation, translation):
@@ -17,6 +18,11 @@ def compose_transformation_matrix(rotation, translation):
     translation = np.array(translation)
 
     return rotation_flattened, translation
+
+
+def facing_down_rot():
+    rotation_down = R.from_euler('xyz', [-np.pi / 2, 0, 0])
+    return rotation_down
 
 
 class MotionExecutor:
@@ -31,12 +37,16 @@ class MotionExecutor:
         # set current configuration
         for robot, pose in state['robots_joint_pos'].items():
             self.motion_planner.update_robot_config(robot, pose)
-        for block_name, pos in blocks_positions_dict.items():
-            self.motion_planner.add_block(name=block_name, position=pos)
+        # for block_name, pos in blocks_positions_dict.items():
+        #     self.motion_planner.add_block(name=block_name, position=pos)
+
+        self.pid_controllers = {}
+        for robot in self.env.robots_joint_pos.keys():
+            self.pid_controllers[robot] = [PIDController(kp=1.0, ki=0.1, kd=0.05) for _ in range(6)]
 
     def reset(self, randomize=True, block_positions=None):
         self.env.reset(randomize=randomize, block_positions=block_positions)
-        self.update_blocks_positions()
+        # self.update_blocks_positions()
         return self.env.get_state()
 
     def move_to(self, agent, target_config, tolerance=0.05, end_vel=0.1, max_steps=None,
@@ -68,11 +78,12 @@ class MotionExecutor:
         while np.linalg.norm(joint_positions[agent] - target_config) > tolerance \
                 or np.linalg.norm(joint_velocities[agent]) > end_vel:
             if max_steps is not None and i > max_steps:
-                return False, frames
+                return False, frames, self.env.get_state()
 
             state = self.env.step(actions)
             joint_positions = state['robots_joint_pos']
             joint_velocities = state['robots_joint_velocities']
+            self.motion_planner.update_robot_config(agent, joint_positions[agent])
 
             if i % render_freq == 0:
                 frames.append(self.env.render())
@@ -110,7 +121,7 @@ class MotionExecutor:
                 render_freq=render_freq)
             frames.extend(frames_curr)
             if not success:
-                return False, frames
+                return False, frames, self.env.get_state()
 
         return True, frames, state
 
@@ -137,7 +148,7 @@ class MotionExecutor:
             render_freq=render_freq)
 
         # after executing a motion, blocks position can change, update the motion planner:
-        self.update_blocks_positions()
+        # self.update_blocks_positions()
 
         return success, frames, state
 
@@ -172,11 +183,11 @@ class MotionExecutor:
                 frames.append(self.env.render())
 
         # account for falling objects
-        self.update_blocks_positions()
+        # self.update_blocks_positions()
 
         return True, frames, state
 
-    def move_and_detect_height(self, agent, x, y, start_z=0.2, step_size=0.01, force_threshold=0.1, max_steps=500):
+    def move_and_detect_height(self, agent, x, y, start_z=0.1, step_size=0.01, force_threshold=10, max_steps=500):
         """
         Move the robot above a specified (x,y) point and lower it until contact is detected.
 
@@ -191,42 +202,52 @@ class MotionExecutor:
         """
         # First, move to the position above (x, y, start_z)
         target_position = [x, y, start_z]
-        target_orientation = FACING_DOWN_R  # Assuming this is defined in your class
-        target_transform = compose_transformation_matrix(target_orientation, target_position)
+        target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
 
-        vis.add('world', self.motion_planner.world)
-
-        # Use inverse kinematics to get the joint configuration for this pose
-        target_config = self.motion_planner.ik_solve(agent, target_transform)
-        if target_config is None:
-            print(f'({x}, {y}, {start_z}) is unreachable')
-            return False, None, None
+        target_config = self.facing_down_ik(agent, target_transform)
 
         success, frames, state = self.move_to_config(agent, target_config)
         if not success:
             return False, frames, None
 
         # Now, start moving down until contact is detected
-        current_z = start_z
+        target_transform[1][2] = 0.05
         total_frames = frames
 
-        for _ in range(max_steps):
-            current_z -= step_size
-            target_transform[1][2] = current_z
+        sense_config = self.facing_down_ik(agent, target_transform)
+        success, new_frames, state = self.move_to_config(agent, sense_config, tolerance=0.001,
+                                                         max_steps_per_section=50)
+        total_frames.extend(new_frames)
 
-            target_config = self.motion_planner.ik_solve(agent, target_transform)
-            success, new_frames, state = self.move_to_config(agent, target_config, tolerance=0.001,
-                                                             max_steps_per_section=50)
-            total_frames.extend(new_frames)
+        force_data_z = self.env.get_state()['robots_force'][agent][2]
 
-            if not success:
-                return False, total_frames, None
+        success, frames, state = self.move_to_config(agent, target_config)
 
-            # Check force sensor data
-            force_data = self.env.get_state()[agent]['sensor']
-            if abs(force_data[2]) > force_threshold:  # Assuming z-axis is the third component
-                print(f"Contact detected at height: {current_z}")
-                return True, total_frames, current_z
+        total_frames.extend(frames)
 
-        print("Max steps reached without detecting contact")
-        return False, total_frames, current_z
+        return abs(force_data_z) > force_threshold
+
+    def facing_down_ik(self, agent, target_transform):
+
+        # Use inverse kinematics to get the joint configuration for this pose
+        target_config = self.motion_planner.ik_solve(agent, target_transform)
+        if target_config is None:
+            target_config = []
+        shoulder_constraint_for_down_movement = 0.15
+        max_tries = 10
+
+        def valid_shoulder_angle(q):
+            return -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
+
+        trial = 1
+        while ((self.motion_planner.is_config_feasible(agent, target_config) is False or valid_shoulder_angle(
+                target_config) is False)
+               and trial < max_tries):
+            trial += 1
+            # try to find another solution, starting from other random configurations:
+            q_near = np.random.uniform(-np.pi / 2, np.pi / 2, 6)
+            target_config = self.motion_planner.ik_solve(agent, target_transform, start_config=q_near)
+            if target_config is None:
+                target_config = []
+
+        return target_config

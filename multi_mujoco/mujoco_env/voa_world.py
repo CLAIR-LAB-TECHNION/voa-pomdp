@@ -33,7 +33,7 @@ class WorldVoA:
         self._grasp_manager = GraspManager(self._mj_model, self._mj_data, self._object_manager, min_grasp_distance=0.1)
 
         self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
-        # dt = self._mj_model.opt.timestep * frame_skip
+        self.dt = self._mj_model.opt.timestep * frame_skip
         # self._pid_controller = PIDController(kp, ki, kd, dt)
 
         self.reset()
@@ -49,7 +49,7 @@ class WorldVoA:
             self.robots_joint_pos[agent] = obs[agent]['robot_state'][:6]
             self.robots_joint_velocities[agent] = obs[agent]["robot_state"][6:12]
             self.robots_force[agent] = obs[agent]['sensor']
-            self.robots_camera = [obs[agent]['camera'], obs[agent]['camera']]
+            self.robots_camera[agent] = [obs[agent]['camera'], obs[agent]['camera_pose']]
         self.gripper_state_closed = False
         self._grasp_manager.release_object()
         self._object_manager.reset(randomize=randomize, block_positions=block_positions)
@@ -176,7 +176,7 @@ class WorldVoA:
             self.robots_joint_pos[agent] = ob['robot_state'][:6]
             self.robots_joint_velocities[agent] = ob['robot_state'][6:12]
             self.robots_force[agent] = obs[agent]['sensor']
-            self.robots_camera = [obs[agent]['camera'], obs[agent]['camera']]
+            self.robots_camera[agent] = [obs[agent]['camera'], obs[agent]['camera_pose']]
         self.gripper_state_closed = gripper_closed
 
     def get_ee_pos(self):

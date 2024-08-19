@@ -16,7 +16,6 @@ import os
 
 
 class AbstractMotionPlanner:
-    ee_offset = 0.15  # end effector offset forward
     default_attachments = frozendict(ur5e_1=["camera", "gripper"], ur5e_2=["gripper"])
     default_settings = frozendict({  # "type": "lazyrrg*",
         "type": "rrt*",
@@ -31,7 +30,7 @@ class AbstractMotionPlanner:
     # Class-level attribute to track initialization
     vis_initialized = False
 
-    def __init__(self, eps=2e-2, attachments=default_attachments, settings=default_settings):
+    def __init__(self, eps=2e-2, attachments=default_attachments, settings=default_settings, ee_offset=0.15):
         """
         parameters:
         eps: epsilon gap for collision checking along the line in configuration space. Too high value may lead to
@@ -43,6 +42,7 @@ class AbstractMotionPlanner:
         world_path = self._get_klampt_world_path()
         self.world.readFile(world_path)
 
+        self.ee_offset = ee_offset
         self.ur5e_1 = self.world.robot("ur5e_1")
         self.ur5e_2 = self.world.robot("ur5e_2")
         self.robot_name_mapping = {"ur5e_1": self.ur5e_1, "ur5e_2": self.ur5e_2}
@@ -271,6 +271,9 @@ class AbstractMotionPlanner:
             config_klampt = self.config6d_to_klampt(config)
         else:
             config_klampt = config.copy()
+
+        if len(config) == 0:
+            return False
 
         robot = self.robot_name_mapping[robot_name]
         current_config = robot.getConfig()

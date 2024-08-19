@@ -39,7 +39,7 @@ if __name__ == '__main__':
     FACING_DOWN_R = [[0, 0, -1],
                      [0, 1, 0],
                      [1, 0, 0]]
-    # simulator.motion_executor.move_to_config('ur5e_2', np.array([2., -1.5, -1.5, -1.5, 0., 0.]))
-    simulator.sense_camera('ur5e_1', [0.2, 0.3, 0.2], FACING_DOWN_R)
-    # simulator.sense_height('ur5e_2', -0.9, -0.65)
+    simulator.motion_executor.move_to_config('ur5e_2', np.array([1., -1., -1.5, -1.5, 0., 0.]))
+    # simulator.sense_camera('ur5e_1', [0.2, 0.3, 0.2], FACING_DOWN_R)
+    simulator.sense_height('ur5e_2', -0.7, -0.7)
     simulator.close()
