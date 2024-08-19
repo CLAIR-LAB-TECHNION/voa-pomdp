@@ -77,7 +77,7 @@ class ExperimentManager:
         """
         logging.info("running an experiment")
         self.clear_robot1()
-        self.distribute_blocks_from_positions(init_block_positions)
+        self.safe_distribute_blocks_in_positions(init_block_positions)
 
         results = ExperimentResults(policy_type=self.policy.__class__.__name__,
                                     agent_params=self.policy.get_params(),
@@ -267,7 +267,7 @@ class ExperimentManager:
         self.env.r2_controller.plan_and_move_to_xyzrz(goal_tower_position[0], goal_tower_position[1],
                                                       (self.env.n_blocks + 2) * 0.04, 0)
 
-    def distribute_blocks_from_positions(self, block_positions):
+    def safe_distribute_blocks_in_positions(self, block_positions):
         """ distribute blocks from given positions """
         logging.info("distributing blocks from positions")
 

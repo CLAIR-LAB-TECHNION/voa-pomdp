@@ -80,7 +80,7 @@ class ImageBlockPositionEstimator:
         return depths, windows_xyxy
 
     def get_block_positions_depth(self, images, depths, robot_configurations, return_annotations=True,
-                                  z_offset=0.02, detect_on_cropped=True):
+                                  block_half_size=0.02, detect_on_cropped=True):
         """
         we assume RGB images!!!
         Get block positions from images and depth images. can be single image or batch of images
@@ -88,8 +88,7 @@ class ImageBlockPositionEstimator:
         :param depths: depths to get block positions from
         :param robot_configurations: robot configurations for each image
         :param return_annotations: whether to return annotated images
-        :param z_offset: offset from the detected depth to the block position, this is the length of the block,
-            since depth is measured to face and we want to get the center of the block
+        :param block_half_size: half of the size of the block in meters, used to get the center of the block
         :param detect_on_cropped: if True, detect objects on cropped images, if False, detect on full images
         :return: list of detected block positions in world coordinates for each image
             (or single list if single image is given)
@@ -108,18 +107,22 @@ class ImageBlockPositionEstimator:
         bboxes, bboxes_centers, bbox_sizes, results, annotated_cropped, annotated =\
             self.get_bboxes(detect_on_cropped, images, robot_configurations, return_annotations)
 
+
         depth_with_windows = []
         estimated_z_depths = []
-        for bbox_centers_curr, bbox_sizes_curr, depth_im in zip(bboxes_centers, bbox_sizes, depths):
+        for bbox_centers_curr, bbox_sizes_curr, depth_im, r_config in\
+                zip(bboxes_centers, bbox_sizes, depths, robot_configurations):
             # take at least 3x3 pixels, at most 10x10 pixels, and as default half of the bbox size,
             # separately for x and y
             bbox_sizes_curr = np.array(bbox_sizes_curr)
-            win_sizes_x = np.clip(np.ceil(bbox_sizes_curr[:, 0] / 2), 3, 10)
-            win_sizes_y = np.clip(np.ceil(bbox_sizes_curr[:, 1] / 2), 3, 10)
+            win_sizes_x = np.clip(np.ceil(bbox_sizes_curr[:, 0] / 3), 3, 6)
+            win_sizes_y = np.clip(np.ceil(bbox_sizes_curr[:, 1] / 3), 3, 6)
             windows_sizes = np.vstack((win_sizes_x, win_sizes_y)).T
 
+            z_depth_offset = self.get_z_offset_for_depth(r_config, block_half_size)
+
             estimated_z_depths_curr, windows_xyxy = self.get_z_depth_mean(bbox_centers_curr, depth_im, windows_sizes)
-            estimated_z_depths_curr = np.array(estimated_z_depths_curr) + z_offset
+            estimated_z_depths_curr = np.array(estimated_z_depths_curr) + z_depth_offset
             estimated_z_depths.append(estimated_z_depths_curr)
 
             if return_annotations:
@@ -156,6 +159,41 @@ class ImageBlockPositionEstimator:
             # convert to list of tuples
             return block_positions_world, list(zip(annotated_cropped, annotated, depth_with_windows))
         return block_positions_world
+
+    def get_z_offset_for_depth(self, robot_config, block_half_size):
+        """
+        when we detect a block, we get the depth to the face of the block, but we want to get the center of the block,
+        so we need to add an offset to the depth to get the center of the block. If we look directly perpendicular to the
+        block, the offset is the half of the block length. If we look from one of the corners, the offset is sqrt(3)/2
+        times the block length, but the point for depth is not exactly the corner, so we find an approximated  heuristic
+        offset between these two values based on the horizontal and vertical angles of the camera to the block.
+        knowing the exact offset is too complicated. We also assume for simplicity that all blocks are at the center
+        of the workspace.
+        """
+        ws_center = np.array([np.mean(self.workspace_limits_x), np.mean(self.workspace_limits_y), 0])
+
+        camera_position = np.array(self.gt.point_camera_to_world([0, 0, 0], self.robot_name, robot_config))
+
+        camera_to_ws = ws_center - camera_position
+
+        horizontal_angle = np.arctan2(camera_to_ws[1], camera_to_ws[0])
+        vertical_angle = np.arctan2(camera_to_ws[2], np.sqrt(camera_to_ws[0] ** 2 + camera_to_ws[1] ** 2))
+
+        horizontal_factor = np.sin(2 * np.abs(horizontal_angle))
+        vertical_factor = np.sin(2 * np.abs(vertical_angle))
+
+        horizontal_factor = np.abs(horizontal_factor)
+        vertical_factor = np.abs(vertical_factor)
+
+        combined_factor = horizontal_factor * vertical_factor
+
+        min_offset = block_half_size  # looking straight down or horizontally
+        max_offset = np.sqrt(3) * block_half_size  # from corner to center, ~0.0346 for a 0.04m cube
+        max_offset *= 0.8  # considering that we take mean depth over a window, we reduce the offset a bit
+
+        # Interpolate between min and max offset based on the combined factor
+        offset = min_offset + combined_factor * (max_offset - min_offset)
+        return offset
 
     def get_block_position_plane_projection(self, images, robot_configurations, plane_z=-0.02,
                                             return_annotations=True, detect_on_cropped=True):
