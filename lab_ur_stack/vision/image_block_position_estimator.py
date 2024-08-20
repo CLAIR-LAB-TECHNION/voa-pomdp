@@ -80,7 +80,7 @@ class ImageBlockPositionEstimator:
         return depths, windows_xyxy
 
     def get_block_positions_depth(self, images, depths, robot_configurations, return_annotations=True,
-                                  block_half_size=0.02, detect_on_cropped=True):
+                                  block_half_size=0.02, detect_on_cropped=True, max_detections=5):
         """
         we assume RGB images!!!
         Get block positions from images and depth images. can be single image or batch of images
@@ -90,6 +90,8 @@ class ImageBlockPositionEstimator:
         :param return_annotations: whether to return annotated images
         :param block_half_size: half of the size of the block in meters, used to get the center of the block
         :param detect_on_cropped: if True, detect objects on cropped images, if False, detect on full images
+        :param max_detections: maximum number of detections to return, if more detections are found, the ones with the
+            highest confidence are returned
         :return: list of detected block positions in world coordinates for each image
             (or single list if single image is given)
             if return_annotations is True, another or list of tuples of images will be returned.
@@ -105,7 +107,7 @@ class ImageBlockPositionEstimator:
             depths = [depths]
 
         bboxes, bboxes_centers, bbox_sizes, results, annotated_cropped, annotated =\
-            self.get_bboxes(detect_on_cropped, images, robot_configurations, return_annotations)
+            self.get_bboxes(detect_on_cropped, images, robot_configurations, return_annotations, max_detections)
 
 
         depth_with_windows = []
@@ -196,7 +198,7 @@ class ImageBlockPositionEstimator:
         return offset
 
     def get_block_position_plane_projection(self, images, robot_configurations, plane_z=-0.02,
-                                            return_annotations=True, detect_on_cropped=True):
+                                            return_annotations=True, detect_on_cropped=True, max_detections=5):
         """
         we assume RGB images!!!
         Get block positions from images, without depth. To get the missing information that we get from depth,
@@ -220,7 +222,7 @@ class ImageBlockPositionEstimator:
 
         # we will only fill these if return_annotations is True
         bboxes, bboxes_centers, _, results, annotated_cropped, annotated =\
-            self.get_bboxes(detect_on_cropped, images, robot_configurations, return_annotations)
+            self.get_bboxes(detect_on_cropped, images, robot_configurations, return_annotations, max_detections)
 
         block_positions_world = []
 
@@ -274,7 +276,7 @@ class ImageBlockPositionEstimator:
             return block_positions_world, list(zip(annotated_cropped, annotated))
         return block_positions_world
 
-    def get_bboxes(self, detect_on_cropped, images, robot_configurations, return_annotations):
+    def get_bboxes(self, detect_on_cropped, images, robot_configurations, return_annotations, max_detections):
 
         # we will only fill these if return_annotations is True:
         annotated_cropped = []
@@ -293,11 +295,11 @@ class ImageBlockPositionEstimator:
                 cropped_images.append(cropped_image)
                 cropped_images_xyxy.append(xyxy)
 
-            bboxes_in_cropped, _, results = self.detector.detect_objects(cropped_images)
+            bboxes_in_cropped, _, results = self.detector.detect_objects(cropped_images, max_detections=max_detections)
             bboxes = [self.bboxes_cropped_to_orig(bboxes, xyxy)
                       for bboxes, xyxy in zip(bboxes_in_cropped, cropped_images_xyxy)]
         else:
-            bboxes, _, results = self.detector.detect_objects(images)
+            bboxes, _, results = self.detector.detect_objects(images, max_detections=max_detections)
 
         bboxes_centers = [(bbox[:, :2] + bbox[:, 2:]) / 2 for bbox in bboxes]
         bbox_sizes = [(bbox[:, 2:] - bbox[:, :2]) for bbox in bboxes]

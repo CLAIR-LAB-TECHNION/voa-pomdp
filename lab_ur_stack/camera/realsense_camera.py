@@ -112,10 +112,12 @@ class RealsenseCameraWithRecording(RealsenseCamera):
         depth_path = os.path.join(directory, f"{base_name}_depth.mp4")
 
         color_video = cv2.VideoWriter(color_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (1280, 720))
-        depth_video = cv2.VideoWriter(depth_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (1280, 720))
+        # fps for depth is low because it's much more jittery and it makes video weight alot
+        depth_video = cv2.VideoWriter(depth_path, cv2.VideoWriter_fourcc(*'mp4v'), 2, (1280, 720))
 
         frame_interval = 1.0 / fps  # Time interval between frames
         last_frame_time = time.time()
+        last_depth_frame_time = time.time()
 
         while self.recording:
             current_time = time.time()
@@ -126,10 +128,12 @@ class RealsenseCameraWithRecording(RealsenseCamera):
                         self.latest_frame = (color_frame.copy(), depth_frame.copy())
 
                     color_video.write(color_frame)
-                    depth_frame_vis = np.clip(depth_frame, 0, max_depth)
-                    depth_frame_vis = (depth_frame_vis / max_depth * 255).astype(np.uint8)
-                    depth_frame_vis = cv2.applyColorMap(depth_frame_vis, cv2.COLORMAP_JET)
-                    depth_video.write(depth_frame_vis)
+                    if current_time - last_depth_frame_time >= 0.5:  # Only record depth every 0.5 seconds
+                        depth_frame_vis = np.clip(depth_frame, 0, max_depth)
+                        depth_frame_vis = (depth_frame_vis / max_depth * 255).astype(np.uint8)
+                        depth_frame_vis = cv2.cvtColor(depth_frame_vis, cv2.COLOR_GRAY2BGR)
+                        depth_video.write(depth_frame_vis)
+                        last_depth_frame_time = current_time
 
                     last_frame_time = current_time
             else:

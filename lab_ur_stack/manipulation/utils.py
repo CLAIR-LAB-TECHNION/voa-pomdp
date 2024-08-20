@@ -5,28 +5,29 @@ from lab_ur_stack.manipulation.manipulation_controller import ManipulationContro
 import numpy as np
 
 
-def to_canonical_config(clean_up_sensor_config):
+def to_canonical_config(config):
     """
     change config to be between -pi and pi for all joints
     """
     for i in range(6):
-        while clean_up_sensor_config[i] > np.pi:
-            clean_up_sensor_config[i] -= 2 * np.pi
-        while clean_up_sensor_config[i] < -np.pi:
-            clean_up_sensor_config[i] += 2 * np.pi
+        while config[i] > np.pi:
+            config[i] -= 2 * np.pi
+        while config[i] < -np.pi:
+            config[i] += 2 * np.pi
 
-    return clean_up_sensor_config
+    return config
 
 
 def distribute_blocks_in_positions(block_positions,
                                    robot_controller: ManipulationController,
-                                   stack_position_ur5e_2_frame=stack_position_r2frame,
+                                   stack_position=stack_position_r2frame,
+                                   is_stack_position_in_ur5e_2_frame=True,
                                    start_height=None):
     """
     distribute blocks from stack positions to given positions
     """
     stack_position_world = robot_controller.gt.point_robot_to_world(robot_controller.robot_name,
-                                                                    [*stack_position_ur5e_2_frame, 0.])
+                                                                    [*stack_position, 0.])
 
     if start_height is None:
         start_height = 0.1 + 0.04 * len(block_positions)

@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from frozendict import frozendict
 from experiments_lab.experiment_results_data import ExperimentResults
+from lab_ur_stack.camera.realsense_camera import RealsenseCameraWithRecording
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.manipulation.utils import to_canonical_config, distribute_blocks_in_positions, \
     ur5e_2_distribute_blocks_from_block_positions_dists, ur5e_2_collect_blocks_from_positions
@@ -139,7 +140,8 @@ class ExperimentManager:
 
         self.env.r1_controller.plan_and_moveJ(help_config)
         im, depth = self.env.camera.get_frame_rgb()
-        positions, annotations = self.env.position_estimator.get_block_positions_depth(im, depth, help_config)
+        positions, annotations = self.env.position_estimator.get_block_positions_depth(im, depth, help_config,
+                                                                                       max_detections=self.env.n_blocks)
         detections_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
                                                              workspace_x_lims_default, workspace_y_lims_default)
 
@@ -151,6 +153,8 @@ class ExperimentManager:
 
         ordered_detection_mus, ordered_detection_sigmas = \
             block_belief.update_from_image_detections_position_distribution(mus, sigmas)
+
+        self.clear_robot1()
 
         return ordered_detection_mus, ordered_detection_sigmas, detections_im
 
@@ -177,31 +181,43 @@ class ExperimentManager:
 
         It is assumed the workspace is clear before the experiment starts and that there are enough blocks
         in the pile
+
+        if the camera in the environment is of type RealsenseCameraWithRecording, the method will also save a recording
+        of the experiments.
+
         @param init_block_positions:
         @param init_block_belief:
         @param helper_config:
         @param dirname:
         @return:
         """
+
         datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         os.makedirs(f"{dirname}/{datetime_stamp}")
 
         logging.info(f"starting value diff experiment {datetime_stamp}")
 
-        resutls_no_help = self.run_single_experiment(init_block_positions, init_block_belief, None)
-        resutls_no_help.save(f"{dirname}/{datetime_stamp}/no_help.pkl")
+        try:
+            if isinstance(self.env.camera, RealsenseCameraWithRecording):
+                self.env.camera.start_recording(f"{dirname}/{datetime_stamp}/vid", max_depth=5, fps=20)
 
-        no_help_cleanup_detections = self.clean_up_workspace()
-        cv2.imwrite(f"{dirname}/{datetime_stamp}/no_help_cleanup.png", no_help_cleanup_detections)
+            resutls_no_help = self.run_single_experiment(init_block_positions, init_block_belief, None)
+            resutls_no_help.save(f"{dirname}/{datetime_stamp}/no_help.pkl")
 
-        results_with_help = self.run_single_experiment(init_block_positions, init_block_belief, helper_config,
-                                                       f"{dirname}/{datetime_stamp}/help_detections.png")
-        results_with_help.save(f"{dirname}/{datetime_stamp}/with_help.pkl")
+            no_help_cleanup_detections = self.clean_up_workspace()
+            cv2.imwrite(f"{dirname}/{datetime_stamp}/no_help_cleanup.png", no_help_cleanup_detections)
 
-        with_help_cleanup_detections = self.clean_up_workspace()
-        cv2.imwrite(f"{dirname}/{datetime_stamp}/with_help_cleanup.png", with_help_cleanup_detections)
+            results_with_help = self.run_single_experiment(init_block_positions, init_block_belief, helper_config,
+                                                           f"{dirname}/{datetime_stamp}/help_detections.png")
+            results_with_help.save(f"{dirname}/{datetime_stamp}/with_help.pkl")
 
-        logging.info(f"value difference experiment is over, all data saved {datetime_stamp}")
+            with_help_cleanup_detections = self.clean_up_workspace()
+            cv2.imwrite(f"{dirname}/{datetime_stamp}/with_help_cleanup.png", with_help_cleanup_detections)
+
+            logging.info(f"value difference experiment is over, all data saved {datetime_stamp}")
+        finally:
+            if isinstance(self.env.camera, RealsenseCameraWithRecording):
+                self.env.camera.stop_recording()
 
     def sample_value_difference_experiments(self,
                                             n_blocks,
@@ -234,7 +250,8 @@ class ExperimentManager:
 
         init_block_belief = BlocksPositionsBelief(n_blocks, self.ws_x_lims, self.ws_y_lims,
                                                   init_mus=block_pos_mu, init_sigmas=block_pos_sigma)
-        init_block_positions = sample_block_positions_from_dists(init_block_belief.block_beliefs)
+        init_block_positions = sample_block_positions_from_dists(init_block_belief.block_beliefs,
+                                                                 min_dist=0.08)
 
         help_config = self.sample_help_config()
 
@@ -260,7 +277,7 @@ class ExperimentManager:
 
     def clear_robot1(self):
         """ make sure robot1 is in a configuration it can never collide with robot2 while it works"""
-        self.env.r1_controller.plan_and_move_home()
+        self.env.r1_controller.plan_and_moveJ([0.064, -2.455, 0.377, -0.460, -1.161, -0.176])
 
     def clear_robot2(self):
         """ make sure robot2 is in a configuration it can never collide with robot1 while it works"""
@@ -329,7 +346,8 @@ class ExperimentManager:
         self.env.r1_controller.plan_and_moveJ(clean_up_sensor_config)
         im, depth = self.env.camera.get_frame_rgb()
         positions, annotations = self.env.position_estimator.get_block_positions_depth(im, depth,
-                                                                                       clean_up_sensor_config)
+                                                                                       clean_up_sensor_config,
+                                                                                       max_detections=self.env.n_blocks)
         plot_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
                                                        workspace_x_lims_default, workspace_y_lims_default)
         self.clear_robot1()
@@ -349,7 +367,7 @@ class ExperimentManager:
 
         logging.info("workspace cleaning procedure finished")
 
-        return plot_im
+        return cv2.cvtColor(plot_im, cv2.COLOR_BGR2RGB)
 
     def plot_belief(self, current_belief, history=[]):
         # use the history for points
@@ -370,3 +388,11 @@ class ExperimentManager:
                                 positive_sensing_points=positive_sens,
                                 negative_sensing_points=negative_sens,
                                 pickup_attempt_points=failed_pickups)
+
+
+class BlockPilesManager:
+    # first pile is at the corner
+    piles_positions = []
+
+    def __init__(self):
+        self.piles_heights = [4, 4]

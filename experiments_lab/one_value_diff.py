@@ -6,7 +6,7 @@ from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
-from lab_ur_stack.camera.realsense_camera import RealsenseCamera
+from lab_ur_stack.camera.realsense_camera import RealsenseCamera, RealsenseCameraWithRecording
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default, goal_tower_position)
@@ -37,9 +37,8 @@ app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 2,
-         use_depth_for_help: bool = 1, ):
-    # camera = RealsenseCamera()
+def main(n_blocks: int = 2,):
+    camera = RealsenseCameraWithRecording()
     motion_planner = MotionPlanner()
     gt = GeometryAndTransforms.from_motion_planner(motion_planner)
     position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt)
@@ -47,7 +46,7 @@ def main(n_blocks: int = 2,
     r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
-    r2_controller.speed, r2_controller.acceleration = 3.0, 3.0
+    r2_controller.speed, r2_controller.acceleration = 2.0, 4.0
 
     initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
                                            initial_positions_mus[:n_blocks], initial_positions_sigmas[:n_blocks])
@@ -59,17 +58,13 @@ def main(n_blocks: int = 2,
                          finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff, max_planning_depth=6,
                          show_progress=True)
 
-    help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, help_verangle, help_horangle,
-                                                                    help_distance, gt, "ur5e_1")
-
     experiment_mgr = ExperimentManager(env=env, policy=policy, )
 
-    init_block_positions = [b.sample(1)[0] for b in initial_belief.block_beliefs]
 
-    experiment_mgr.run_value_difference_experiments(init_block_positions,
-                                                    initial_belief,
-                                                    helper_config=help_config,
-                                                    dirname="experiments/2blocks/")
+    experiment_mgr.sample_value_difference_experiments(n_blocks=n_blocks,
+                                                       min_prior_std=0.01,
+                                                       max_prior_std=0.1,
+                                                       dirname="experiments/2blocks/")
 
 
 if __name__ == "__main__":

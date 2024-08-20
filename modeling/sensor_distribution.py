@@ -21,6 +21,7 @@ def detections_to_distributions(detected_positions,
         return [], []
 
     expectations = np.asarray(detected_positions)
+    detected_positions = np.asarray(detected_positions)
 
     n_blocks = len(detected_positions)
     stds = np.full((n_blocks, 2), minimal_std)
@@ -31,9 +32,12 @@ def detections_to_distributions(detected_positions,
     nearest_block_distances = np.min(blocks_distances_matrix, axis=1)
     stds += inverse_nearest_block_coeff * nearest_block_distances[:, None]
 
-    detected_positions_3d = np.concatenate([detected_positions, np.zeros((n_blocks, 1))], axis=-1)
-    camera_distances = np.linalg.norm(detected_positions_3d - camera_position, axis=-1)
+    # detected_positions_3d = np.concatenate([detected_positions, np.zeros((n_blocks, 1))], axis=-1)
+    camera_distances = np.linalg.norm(detected_positions - camera_position, axis=-1)
     stds += distance_coeff * camera_distances[:, None]
+
+    # expectations are only x,y:
+    expectations = expectations[:, :2]
 
     return expectations, stds
 
