@@ -15,7 +15,7 @@ class ExperimentVisualizer:
         self.accumulated_reward = 0
         self.additional_info = ""
         self.action_obs_reward_text = ""
-        self.detection_image = np.zeros((400, 400, 3), dtype=np.uint8)
+        self.detection_image = np.zeros((380, 400, 3), dtype=np.uint8)
         self.detection_header = "Last Detections"
         self.belief_image = np.zeros((800, 600, 3), dtype=np.uint8)
 
@@ -39,22 +39,13 @@ class ExperimentVisualizer:
         self.action_obs_reward_text = text
 
     def update_detection_image(self, image, header=None):
-        self.detection_image = cv2.resize(image, (400, 400))
+        self.detection_image = cv2.resize(image, (400, 380))
         if header is not None:
             self.detection_header = header
 
-    def update_belief(self, belief, positive_sensing_points=None, negative_sensing_points=None,
-                      pickup_attempt_points=None):
-        fig = plt.figure(figsize=(6, 8))
-        plot_all_blocks_beliefs(belief,
-                                positive_sensing_points=positive_sensing_points,
-                                negative_sensing_points=negative_sensing_points,
-                                pickup_attempt_points=pickup_attempt_points)
-        fig.canvas.draw()
-        belief_image = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
-        belief_image = belief_image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-        plt.close(fig)
+    def update_belief_image(self, belief_image):
         self.belief_image = cv2.resize(belief_image, (600, 800))
+
 
     def _draw_text(self, image, text, position, font_scale=0.5, color=(255, 255, 255), thickness=1):
         for i, line in enumerate(text.split('\n')):
@@ -75,7 +66,7 @@ class ExperimentVisualizer:
 
         # Draw detection image
         self._draw_text(self.canvas, self.detection_header, (10, 400))
-        self.canvas[420:820, 10:410] = self.detection_image
+        self.canvas[420:800, 10:410] = self.detection_image  # Changed to [420:800, 10:410]
 
         # Draw belief image
         self.canvas[:800, 600:] = self.belief_image
@@ -83,5 +74,7 @@ class ExperimentVisualizer:
         cv2.imshow(self.window_name, self.canvas)
         cv2.waitKey(1)
 
+
     def close(self):
         cv2.destroyAllWindows()
+

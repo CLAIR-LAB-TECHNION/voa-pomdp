@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from frozendict import frozendict
 from experiments_lab.experiment_results_data import ExperimentResults
+from experiments_lab.experiment_visualizer import ExperimentVisualizer
 from lab_ur_stack.camera.realsense_camera import RealsenseCameraWithRecording
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.manipulation.utils import to_canonical_config,  ur5e_2_collect_blocks_from_positions
@@ -32,7 +33,7 @@ default_rewards = frozendict(stacking_reward=1,
 class ExperimentManager:
     cleared_blocks_position = [-0.25, -1.15]
 
-    def __init__(self, env: LabBlockStackingEnv, policy: AbastractPolicy):
+    def __init__(self, env: LabBlockStackingEnv, policy: AbastractPolicy, visualize=True):
         self.env = env
         self.policy = policy
 
@@ -42,7 +43,7 @@ class ExperimentManager:
         self.help_configs = None
         self.piles_manager = BlockPilesManager()
 
-        # TODO block piles managements
+        self.visualizer = ExperimentVisualizer() if visualize else None
 
     @classmethod
     def from_params(cls,
@@ -377,7 +378,7 @@ class ExperimentManager:
 
         return cv2.cvtColor(plot_im, cv2.COLOR_BGR2RGB)
 
-    def plot_belief(self, current_belief, history=[]):
+    def plot_belief(self, current_belief, history=[], ret_as_image=False):
         # use the history for points
         positive_sens = []
         negative_sens = []
@@ -392,10 +393,11 @@ class ExperimentManager:
                 if not o.is_object_picked:
                     failed_pickups.append((a.x, a.y))
 
-        plot_all_blocks_beliefs(current_belief,
+        return plot_all_blocks_beliefs(current_belief,
                                 positive_sensing_points=positive_sens,
                                 negative_sensing_points=negative_sens,
-                                pickup_attempt_points=failed_pickups)
+                                pickup_attempt_points=failed_pickups,
+                                ret_as_image=ret_as_image)
 
 
 class BlockPilesManager:
