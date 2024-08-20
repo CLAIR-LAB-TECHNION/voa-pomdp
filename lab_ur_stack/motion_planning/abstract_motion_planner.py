@@ -1,3 +1,4 @@
+import sys
 import time
 from abc import abstractmethod
 
@@ -66,15 +67,18 @@ class AbstractMotionPlanner:
         """
         open visualization window
         """
+        if AbstractMotionPlanner.vis_initialized:
+            return
+
         if backend is None:
-            backend = "PyQt5" if self.is_pyqt5_available() else "GLUT"
+            if sys.platform.startswith('linux'):
+                backend = "GLUT"
+            else:
+                backend = "PyQt5" if self.is_pyqt5_available() else "GLUT"
 
         vis.init(backend)
-
-        # Check if vis is already initialized
-        if not AbstractMotionPlanner.vis_initialized:
-            if window_name:
-                vis.createWindow(window_name)
+        if window_name:
+            vis.createWindow(window_name)
 
         vis.add("world", self.world)
         # vis.setColor(('world', 'ur5e_1'), 0, 1, 1)
