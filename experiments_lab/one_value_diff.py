@@ -34,7 +34,9 @@ app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 4,):
+def main(n_blocks: int = 4,
+         max_steps: int = 5,
+         max_planning_depth: int = 6,):
     camera = RealsenseCameraWithRecording()
     motion_planner = MotionPlanner()
     gt = GeometryAndTransforms.from_motion_planner(motion_planner)
@@ -48,11 +50,11 @@ def main(n_blocks: int = 4,):
     dummy_initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
                                                  np.zeros((n_blocks, 2)), np.ones((n_blocks, 2)))
 
-    env = LabBlockStackingEnv(n_blocks, 5, r1_controller, r2_controller, gt, camera, position_estimator)
+    env = LabBlockStackingEnv(n_blocks, max_steps, r1_controller, r2_controller, gt, camera, position_estimator)
     # policy = FixedSenseUntilPositivePolicy()
     policy = POUCTPolicy(dummy_initial_belief, env.max_steps, goal_tower_position, stacking_reward=env.stacking_reward,
                          sensing_cost_coeff=env.sensing_cost_coeff, stacking_cost_coeff=env.stacking_cost_coeff,
-                         finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff, max_planning_depth=6,
+                         finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff, max_planning_depth=max_planning_depth,
                          show_progress=True)
 
     experiment_mgr = ExperimentManager(env=env, policy=policy, )
