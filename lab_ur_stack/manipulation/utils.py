@@ -32,7 +32,8 @@ def distribute_blocks_in_positions(block_positions,
     if start_height is None:
         start_height = 0.1 + 0.04 * len(block_positions)
     for block_pos in block_positions:
-        robot_controller.pick_up(stack_position_world[0], stack_position_world[1], rz=0, start_height=start_height)
+        robot_controller.pick_up(stack_position_world[0], stack_position_world[1], rz=np.pi/2,
+                                 start_height=start_height)
         robot_controller.put_down(block_pos[0], block_pos[1], rz=0, start_height=0.15)
         start_height -= 0.04
 

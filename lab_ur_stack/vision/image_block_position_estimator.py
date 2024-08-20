@@ -190,8 +190,8 @@ class ImageBlockPositionEstimator:
         combined_factor = horizontal_factor * vertical_factor
 
         min_offset = block_half_size  # looking straight down or horizontally
-        max_offset = np.sqrt(3) * block_half_size  # from corner to center, ~0.0346 for a 0.04m cube
-        max_offset *= 0.8  # considering that we take mean depth over a window, we reduce the offset a bit
+        # max_offset = np.sqrt(3) * block_half_size  # from corner to center, ~0.0346 for a 0.04m cube
+        max_offset = block_half_size*1.1 # considering that we take mean depth over a window, we reduce the offset a bit
 
         # Interpolate between min and max offset based on the combined factor
         offset = min_offset + combined_factor * (max_offset - min_offset)

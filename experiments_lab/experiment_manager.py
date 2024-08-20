@@ -1,6 +1,6 @@
 import logging
 import os
-from copy import deepcopy
+from copy import deepcopy, copy
 import time
 
 import cv2
@@ -9,8 +9,7 @@ from frozendict import frozendict
 from experiments_lab.experiment_results_data import ExperimentResults
 from lab_ur_stack.camera.realsense_camera import RealsenseCameraWithRecording
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
-from lab_ur_stack.manipulation.utils import to_canonical_config, distribute_blocks_in_positions, \
-    ur5e_2_distribute_blocks_from_block_positions_dists, ur5e_2_collect_blocks_from_positions
+from lab_ur_stack.manipulation.utils import to_canonical_config,  ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, goal_tower_position, \
     sample_block_positions_from_dists
@@ -41,6 +40,8 @@ class ExperimentManager:
         self.ws_y_lims = env.ws_y_lims
 
         self.help_configs = None
+        self.piles_manager = BlockPilesManager()
+
         # TODO block piles managements
 
     @classmethod
@@ -289,22 +290,28 @@ class ExperimentManager:
         logging.info("distributing blocks from positions")
 
         self.clear_robot1()
-        distribute_blocks_in_positions(block_positions, self.env.r2_controller)
+
+        for bpos in block_positions:
+            pile_pos, h = self.piles_manager.pop_next_block()
+            start_height = 0.1 + 0.04 * h
+            self.env.r2_controller.pick_up(pile_pos[0], pile_pos[1], np.pi/2, start_height)
+            self.env.r2_controller.put_down(bpos[0], bpos[1], 0, 0.12)
+
         self.clear_robot2()
 
-    def distribute_blocks_from_priors(self, block_positions_distributions: list[BlockPosDist]) -> np.ndarray:
-        """
-        sample block positions from distribution, and place actual blocks from the pike at those positions.
-        returns the sampled block positions
-        """
-        logging.info("distributing blocks from priors")
-
-        self.clear_robot1()
-        block_positions = ur5e_2_distribute_blocks_from_block_positions_dists(block_positions_distributions,
-                                                                              self.env.r2_controller)
-        self.clear_robot2()
-
-        return block_positions
+    # def distribute_blocks_from_priors(self, block_positions_distributions: list[BlockPosDist]) -> np.ndarray:
+    #     """
+    #     sample block positions from distribution, and place actual blocks from the pike at those positions.
+    #     returns the sampled block positions
+    #     """
+    #     logging.info("distributing blocks from priors")
+    #
+    #     self.clear_robot1()
+    #     block_positions = ur5e_2_distribute_blocks_from_block_positions_dists(block_positions_distributions,
+    #                                                                           self.env.r2_controller)
+    #     self.clear_robot2()
+    #
+    #     return block_positions
 
     def clean_up_workspace(self, put_back_to_stack=False) -> np.ndarray:
         """
@@ -355,6 +362,7 @@ class ExperimentManager:
 
         # now clean the blocks:
         if put_back_to_stack:
+            # TODO: need to intergrate with piles management
             ur5e_2_collect_blocks_from_positions(positions, self.env.r2_controller)
         else:
             for p in positions:
@@ -392,7 +400,31 @@ class ExperimentManager:
 
 class BlockPilesManager:
     # first pile is at the corner
-    piles_positions = []
+    piles_positions = [[-0.3986, -1.5227],
+                       [-0.4786, -1.5227]]
 
     def __init__(self):
-        self.piles_heights = [4, 4]
+        self.piles_current_heights = [4, 4]
+        self.piles_max_heights = [4, 4]
+
+    def pop_next_block(self):
+        """ return (position, height) of next pile. height is in blocks and position is xy and world frame"""
+        # find next non-empty pile:
+        for i, h in enumerate(self.piles_current_heights):
+            if h > 0:
+                h_before_pikcup = copy(h)
+                self.piles_current_heights[i] -= 1
+                return self.piles_positions[i], h_before_pikcup
+
+        raise ValueError("all piles are empty")
+
+    def push_back_block(self,):
+        # find next pile that is not full
+        for i, h in enumerate(self.piles_current_heights):
+            if h < self.piles_max_heights[i]:
+                self.piles_current_heights[i] += 1
+                return
+
+        raise ValueError("all piles are full")
+
+

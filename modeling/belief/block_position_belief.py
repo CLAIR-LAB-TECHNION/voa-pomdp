@@ -245,7 +245,8 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
                 sigmas = -1
             mus_and_sigmas.append((mus, sigmas))
 
-        return mus_and_sigmas
+        mus_and_sigmas = np.array(mus_and_sigmas)
+        return mus_and_sigmas[:, 0], mus_and_sigmas[:, 1]
 
     def update_belief_block_from_detection(self, block_id, mu_detection, sigma_detection):
         """

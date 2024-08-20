@@ -21,9 +21,6 @@ from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot
 import numpy as np
 
 
-initial_positions_mus = [[-0.8, -0.75], [-0.6, -0.65]]
-initial_positions_sigmas = [[0.04, 0.02], [0.05, 0.07]]
-
 # fixed help config:
 lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]
 lookat[1] -=0.2
@@ -37,7 +34,7 @@ app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 2,):
+def main(n_blocks: int = 4,):
     camera = RealsenseCameraWithRecording()
     motion_planner = MotionPlanner()
     gt = GeometryAndTransforms.from_motion_planner(motion_planner)
@@ -46,14 +43,14 @@ def main(n_blocks: int = 2,):
     r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
-    r2_controller.speed, r2_controller.acceleration = 2.0, 4.0
+    r2_controller.speed, r2_controller.acceleration = 2.0, 2.0
 
-    initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
-                                           initial_positions_mus[:n_blocks], initial_positions_sigmas[:n_blocks])
+    dummy_initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
+                                                 np.zeros((n_blocks, 2)), np.ones((n_blocks, 2)))
 
     env = LabBlockStackingEnv(n_blocks, 5, r1_controller, r2_controller, gt, camera, position_estimator)
     # policy = FixedSenseUntilPositivePolicy()
-    policy = POUCTPolicy(initial_belief, env.max_steps, goal_tower_position, stacking_reward=env.stacking_reward,
+    policy = POUCTPolicy(dummy_initial_belief, env.max_steps, goal_tower_position, stacking_reward=env.stacking_reward,
                          sensing_cost_coeff=env.sensing_cost_coeff, stacking_cost_coeff=env.stacking_cost_coeff,
                          finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff, max_planning_depth=6,
                          show_progress=True)
@@ -64,7 +61,7 @@ def main(n_blocks: int = 2,):
     experiment_mgr.sample_value_difference_experiments(n_blocks=n_blocks,
                                                        min_prior_std=0.01,
                                                        max_prior_std=0.1,
-                                                       dirname="experiments/2blocks/")
+                                                       dirname=f"experiments/{n_blocks}blocks/")
 
 
 if __name__ == "__main__":
