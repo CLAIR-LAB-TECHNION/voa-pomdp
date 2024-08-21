@@ -42,11 +42,12 @@ class ObjectManager:
             block_positions = []
             for _ in range(len(self.object_names)):
                 # generate random position for block
-                block_location = [random.uniform(*self.workspace_x_lims), random.uniform(*self.workspace_y_lims), 0.05 ]
+                block_location = [random.uniform(*self.workspace_x_lims), random.uniform(*self.workspace_y_lims), 0.05]
                 # check if block collides with any other previous new block position
                 while check_block_collision(np.array(block_location)):
                     # generate new random position for block
-                    block_location = [random.uniform(*self.workspace_x_lims), random.uniform(*self.workspace_y_lims), 0.05]
+                    block_location = [random.uniform(*self.workspace_x_lims), random.uniform(*self.workspace_y_lims),
+                                      0.05]
             # set blocks to new positions
             self.set_all_block_positions(block_positions)
         else:
@@ -54,6 +55,19 @@ class ObjectManager:
                 self.set_all_block_positions(block_positions)
             else:
                 self.set_all_block_positions(list(self.initial_positions_dict.values()))
+
+    def get_object_pos(self, name: str):
+        return self._mj_data.joint(name).qpos[:3]
+
+    def set_object_pose(self, name: str, pos, quat):
+        joint_id = self.objects_mjdata_dict[name].id
+        pos_adr = self._mj_model.jnt_qposadr[joint_id]
+        self._mj_data.qpos[pos_adr:pos_adr + 7] = np.concatenate([pos, quat])
+
+    def set_object_vel(self, name: str, cvel):
+        joint_id = self.objects_mjdata_dict[name].id
+        vel_adr = self._mj_model.jnt_dofadr[joint_id]
+        self._mj_data.qvel[vel_adr:vel_adr + 6] = cvel
 
     def get_block_position(self, block_id: int) -> np.ndarray:
         """

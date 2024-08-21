@@ -10,6 +10,8 @@ class BlockStackingSimulator:
         self.motion_executor = MotionExecutor(env=self.mujoco_env)
         self.current_state = None
         self.reset()
+        self.tower_counter = 0
+        self.tower_pos = [-0.3, -1.]
 
     def reset(self, randomize=True, block_positions=None):
         """
@@ -29,6 +31,14 @@ class BlockStackingSimulator:
     def sense_height(self, agent, x, y):
         self.motion_executor.move_and_detect_height(agent, x, y)
 
+    def pick_up(self, agent, x, y):
+        self.motion_executor.pick_up(agent, x, y)
+
+    def stack(self, agent):
+        z = 0.04 + 0.05*self.tower_counter
+        self.motion_executor.put_down(agent, x=self.tower_pos[0], y=self.tower_pos[1], z=z)
+        self.tower_counter += 1
+
     def sense_camera(self, agent, camera_position, camera_orientation):
         success, _, obs = self.motion_executor.move_to_pose(agent, camera_position, camera_orientation)
         return obs['robots_camera'][agent] if success else None  # A list of two, first is image, second is camera pose
@@ -36,10 +46,14 @@ class BlockStackingSimulator:
 
 if __name__ == '__main__':
     simulator = BlockStackingSimulator()
-    FACING_DOWN_R = [[0, 0, -1],
-                     [0, 1, 0],
-                     [1, 0, 0]]
-    simulator.motion_executor.move_to_config('ur5e_2', np.array([1., -1., -1.5, -1.5, 0., 0.]))
-    # simulator.sense_camera('ur5e_1', [0.2, 0.3, 0.2], FACING_DOWN_R)
-    simulator.sense_height('ur5e_2', -0.7, -0.7)
+
+    simulator.motion_executor.move_to_config('ur5e_2', np.array([0.0, -1.2, 0.8419, -1.3752, -1.5739, -2.3080]))
+    box = simulator.mujoco_env.get_state()['object_positions']['block0_fj']
+    simulator.pick_up('ur5e_2', box[0], box[1])
+    simulator.stack('ur5e_2')
+
+    box = simulator.mujoco_env.get_state()['object_positions']['block1_fj']
+    simulator.pick_up('ur5e_2', box[0], box[1])
+    simulator.stack('ur5e_2')
+
     simulator.close()

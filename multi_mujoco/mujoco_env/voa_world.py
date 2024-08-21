@@ -71,7 +71,7 @@ class WorldVoA:
         self._clip_joint_velocities()
 
         if gripper_closed:
-            if self._grasp_manager.attatched_object_name is not None:
+            if self._grasp_manager.attached_object_name is not None:
                 self._grasp_manager.update_grasped_object_pose()
             else:
                 self._grasp_manager.grasp_nearest_object_if_close_enough()
@@ -93,9 +93,6 @@ class WorldVoA:
 
     def render(self):
         return self._env.render()
-
-    def close(self):
-        self._env.close()
 
     def get_state(self):
         object_positions = self._object_manager.get_all_block_positions_dict()

@@ -1,8 +1,6 @@
 import numpy as np
-from scipy.spatial.transform import Rotation as R
 
 from .simulation_motion_planner import SimulationMotionPlanner
-from .pid_controller import PIDController
 from ..mujoco_env.voa_world import WorldVoA
 
 FACING_DOWN_R = [[1, 0, 0],
@@ -20,9 +18,18 @@ def compose_transformation_matrix(rotation, translation):
     return rotation_flattened, translation
 
 
-def facing_down_rot():
-    rotation_down = R.from_euler('xyz', [-np.pi / 2, 0, 0])
-    return rotation_down
+def point_in_square(square_center, edge_length, point):
+    # Calculate half the edge length to determine the bounds
+    half_edge = edge_length / 2
+
+    # Calculate the left, right, bottom, and top boundaries of the square
+    left_bound = square_center[0] - half_edge
+    right_bound = square_center[0] + half_edge
+    bottom_bound = square_center[1] - half_edge
+    top_bound = square_center[1] + half_edge
+
+    # Check if the point is within these boundaries
+    return (left_bound <= point[0] <= right_bound) and (bottom_bound <= point[1] <= top_bound)
 
 
 class MotionExecutor:
@@ -31,8 +38,10 @@ class MotionExecutor:
         self.motion_planner = SimulationMotionPlanner()
         self.env.reset()
 
+        self.default_config = [0.0, -1.2, 0.8419, -1.3752, -1.5739, -2.3080]
+
         state = self.env.get_state()
-        blocks_positions_dict = state['object_positions']
+        self.blocks_positions_dict = state['object_positions']
 
         # set current configuration
         for robot, pose in state['robots_joint_pos'].items():
@@ -40,14 +49,14 @@ class MotionExecutor:
         # for block_name, pos in blocks_positions_dict.items():
         #     self.motion_planner.add_block(name=block_name, position=pos)
 
-        self.pid_controllers = {}
-        for robot in self.env.robots_joint_pos.keys():
-            self.pid_controllers[robot] = [PIDController(kp=1.0, ki=0.1, kd=0.05) for _ in range(6)]
+        # self.pid_controllers = {}
+        # for robot in self.env.robots_joint_pos.keys():
+        #     self.pid_controllers[robot] = [PIDController(kp=1.0, ki=0.1, kd=0.05) for _ in range(6)]
 
     def reset(self, randomize=True, block_positions=None):
-        self.env.reset(randomize=randomize, block_positions=block_positions)
-        # self.update_blocks_positions()
-        return self.env.get_state()
+        state = self.env.reset(randomize=randomize, block_positions=block_positions)
+        self.blocks_positions_dict = state['object_positions']
+        return state
 
     def move_to(self, agent, target_config, tolerance=0.05, end_vel=0.1, max_steps=None,
                 render_freq=8):
@@ -208,10 +217,10 @@ class MotionExecutor:
 
         success, frames, state = self.move_to_config(agent, target_config)
         if not success:
-            return False, frames, None
+            return False, frames, state
 
         # Now, start moving down until contact is detected
-        target_transform[1][2] = 0.05
+        target_transform[1][2] = 0.06
         total_frames = frames
 
         sense_config = self.facing_down_ik(agent, target_transform)
@@ -221,14 +230,48 @@ class MotionExecutor:
 
         force_data_z = self.env.get_state()['robots_force'][agent][2]
 
-        success, frames, state = self.move_to_config(agent, target_config)
+        success, frames, state = self.move_to_config(agent, self.default_config)
 
         total_frames.extend(frames)
 
-        return abs(force_data_z) > force_threshold
+        return not self.check_point_in_block(x, y) is None, total_frames, state
+
+    def pick_up(self, agent, x, y):
+        block_id = self.check_point_in_block(x, y)
+        if block_id is None:
+            print('There is no block below')
+            return False, None, self.env.get_state()
+        target_position = [x, y, 0.06]
+        target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
+        target_config = self.facing_down_ik(agent, target_transform)
+        success, frames, state = self.move_to_config(agent, target_config)
+        if not success:
+            return False, frames, state
+
+        grasp_suc, grasp_frames, _ = self.activate_grasp()
+
+        d_success, d_frames, state = self.move_to_config(agent, self.default_config)
+
+        return grasp_suc and d_success, np.concatenate([frames, grasp_frames, d_frames]), state
+
+    def put_down(self, agent, x, y, z):
+        if self.env.gripper_state_closed is False:
+            print('There is no block to put down')
+            return False, None, self.env.get_state()
+        target_position = [x, y, z]
+        target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
+        target_config = self.facing_down_ik(agent, target_transform)
+        success, frames, state = self.move_to_config(agent, target_config)
+        if not success:
+            return False, frames, state
+
+        grasp_suc, grasp_frames, state = self.deactivate_grasp()
+
+        d_success, d_frames, state = self.move_to_config(agent, self.default_config)
+
+        return grasp_suc and d_success, np.concatenate([frames, grasp_frames, d_frames]), state
 
     def facing_down_ik(self, agent, target_transform):
-
         # Use inverse kinematics to get the joint configuration for this pose
         target_config = self.motion_planner.ik_solve(agent, target_transform)
         if target_config is None:
@@ -251,3 +294,10 @@ class MotionExecutor:
                 target_config = []
 
         return target_config
+
+    def check_point_in_block(self, x, y):
+        for block_id, pos in self.blocks_positions_dict.items():
+            box_center = pos[:2].tolist()
+            if point_in_square(square_center=box_center, edge_length=.04, point=[x, y]):
+                return block_id
+        return None
