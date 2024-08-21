@@ -1,26 +1,46 @@
+import time
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
-from modeling.belief.belief_plotting import plot_all_blocks_beliefs
+import threading
 
 
 class ExperimentVisualizer:
-    def __init__(self, window_name="Experiment Visualization", window_size=(1200, 800)):
+    def __init__(self, window_name="Experiment Visualization", window_size=(1200, 1000)):
         self.window_name = window_name
         self.window_size = window_size
         self.canvas = np.zeros((window_size[1], window_size[0], 3), dtype=np.uint8)
 
-        # Create initial blank subplots
         self.experiment_type = ""
         self.accumulated_reward = 0
         self.additional_info = ""
         self.action_obs_reward_text = ""
-        self.detection_image = np.zeros((380, 400, 3), dtype=np.uint8)
+        self.detection_image = np.zeros((600, 500, 3), dtype=np.uint8)
         self.detection_header = "Last Detections"
-        self.belief_image = np.zeros((800, 600, 3), dtype=np.uint8)
+        self.belief_image = np.zeros((1000, 600, 3), dtype=np.uint8)
 
+        self.running = False
+        self.update_thread = None
+
+    def start(self):
+        self.running = True
+        self.update_thread = threading.Thread(target=self._update_loop)
+        self.update_thread.start()
+
+    def stop(self):
+        self.running = False
+        if self.update_thread:
+            self.update_thread.join()
+        cv2.destroyAllWindows()
+
+    def _update_loop(self):
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
-        cv2.resizeWindow(self.window_name, window_size[0], window_size[1])
+        cv2.resizeWindow(self.window_name, self.window_size[0], self.window_size[1])
+
+        while self.running:
+            self._update_display()
+            key = cv2.waitKey(1000) & 0xFF
+            if key == 27:  # ESC key
+                self.running = False
 
     def update_experiment_type(self, experiment_type):
         self.experiment_type = experiment_type
@@ -31,50 +51,96 @@ class ExperimentVisualizer:
     def update_additional_info(self, additional_info):
         self.additional_info = additional_info
 
-    def update_action_obs_reward(self, actions, observations, rewards, k=5):
+    def update_action_obs_reward(self, actions, observations, rewards):
         text = "Actions | Observations | Rewards\n"
         text += "---------------------------------\n"
-        for a, o, r in list(zip(actions, observations, rewards))[-k:]:
+        for a, o, r in list(zip(actions, observations, rewards))[-5:]:  # Show last 5 entries
             text += f"{str(a)[:15]:15} | {str(o)[:15]:15} | {r:.2f}\n"
         self.action_obs_reward_text = text
 
     def update_detection_image(self, image, header=None):
-        self.detection_image = cv2.resize(image, (400, 380))
+        image = np.asarray(image, dtype=np.uint8)
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif image.shape[2] == 4:
+            image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+
+        h, w = image.shape[:2]
+        aspect_ratio = w / h
+        new_w = min(500, w)
+        new_h = int(new_w / aspect_ratio)
+        if new_h > 600:
+            new_h = 600
+            new_w = int(new_h * aspect_ratio)
+        new_w, new_h = int(new_w), int(new_h)
+        resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        self.detection_image = np.zeros((600, 500, 3), dtype=np.uint8)
+        y_offset = (600 - new_h) // 2
+        x_offset = (500 - new_w) // 2
+        self.detection_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
         if header is not None:
             self.detection_header = header
 
     def update_belief_image(self, belief_image):
-        self.belief_image = cv2.resize(belief_image, (600, 800))
+        belief_image = np.asarray(belief_image, dtype=np.uint8)
+        if belief_image.ndim == 2:
+            belief_image = cv2.cvtColor(belief_image, cv2.COLOR_GRAY2BGR)
+        elif belief_image.shape[2] == 4:
+            belief_image = cv2.cvtColor(belief_image, cv2.COLOR_RGBA2BGR)
 
+        h, w = belief_image.shape[:2]
+        aspect_ratio = w / h
+        new_h = min(1000, h)
+        new_w = int(new_h * aspect_ratio)
+        if new_w > 600:
+            new_w = 600
+            new_h = int(new_w / aspect_ratio)
+        new_w, new_h = int(new_w), int(new_h)
+        resized = cv2.resize(belief_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        self.belief_image = np.zeros((1000, 600, 3), dtype=np.uint8)
+        y_offset = (1000 - new_h) // 2
+        x_offset = (600 - new_w) // 2
+        self.belief_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
 
-    def _draw_text(self, image, text, position, font_scale=0.5, color=(255, 255, 255), thickness=1):
+    def _draw_text(self, image, text, position, font_scale=0.7, color=(255, 255, 255), thickness=2):
         for i, line in enumerate(text.split('\n')):
-            cv2.putText(image, line, (position[0], position[1] + i * 20),
+            cv2.putText(image, line, (position[0], position[1] + i * 25),
                         cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
 
-    def update_display(self):
-        self.canvas.fill(0)  # Clear the canvas
+    def _update_display(self):
+        self.canvas.fill(0)
 
-        # Draw info text
         info_text = f"Experiment Type: {self.experiment_type}\n"
         info_text += f"Accumulated Reward: {self.accumulated_reward:.2f}\n"
         info_text += self.additional_info
         self._draw_text(self.canvas, info_text, (10, 30))
 
-        # Draw action, observation, reward text
-        self._draw_text(self.canvas, self.action_obs_reward_text, (10, 150))
+        self._draw_text(self.canvas, self.action_obs_reward_text, (10, 150), font_scale=0.6)
 
-        # Draw detection image
-        self._draw_text(self.canvas, self.detection_header, (10, 400))
-        self.canvas[420:800, 10:410] = self.detection_image  # Changed to [420:800, 10:410]
+        self._draw_text(self.canvas, self.detection_header, (10, 350))
+        self.canvas[370:970, 10:510] = self.detection_image
 
-        # Draw belief image
-        self.canvas[:800, 600:] = self.belief_image
+        self.canvas[:1000, 600:] = self.belief_image
 
         cv2.imshow(self.window_name, self.canvas)
-        cv2.waitKey(1)
 
 
-    def close(self):
-        cv2.destroyAllWindows()
+if __name__ == "__main__":
+    visualizer = ExperimentVisualizer()
+    visualizer.start()
 
+    try:
+        for i in range(50):
+            visualizer.update_experiment_type(f"Test {i}")
+            visualizer.update_accumulated_reward(i * 10)
+            visualizer.update_additional_info(f"Step {i}")
+            visualizer.update_action_obs_reward(
+                [f"Action {j}" for j in range(i - 4, i + 1)],
+                [f"Obs {j}" for j in range(i - 4, i + 1)],
+                [j * 0.5 for j in range(i - 4, i + 1)]
+            )
+            visualizer.update_detection_image(np.random.randint(0, 255, (700, 700, 3)))
+            visualizer.update_belief_image(np.random.randint(0, 255, (1000, 600, 3)))
+            time.sleep(0.5)  # Simulate some processing time
+    finally:
+        visualizer.stop()
