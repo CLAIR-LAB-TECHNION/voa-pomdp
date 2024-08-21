@@ -74,15 +74,19 @@ class ManipulationController(RobotInterfaceWithGripper):
             logging.error(f"{self.robot_name} no inverse kinematic solution found at all "
                           f"for pose {pose}")
 
-        def valid_shoulder_angle(q):
+        def is_safe_config(q):
             if for_down_movement:
-                return -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
+                safe_shoulder = -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
+                safe_for_sensing_close = True
+                if pose[2] < -0.8:  # too close to robot
+                    safe_for_sensing_close = -3*np.pi/4 < q[0] < -np.pi/2 or np.pi/2 < q[0] < 3*np.pi/4
+                return safe_shoulder and safe_for_sensing_close
             else:
                 return True
 
         trial = 1
         while ((self.motion_planner.is_config_feasible(self.robot_name, solution) is False or
-               valid_shoulder_angle(solution) is False)
+               is_safe_config(solution) is False)
                and trial < max_tries):
             trial += 1
             # try to find another solution, starting from other random configurations:

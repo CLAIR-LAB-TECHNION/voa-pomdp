@@ -43,7 +43,7 @@ def main(use_depth: bool = 1):
             plot_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
                                                            workspace_x_lims, workspace_y_lims,
                                                            actual_positions=actual_positions)
-            # plot_im = cv2.cvtColor(plot_im, cv2.COLOR_RGB2BGR)
+            plot_im = cv2.cvtColor(plot_im, cv2.COLOR_RGB2BGR)
             cv2.imshow('detections', plot_im)
             cv2.waitKey(1)
 

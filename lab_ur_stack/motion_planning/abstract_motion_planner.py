@@ -1,3 +1,4 @@
+import sys
 import time
 from abc import abstractmethod
 
@@ -66,15 +67,18 @@ class AbstractMotionPlanner:
         """
         open visualization window
         """
+        if AbstractMotionPlanner.vis_initialized:
+            return
+
         if backend is None:
-            backend = "PyQt5" if self.is_pyqt5_available() else "GLUT"
+            if sys.platform.startswith('linux'):
+                backend = "GLUT"
+            else:
+                backend = "PyQt5" if self.is_pyqt5_available() else "GLUT"
 
         vis.init(backend)
-
-        # Check if vis is already initialized
-        if not AbstractMotionPlanner.vis_initialized:
-            if window_name:
-                vis.createWindow(window_name)
+        if window_name:
+            vis.createWindow(window_name)
 
         vis.add("world", self.world)
         # vis.setColor(('world', 'ur5e_1'), 0, 1, 1)
@@ -335,7 +339,7 @@ class AbstractMotionPlanner:
             robot.setConfig(start_config)
 
         ik_objective = ik.objective(robot.link("ee_link"), R=ee_transform[0], t=ee_transform[1])
-        res = ik.solve(ik_objective, tol=1e-5, iters=5000)
+        res = ik.solve(ik_objective, tol=2e-5, iters=10000)
         if not res:
             # print("ik not solved")
             robot.setConfig(curr_config)

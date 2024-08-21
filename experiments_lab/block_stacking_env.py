@@ -74,7 +74,7 @@ class LabBlockStackingEnv:
         reward = 0
 
         if isinstance(action, ActionSense):
-            height = self.r2_controller.sense_height_tilted(action.x, action.y, start_height=0.12)
+            height = self.r2_controller.sense_height_tilted(action.x, action.y, start_height=0.1)
             is_occupied = height > 0.036
 
             observation = ObservationSenseResult(is_occupied,

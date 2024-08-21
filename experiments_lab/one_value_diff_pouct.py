@@ -6,7 +6,7 @@ from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
-from lab_ur_stack.camera.realsense_camera import RealsenseCamera
+from lab_ur_stack.camera.realsense_camera import RealsenseCamera, RealsenseCameraWithRecording
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default, goal_tower_position)
@@ -21,9 +21,6 @@ from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot
 import numpy as np
 
 
-initial_positions_mus = [[-0.8, -0.75], [-0.6, -0.65]]
-initial_positions_sigmas = [[0.04, 0.02], [0.05, 0.07]]
-
 # fixed help config:
 lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]
 lookat[1] -=0.2
@@ -37,9 +34,12 @@ app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 2,
-         use_depth_for_help: bool = 1, ):
-    # camera = RealsenseCamera()
+def main(n_blocks: int = 4,
+         max_steps: int = 5,
+         max_planning_depth: int = 6,
+         planner_n_iterations: int = 2000):
+
+    camera = RealsenseCameraWithRecording()
     motion_planner = MotionPlanner()
     gt = GeometryAndTransforms.from_motion_planner(motion_planner)
     position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt)
@@ -47,29 +47,29 @@ def main(n_blocks: int = 2,
     r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
-    r2_controller.speed, r2_controller.acceleration = 3.0, 3.0
+    r2_controller.speed, r2_controller.acceleration = 2.0, 2.0
 
-    initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
-                                           initial_positions_mus[:n_blocks], initial_positions_sigmas[:n_blocks])
+    dummy_initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
+                                                 np.zeros((n_blocks, 2)), np.ones((n_blocks, 2)))
 
-    env = LabBlockStackingEnv(n_blocks, 5, r1_controller, r2_controller, gt, camera, position_estimator)
+    env = LabBlockStackingEnv(n_blocks, max_steps, r1_controller, r2_controller, gt, camera, position_estimator)
     # policy = FixedSenseUntilPositivePolicy()
-    policy = POUCTPolicy(initial_belief, env.max_steps, goal_tower_position, stacking_reward=env.stacking_reward,
-                         sensing_cost_coeff=env.sensing_cost_coeff, stacking_cost_coeff=env.stacking_cost_coeff,
-                         finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff, max_planning_depth=6,
+    policy = POUCTPolicy(dummy_initial_belief, env.max_steps, goal_tower_position,
+                         num_sims=planner_n_iterations,
+                         stacking_reward=env.stacking_reward,
+                         sensing_cost_coeff=env.sensing_cost_coeff,
+                         stacking_cost_coeff=env.stacking_cost_coeff,
+                         finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff,
+                         max_planning_depth=max_planning_depth,
                          show_progress=True)
-
-    help_config = lookat_verangle_horangle_distance_to_robot_config(lookat, help_verangle, help_horangle,
-                                                                    help_distance, gt, "ur5e_1")
 
     experiment_mgr = ExperimentManager(env=env, policy=policy, )
 
-    init_block_positions = [b.sample(1)[0] for b in initial_belief.block_beliefs]
 
-    experiment_mgr.run_value_difference_experiments(init_block_positions,
-                                                    initial_belief,
-                                                    helper_config=help_config,
-                                                    dirname="experiments/2blocks/")
+    experiment_mgr.sample_value_difference_experiments(n_blocks=n_blocks,
+                                                       min_prior_std=0.01,
+                                                       max_prior_std=0.1,
+                                                       dirname=f"experiments/{n_blocks}blocks/")
 
 
 if __name__ == "__main__":
