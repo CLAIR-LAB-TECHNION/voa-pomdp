@@ -78,7 +78,7 @@ class ManipulationController(RobotInterfaceWithGripper):
             if for_down_movement:
                 safe_shoulder = -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
                 safe_for_sensing_close = True
-                if pose[2] < -0.8:  # too close to robot
+                if pose[1] < -0.8:  # too close to robot
                     safe_for_sensing_close = -3*np.pi/4 < q[0] < -np.pi/2 or np.pi/2 < q[0] < 3*np.pi/4
                 return safe_shoulder and safe_for_sensing_close
             else:
