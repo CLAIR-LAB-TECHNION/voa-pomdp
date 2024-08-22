@@ -2,6 +2,8 @@ import io
 from PIL import Image
 from klampt.math import se3
 from matplotlib import pyplot as plt
+
+from lab_ur_stack.manipulation.utils import to_canonical_config
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 import numpy as np
 from lab_ur_stack.camera.configurations_and_params import color_camera_intrinsic_matrix
@@ -277,7 +279,7 @@ def lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle
 
 
 def lookat_verangle_horangle_distance_to_robot_config(lookat, vertical_angle, horizontal_angle,
-                                                      distance, gt, robot_name, ):
+                                                      distance, gt, robot_name, canonize_config=True):
     camera_rotations = np.linspace(0, 270, 5)
     for rot in camera_rotations:
         camera_transform = lookat_verangle_horangle_distance_to_camera_transform(lookat, vertical_angle,
@@ -286,6 +288,8 @@ def lookat_verangle_horangle_distance_to_robot_config(lookat, vertical_angle, ho
         ee_transform = se3.mul(gt.camera_to_ee_transform(), camera_transform)
         config = gt.motion_planner.ik_solve(robot_name, ee_transform)
         if config is not None and gt.motion_planner.is_config_feasible(robot_name, config):
+            if canonize_config:
+                config = to_canonical_config(config)
             return config
 
     return None

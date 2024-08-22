@@ -26,9 +26,12 @@ initial_positions_sigmas = [[0.04, 0.02], [0.05, 0.07]]
 # fixed help config:
 lookat = [np.mean(workspace_x_lims_default), np.mean(workspace_y_lims_default), 0]
 lookat[1] +=0.05
-vertical_angle = 35
-horizontal_angle = 20
-distance = 1
+# vertical_angle = 35
+# horizontal_angle = 20
+# distance = 1
+vertical_angle = 25
+horizontal_angle = 0
+distance = 0.7
 
 
 app = typer.Typer()
@@ -36,7 +39,7 @@ app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def main(n_blocks: int = 3,
+def main(n_blocks: int = 4,
          use_depth: bool = 1, ):
     camera = RealsenseCamera()
     motion_planner = MotionPlanner()
@@ -75,8 +78,6 @@ def main(n_blocks: int = 3,
         pos_num = manipulation(env, positions)
         if pos_num == 0:
             break
-
-
 
 
 def sensing(env, use_depth, help_config):
