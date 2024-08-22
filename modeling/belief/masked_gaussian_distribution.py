@@ -151,16 +151,16 @@ class UnnormalizedMasked2DTruncNorm:
     #
     #     return points
     def sample(self, n_samples=1, ratio=2, max_retries=10):
-        samples_x = self.dist_x.rvs(n_samples)
-        samples_y = self.dist_y.rvs(n_samples)
+        samples_x = self.dist_x.rvs(n_samples * ratio)
+        samples_y = self.dist_y.rvs(n_samples * ratio)
         points = np.stack([samples_x, samples_y], axis=1)
 
         valid_points = points[self.are_points_masked(points) == 0]
         retries = 0
         while len(valid_points) < n_samples and retries < max_retries:
             retries += 1
-            new_samples_x = self.dist_x.rvs(n_samples)
-            new_samples_y = self.dist_y.rvs(n_samples)
+            new_samples_x = self.dist_x.rvs(n_samples * ratio)
+            new_samples_y = self.dist_y.rvs(n_samples * ratio)
             new_points = np.stack([new_samples_x, new_samples_y], axis=1)
             new_valid_points = new_points[self.are_points_masked(new_points) == 0]
             valid_points = np.concatenate((valid_points, new_valid_points))

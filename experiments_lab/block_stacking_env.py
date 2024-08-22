@@ -30,7 +30,7 @@ class LabBlockStackingEnv:
                  stacking_reward=1,
                  finish_ahead_of_time_reward_coeff=0.1,
                  sensing_cost_coeff=0.1,
-                 stacking_cost_coeff=0.2):
+                 stacking_cost_coeff=0.1):
 
         self.n_blocks = n_blocks
         self.max_steps = max_steps
@@ -75,7 +75,7 @@ class LabBlockStackingEnv:
 
         if isinstance(action, ActionSense):
             height = self.r2_controller.sense_height_tilted(action.x, action.y, start_height=0.1)
-            is_occupied = height > 0.036
+            is_occupied = height > 0.035
 
             observation = ObservationSenseResult(is_occupied,
                                                  robot_position=(action.x, action.y),

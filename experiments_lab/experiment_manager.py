@@ -82,6 +82,12 @@ class ExperimentManager:
         self.clear_robot1()
         self.safe_distribute_blocks_in_positions(init_block_positions)
 
+        if self.visualizer is not None:
+            belief_im = plot_all_blocks_beliefs(init_block_belief,
+                                                actual_states=init_block_positions,
+                                                ret_as_image=True)
+            self.visualizer.update_belief_image(belief_im)
+
         results = ExperimentResults(policy_type=self.policy.__class__.__name__,
                                     agent_params=self.policy.get_params(),
                                     help_config=help_config)
@@ -97,6 +103,9 @@ class ExperimentManager:
 
             results.help_detections_mus = detection_muss
             results.help_detections_sigmas = detections_sigmas
+
+            if self.visualizer is not None:
+                self.visualizer.update_detection_image(detections_im, "Help Detections")
 
         results.beliefs.append(init_block_belief)
 
@@ -121,6 +130,14 @@ class ExperimentManager:
             results.actions.append(action)
             results.observations.append(observation)
             results.rewards.append(reward)
+
+            if self.visualizer is not None:
+                self.visualizer.update_action_obs_reward(results.actions, results.observations, results.rewards)
+                belief_im = self.plot_belief(current_belief, history, actual_state=init_block_positions,
+                                             ret_as_image=True)
+                self.visualizer.update_belief_image(belief_im)
+                self.visualizer.update_accumulated_reward(accumulated_reward)
+                self.visualizer.update_additional_info(f"Step {i + 1}/{self.env.max_steps}")
 
             if isinstance(observation, ObservationReachedTerminal) or len(current_belief.block_beliefs) == 0 \
                     or observation.steps_left <= 0:
@@ -200,6 +217,10 @@ class ExperimentManager:
         logging.info(f"starting value diff experiment {datetime_stamp}")
 
         try:
+            if self.visualizer is not None:
+                self.visualizer.start()
+                self.visualizer.update_experiment_type(f"No Help {datetime_stamp}")
+
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
                 self.env.camera.start_recording(f"{dirname}/{datetime_stamp}/vid", max_depth=5, fps=20)
 
@@ -208,6 +229,10 @@ class ExperimentManager:
 
             no_help_cleanup_detections = self.clean_up_workspace()
             cv2.imwrite(f"{dirname}/{datetime_stamp}/no_help_cleanup.png", no_help_cleanup_detections)
+
+            if self.visualizer is not None:
+                self.visualizer.reset()
+                self.visualizer.update_experiment_type(f"With Help {datetime_stamp}")
 
             results_with_help = self.run_single_experiment(init_block_positions, init_block_belief, helper_config,
                                                            f"{dirname}/{datetime_stamp}/help_detections.png")
@@ -220,6 +245,8 @@ class ExperimentManager:
         finally:
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
                 self.env.camera.stop_recording()
+            if self.visualizer is not None:
+                self.visualizer.stop()
 
     def sample_value_difference_experiments(self,
                                             n_blocks,
@@ -378,7 +405,7 @@ class ExperimentManager:
 
         return cv2.cvtColor(plot_im, cv2.COLOR_BGR2RGB)
 
-    def plot_belief(self, current_belief, history=[], ret_as_image=False):
+    def plot_belief(self, current_belief, history=[], actual_state=None, ret_as_image=False):
         # use the history for points
         positive_sens = []
         negative_sens = []
@@ -397,6 +424,7 @@ class ExperimentManager:
                                 positive_sensing_points=positive_sens,
                                 negative_sensing_points=negative_sens,
                                 pickup_attempt_points=failed_pickups,
+                                actual_states=actual_state,
                                 ret_as_image=ret_as_image)
 
 

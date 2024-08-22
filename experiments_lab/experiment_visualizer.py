@@ -3,6 +3,9 @@ import cv2
 import numpy as np
 import threading
 
+from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
+from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
+
 
 class ExperimentVisualizer:
     def __init__(self, window_name="Experiment Visualization", window_size=(1200, 1000)):
@@ -32,6 +35,15 @@ class ExperimentVisualizer:
             self.update_thread.join()
         cv2.destroyAllWindows()
 
+    def reset(self):
+        self.experiment_type = ""
+        self.accumulated_reward = 0
+        self.additional_info = ""
+        self.action_obs_reward_text = ""
+        self.detection_image = np.zeros((600, 500, 3), dtype=np.uint8)
+        self.detection_header = "Last Detections"
+        self.belief_image = np.zeros((1000, 600, 3), dtype=np.uint8)
+
     def _update_loop(self):
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
         cv2.resizeWindow(self.window_name, self.window_size[0], self.window_size[1])
@@ -55,7 +67,21 @@ class ExperimentVisualizer:
         text = "Actions | Observations | Rewards\n"
         text += "---------------------------------\n"
         for a, o, r in list(zip(actions, observations, rewards))[-5:]:  # Show last 5 entries
-            text += f"{str(a)[:15]:15} | {str(o)[:15]:15} | {r:.2f}\n"
+            next_line = ""
+            if isinstance(a, ActionSense):
+                next_line += f"SE({a.x:5.4f}, {a.y:5.4f}) |"
+            elif isinstance(a, ActionAttemptStack):
+                next_line += f"ST({a.x:5.4f}, {a.y:5.4f}) |"
+
+            if isinstance(o, ObservationSenseResult):
+                next_line += f" occupied |" if o.is_occupied else f" empty |"
+            elif isinstance(o, ObservationStackAttemptResult):
+                next_line += f" success |" if o.is_object_picked else f" fail |"
+
+            next_line += f" {r:5.4f}\n"
+
+            text += next_line
+
         self.action_obs_reward_text = text
 
     def update_detection_image(self, image, header=None):
@@ -102,10 +128,10 @@ class ExperimentVisualizer:
         x_offset = (600 - new_w) // 2
         self.belief_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
 
-    def _draw_text(self, image, text, position, font_scale=0.7, color=(255, 255, 255), thickness=2):
+    def _draw_text(self, image, text, position, font_scale=0.7, color=(255, 255, 255), thickness=1):
         for i, line in enumerate(text.split('\n')):
             cv2.putText(image, line, (position[0], position[1] + i * 25),
-                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, color, thickness)
+                        cv2.FONT_HERSHEY_DUPLEX, font_scale, color, thickness)
 
     def _update_display(self):
         self.canvas.fill(0)

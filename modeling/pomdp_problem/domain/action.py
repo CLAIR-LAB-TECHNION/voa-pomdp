@@ -35,7 +35,7 @@ class ActionAttemptStack(ActionBase):
         return hash(("attempt_stack", self.x, self.y))
 
     def __str__(self):
-        return f"AttemptStack({self.x}, {self.y})"
+        return f"AttemptStack({self.x:3}, {self.y:3})"
 
     def __repr__(self):
         return str(self)
@@ -52,7 +52,7 @@ class ActionSense(ActionBase):
         return hash(("sense", self.x, self.y))
 
     def __str__(self):
-        return f"Sense({self.x}, {self.y})"
+        return f"Sense({self.x:3}, {self.y:3})"
 
     def __repr__(self):
         return str(self)

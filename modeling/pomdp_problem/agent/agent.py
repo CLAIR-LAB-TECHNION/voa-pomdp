@@ -72,7 +72,7 @@ class Agent(pomdp_py.Agent):
         else:
             if self.need_to_generate_samples:
                 # we don't have samples cached, so we need to generate them, generate and save them
-                block_positions_arrays = [block_dist.sample(1000) for block_dist in self._cur_belief.block_beliefs]
+                block_positions_arrays = [block_dist.sample(10000) for block_dist in self._cur_belief.block_beliefs]
                 self.block_positions_arrays = block_positions_arrays
                 self.need_to_generate_samples = False
 

@@ -35,7 +35,7 @@ app = typer.Typer()
 @app.command(
     context_settings={"ignore_unknown_options": True})
 def main(n_blocks: int = 4,
-         max_steps: int = 5,
+         max_steps: int = 20,
          max_planning_depth: int = 6,
          planner_n_iterations: int = 2000):
 
@@ -63,7 +63,7 @@ def main(n_blocks: int = 4,
                          max_planning_depth=max_planning_depth,
                          show_progress=True)
 
-    experiment_mgr = ExperimentManager(env=env, policy=policy, )
+    experiment_mgr = ExperimentManager(env=env, policy=policy, visualize=True)
 
 
     experiment_mgr.sample_value_difference_experiments(n_blocks=n_blocks,

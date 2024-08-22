@@ -65,7 +65,7 @@ class UnnormalizedBlocksPositionsBelief:
 
         return init_mus, init_sigmas
 
-    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.005):
+    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.01):
         if not is_occupied:
             self._update_negative_sensing(point_x, point_y, no_update_margin)
         else:
