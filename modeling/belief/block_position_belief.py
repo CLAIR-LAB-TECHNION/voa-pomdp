@@ -235,18 +235,17 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
                                                     detection_mus[i],
                                                     detection_sigmas[i])
 
-        mus_and_sigmas = []
+        mus = []
+        sigmas = []
         for i in range(self.n_blocks_on_table):
             if i in detections_to_blocks:
-                mus = detection_mus[detections_to_blocks[i]]
-                sigmas = detection_sigmas[detections_to_blocks[i]]
+                mus.append(detection_mus[detections_to_blocks[i]])
+                sigmas.append(detection_sigmas[detections_to_blocks[i]])
             else:
-                mus = -1
-                sigmas = -1
-            mus_and_sigmas.append((mus, sigmas))
+                mus.append([-1, -1])
+                sigmas.append([-1, -1])
 
-        mus_and_sigmas = np.array(mus_and_sigmas)
-        return mus_and_sigmas[:, 0], mus_and_sigmas[:, 1]
+        return mus, sigmas
 
     def update_belief_block_from_detection(self, block_id, mu_detection, sigma_detection):
         """

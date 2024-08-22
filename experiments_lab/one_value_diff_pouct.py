@@ -47,7 +47,7 @@ def main(n_blocks: int = 4,
     r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
-    r2_controller.speed, r2_controller.acceleration = 2.0, 2.0
+    r2_controller.speed, r2_controller.acceleration = 2.0, 4.0
 
     dummy_initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
                                                  np.zeros((n_blocks, 2)), np.ones((n_blocks, 2)))
