@@ -7,17 +7,18 @@ from modeling.pomdp_problem.agent.agent import Agent
 from modeling.pomdp_problem.env.env import Environment
 from modeling.pomdp_problem.models.policy_model import BeliefModel
 from modeling.pomdp_problem.domain.state import State
-from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
+from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult, \
+    ObservationReachedTerminal
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 from pomdp_py.utils import TreeDebugger
 
 
 def get_positions_and_init_belief():
-    mus = [[-0.85, -0.9], [-0.75, -0.75], [-0.65, -0.65]]
+    mus = [[-0.85, -0.9], [-0.75, -0.75], [-0.65, -0.65], [-0.6, -0.9]]
     sigmas = [[0.05, 0.07], [0.1, 0.08], [0.07, 0.07], [0.15, 0.15], [0.02, 0.03]]
-    sigmas = sigmas[:3]
-    belief = BeliefModel(3, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
+    sigmas = sigmas[:4]
+    belief = BeliefModel(4, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
 
     block_positions = sample_block_positions_from_dists(belief.block_beliefs)
 
@@ -27,8 +28,8 @@ def get_positions_and_init_belief():
 max_steps = 20
 
 stacking_reward = 1
-sensing_cost_coeff = 0.1
-stacking_cost_coeff = 0.2  # stack takes much more time than sensing
+sensing_cost_coeff = 0.05
+stacking_cost_coeff = 0.05  # stack takes much more time than sensing
 finish_ahead_of_time_reward_coeff = 0.1
 
 n_blocks_for_actions = 2
@@ -78,6 +79,12 @@ if __name__ == "__main__":
 
         total_reward += actual_reward
 
+        dd = TreeDebugger(agent.tree)
+        dd.p(6)
+
+        if isinstance(actual_observation, ObservationReachedTerminal):
+            break
+
         planner.update(agent, actual_action, actual_observation)
         # planner.update only updates the tree, but not the belief and history of the agent!
         # I implemented agent.update to do both:
@@ -86,7 +93,6 @@ if __name__ == "__main__":
         print("------------")
         print(f"step: {i}, action: {actual_action}, observation: {actual_observation}, reward: {actual_reward}")
         print(f"total reward: {total_reward}, hidden_state={env.state}")
-        dd = TreeDebugger(agent.tree)
         print("num_sims", planner.last_num_sims, "max depth reached", dd.depth)
         if isinstance(actual_observation, ObservationSenseResult):
             if actual_observation.is_occupied:

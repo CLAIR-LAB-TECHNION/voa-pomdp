@@ -59,6 +59,7 @@ class Agent(pomdp_py.Agent):
 
         # override what's done in the super class:
         self._cur_belief = deepcopy(initial_blocks_position_belief)
+        self._history = tuple()
 
     def sample_belief(self):
         # this is override from base agent since we have our different belief model
@@ -93,7 +94,7 @@ class Agent(pomdp_py.Agent):
                      last_stack_attempt_succeded=None)
 
     def update(self, actual_action, actual_observation):
-        self.update_history(actual_action, actual_observation)
+        self.set_full_history(self.history + ((actual_action, actual_observation),))
         self.update_belief(actual_action, actual_observation)
 
     def update_belief(self, actual_action, actual_observation):

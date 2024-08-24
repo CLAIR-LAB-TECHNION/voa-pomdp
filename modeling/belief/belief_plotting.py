@@ -137,6 +137,21 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
     xx, yy = np.meshgrid(x_mid, y_mid)
     z = block_pos_dist.pdf(np.stack([xx.ravel(), yy.ravel()], axis=1)).reshape(xx.shape)
 
+    if z.max() == 0:
+        # no point with probability found. Try finer grid:
+        x = np.linspace(x_lims[0], x_lims[1], grid_size*4)
+        y = np.linspace(y_lims[0], y_lims[1], grid_size*4)
+        dx = (x[1] - x[0]) / 2
+        dy = (y[1] - y[0]) / 2
+        y_mid = y[:-1] + dy
+        x_mid = x[:-1] + dx
+        xx, yy = np.meshgrid(x_mid, y_mid)
+        z = block_pos_dist.pdf(np.stack([xx.ravel(), yy.ravel()], axis=1)).reshape(xx.shape)
+
+    if z.max() == 0:
+        # no point with probability found. Just return empty image
+        return np.zeros((5, 5, 3), dtype=np.uint8)
+
     # for debug, make sure the sum of z is 1
     # sum_z_mid = np.sum(z) * (x[1] - x[0]) * (y[1] - y[0])
     # print(f"Sum of z using midpoints: {sum_z_mid}")
