@@ -11,6 +11,8 @@ app = typer.Typer()
 
 
 def plot_belief(current_belief, history=[]):
+    # TODO: add actual block positions
+    # TODO other details from Experiment results
     positive_sens = []
     negative_sens = []
     failed_pickups = []

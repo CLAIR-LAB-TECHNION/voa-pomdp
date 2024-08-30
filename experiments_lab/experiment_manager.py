@@ -297,7 +297,7 @@ class ExperimentManager:
         @return: Configuration for robot1, with canonical joint angels (between -pi and pi)
         """
         if self.help_configs is None:
-            self.help_configs = np.load("help_configs.npy")
+            self.help_configs = np.load("configurations/help_configs.npy")
             logging.debug(f"{len(self.help_configs)} help configs loaded")
 
         help_config = self.help_configs[np.random.randint(len(self.help_configs))]
