@@ -5,6 +5,7 @@ import time
 
 import cv2
 import numpy as np
+import pandas as pd
 from frozendict import frozendict
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.experiment_visualizer import ExperimentVisualizer
@@ -186,6 +187,68 @@ class ExperimentManager:
         elif isinstance(observation, ObservationStackAttemptResult):
             updated_belief.update_from_pickup_attempt(action.x, action.y, observation.is_object_picked)
         return updated_belief
+
+
+    def run_from_list_and_save_results(self, row, config_file, results_dir):
+        logging.info(f"Belief idx: {row['belief_idx']}, State idx: {row['state_idx']}, Help config idx: {row['help_config_idx_local']}")
+
+        # Prepare experiment data
+        init_block_belief = BlocksPositionsBelief(
+            self.env.n_blocks,
+            self.ws_x_lims,
+            self.ws_y_lims,
+            init_mus=np.array(eval(row['belief_mus'])),
+            init_sigmas=np.array(eval(row['belief_sigmas']))
+        )
+        init_block_positions = np.array(eval(row['state']))
+        help_config = np.array(eval(row['help_config'])) if row['help_config'] != 'None' else None
+
+        # Setup experiment directory
+        datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+        experiment_dir = os.path.join(results_dir, datetime_stamp)
+        os.makedirs(experiment_dir, exist_ok=True)
+
+        logging.info(f"Running experiment, results will be saved in {experiment_dir}")
+        print("Running experiment, results will be saved in", experiment_dir)
+
+        try:
+            if self.visualizer:
+                self.visualizer.start()
+                self.visualizer.update_experiment_type(f"Experiment ID: {row['experiment_id']}")
+
+            if isinstance(self.env.camera, RealsenseCameraWithRecording):
+                self.env.camera.start_recording(os.path.join(experiment_dir, "vid"), max_depth=5, fps=20)
+
+            # Run experiment
+            results = self.run_single_experiment(
+                init_block_positions=init_block_positions,
+                init_block_belief=init_block_belief,
+                help_config=help_config,
+                help_detections_filename=os.path.join(experiment_dir, "help_detections.png") if help_config is not None else None
+            )
+
+            # Save results
+            results.set_metadata('experiment_id', row['experiment_id'])
+            results.set_metadata('belief_idx', row['belief_idx'])
+            results.set_metadata('state_idx', row['state_idx'])
+            results.set_metadata('help_config_idx_local', row['help_config_idx_local'])
+            results.save(os.path.join(experiment_dir, "results.pkl"))
+
+            # Cleanup and save cleanup image
+            cleanup_detections = self.clean_up_workspace()
+            cv2.imwrite(os.path.join(experiment_dir, "cleanup.png"), cv2.cvtColor(cleanup_detections, cv2.COLOR_RGB2BGR))
+
+            # Update CSV
+            df = pd.read_csv(config_file)
+            df.loc[df['experiment_id'] == row['experiment_id'], 'conducted_datetime_stamp'] = datetime_stamp
+            df.to_csv(config_file, index=False)
+
+            logging.info(f"Experiment ID: {row['experiment_id']} completed and results saved.")
+        finally:
+            if isinstance(self.env.camera, RealsenseCameraWithRecording):
+                self.env.camera.stop_recording()
+            if self.visualizer:
+                self.visualizer.stop()
 
     def run_value_difference_experiments(self,
                                          init_block_positions,
@@ -436,6 +499,12 @@ class BlockPilesManager:
     def __init__(self):
         self.piles_current_heights = [4, 4]
         self.piles_max_heights = [4, 4]
+
+    def reset(self):
+        """
+         call this after piles are really reset! This does not change the actual environment!
+        """
+        self.piles_current_heights = self.piles_max_heights
 
     def pop_next_block(self):
         """ return (position, height) of next pile. height is in blocks and position is xy and world frame"""
