@@ -135,11 +135,11 @@ class ManipulationController(RobotInterfaceWithGripper):
             self.motion_planner.vis_config(self.robot_name, start_config,
                                            vis_name="start_config", rgba=(1, 0, 0, 0.5))
 
-        # plan until the ratio between length and distance is lower than 3, but stop if 4 seconds have passed
+        # plan until the ratio between length and distance is lower than 2, but stop if 8 seconds have passed
         path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
                                                                   start_config,
                                                                   q,
-                                                                  max_time=4,
+                                                                  max_time=8,
                                                                   max_length_to_distance_ratio=2)
 
         if path is None:
