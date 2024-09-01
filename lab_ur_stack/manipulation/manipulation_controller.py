@@ -63,7 +63,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
         logging.info(f"{self.robot_name} Updated motion planner with current configuration {self.getActualQ()}")
 
-    def find_ik_solution(self, pose, max_tries=10, for_down_movement=True, shoulder_constraint_for_down_movement=0.15):
+    def find_ik_solution(self, pose, max_tries=10, for_down_movement=True, shoulder_constraint_for_down_movement=0.3):
         """
         if for_down_movement is True, there will be a heuristic check that tha shoulder is not facing down, so when
         movel will be called it won't collide with the table when movingL down.
@@ -78,8 +78,9 @@ class ManipulationController(RobotInterfaceWithGripper):
             if for_down_movement:
                 safe_shoulder = -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
                 safe_for_sensing_close = True
-                if pose[1] < -0.8:  # too close to robot
-                    safe_for_sensing_close = -3*np.pi/4 < q[0] < -np.pi/2 or np.pi/2 < q[0] < 3*np.pi/4
+                # if 0 > pose[1] > -0.4 and -0.1 < pose[0] < 0.1:  # too close to robot base
+                #     print(pose)
+                #     safe_for_sensing_close = -3*np.pi/4 < q[0] < -np.pi/2 or np.pi/2 < q[0] < 3*np.pi/4
                 return safe_shoulder and safe_for_sensing_close
             else:
                 return True
@@ -97,6 +98,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         if trial == max_tries:
             logging.error(f"{self.robot_name} Could not find a feasible IK solution after {max_tries} tries")
+            return None
         elif trial > 1:
             logging.info(f"{self.robot_name} Found IK solution after {trial} tries")
         else:
