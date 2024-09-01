@@ -240,14 +240,16 @@ class ExperimentManager:
 
             # Update CSV
             df = pd.read_csv(config_file)
-            df.loc[df['experiment_id'] == row['experiment_id'], 'conducted_datetime_stamp'] = datetime_stamp
+            df.loc[df['experiment_id'] == row['experiment_id'], 'conducted_datetime_stamp'] = str(datetime_stamp)
             df.to_csv(config_file, index=False)
 
             logging.info(f"Experiment ID: {row['experiment_id']} completed and results saved.")
 
             # Cleanup and save cleanup image
             cleanup_detections = self.clean_up_workspace()
-            cv2.imwrite(os.path.join(experiment_dir, "cleanup.png"), cv2.cvtColor(cleanup_detections, cv2.COLOR_RGB2BGR))
+            cv2.imwrite(os.path.join(experiment_dir, "cleanup.png"), cleanup_detections)
+            if self.visualizer:
+                self.visualizer.update_detection_image(cleanup_detections, "Previous Experiment Cleanup")
 
         finally:
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
@@ -444,7 +446,7 @@ class ExperimentManager:
         #                                                                            distance=0.7,
         #                                                                            gt=self.env.gt,
         #                                                                            robot_name="ur5e_1")
-        clean_up_sensor_config = [1.2861, -0.8437, 0.8167, -1.7062, -2.3100, 1.1541]
+        clean_up_sensor_config = [1.2647, -1.1831, 1.4136, -2.1864, -2.1700, 0.9569]
         clean_up_sensor_config = to_canonical_config(clean_up_sensor_config)
 
         self.env.r1_controller.plan_and_moveJ(clean_up_sensor_config)

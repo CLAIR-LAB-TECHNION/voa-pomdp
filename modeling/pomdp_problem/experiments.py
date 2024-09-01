@@ -14,13 +14,22 @@ from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 from pomdp_py.utils import TreeDebugger
 
 
+# def get_positions_and_init_belief():
+#     mus = [[-0.85, -0.9], [-0.75, -0.75], [-0.65, -0.65], [-0.6, -0.9]]
+#     sigmas = [[0.05, 0.07], [0.1, 0.08], [0.07, 0.07], [0.15, 0.15], [0.02, 0.03]]
+#     sigmas = sigmas[:4]
+#     belief = BeliefModel(4, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
+#
+#     block_positions = sample_block_positions_from_dists(belief.block_beliefs)
+#
+#     return block_positions, belief
+
 def get_positions_and_init_belief():
-    mus = [[-0.85, -0.9], [-0.75, -0.75], [-0.65, -0.65], [-0.6, -0.9]]
-    sigmas = [[0.05, 0.07], [0.1, 0.08], [0.07, 0.07], [0.15, 0.15], [0.02, 0.03]]
-    sigmas = sigmas[:4]
+    mus = [[-0.8649402659295059, -0.7994000627959958], [-0.8696880965659666, -0.6832375435088776], [-0.7908547772295302, -0.9928257302406563], [-0.5461258680744601, -0.8804621760950264]]
+    sigmas = [[0.07650324916733311, 0.06594051688944538], [0.09847477677144892, 0.09150859882826566], [0.07127204624152637, 0.1481613344430858], [0.06730110687507747, 0.12632032024434545]]
     belief = BeliefModel(4, workspace_x_lims_default, workspace_y_lims_default, mus, sigmas)
 
-    block_positions = sample_block_positions_from_dists(belief.block_beliefs)
+    block_positions = [[-0.8486645349743999, -0.7806264328992084], [-0.8850808697013187, -0.6533689138005306], [-0.8141842946905974, -0.9363326621657373], [-0.5478740138832915, -0.6768709817883474]]
 
     return block_positions, belief
 
@@ -33,9 +42,9 @@ stacking_cost_coeff = 0.05  # stack takes much more time than sensing
 finish_ahead_of_time_reward_coeff = 0.1
 
 n_blocks_for_actions = 2
-points_to_sample_for_each_block = 150
+points_to_sample_for_each_block = 250
 sensing_actions_to_sample_per_block = 2
-max_planning_depth = 6
+max_planning_depth = 5
 tower_pos = goal_tower_position
 
 if __name__ == "__main__":

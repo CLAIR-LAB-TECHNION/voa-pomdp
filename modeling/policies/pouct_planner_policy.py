@@ -20,7 +20,7 @@ class POUCTPolicy(AbastractPolicy):
                  stacking_cost_coeff: float,
                  finish_ahead_of_time_reward_coeff: float,
                  n_blocks_for_actions: int = 2,
-                 points_to_sample_for_each_block: int = 150,
+                 points_to_sample_for_each_block: int = 250,
                  sensing_actions_to_sample_per_block: int = 2,
                  num_sims=2000,
                  show_progress=False):

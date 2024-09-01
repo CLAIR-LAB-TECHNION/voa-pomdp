@@ -25,8 +25,8 @@ app = typer.Typer()
 @app.command(context_settings={"ignore_unknown_options": True})
 def run_experiments(
         n_blocks: int = 4,
-        max_steps: int = 25,
-        max_planning_depth: int = 6,
+        max_steps: int = 20,
+        max_planning_depth: int = 5,
         planner_n_iterations: int = 2000
 ):
     # Setup paths

@@ -30,7 +30,7 @@ class LabBlockStackingEnv:
                  stacking_reward=1,
                  finish_ahead_of_time_reward_coeff=0.1,
                  sensing_cost_coeff=0.05,
-                 stacking_cost_coeff=0.025):
+                 stacking_cost_coeff=0.05):
 
         self.n_blocks = n_blocks
         self.max_steps = max_steps
