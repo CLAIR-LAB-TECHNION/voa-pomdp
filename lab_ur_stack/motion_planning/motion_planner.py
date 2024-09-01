@@ -18,16 +18,26 @@ class MotionPlanner(AbstractMotionPlanner):
         all_attachments_geom = Geometry3D()
         all_attachments_geom.setGroup()
 
+        element = 0
+
         if "gripper" in attachments:
-            gripper_obj = box(0.08, 0.08, 0.15, center=[0, 0, 0.07])
+            gripper_obj = box(0.09, 0.09, 0.15, center=[0, 0, 0.07])
             gripper_geom = Geometry3D()
             gripper_geom.set(gripper_obj)
-            all_attachments_geom.setElement(0, gripper_geom)
+            all_attachments_geom.setElement(element, gripper_geom)
+            element += 1
         if "camera" in attachments:
             camera_obj = box(0.18, 0.11, 0.06, center=[0, -0.05, 0.01])
             camera_geom = Geometry3D()
             camera_geom.set(camera_obj)
-            all_attachments_geom.setElement(1, camera_geom)
+            all_attachments_geom.setElement(element, camera_geom)
+            element += 1
+
+        # add safety box around where the tool cable is attached
+        safety_box = box(0.13, 0.13, 0.03, center=[0, 0, -0.04])
+        safety_box_geom = Geometry3D()
+        safety_box_geom.set(safety_box)
+        all_attachments_geom.setElement(element, safety_box_geom)
 
         # the positions of tools were measured for ee_offset = 0. move them back by ee_offset
         for i in range(all_attachments_geom.numElements()):

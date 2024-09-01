@@ -123,7 +123,7 @@ class GeometryAndTransforms:
         # rotation of ee around z depends on proximity to the robot base. Too close to the
         # base requires 0 so the robot won't collide with itself, but with 180 it can reach further
         # these numbers are only correct for ur5e_2 in our setting:
-        rz = 0 if -0.5 < point_robot[1] < 0.5 else pi
+        rz = 0 if -0.4 < point_robot[1] < 0.4 else pi
 
         rotation_euler = R.from_euler('xyz', [-0.8 * pi, 0.15*pi, rz])
 
