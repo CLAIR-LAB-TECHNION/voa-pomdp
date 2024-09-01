@@ -217,7 +217,7 @@ class ExperimentManager:
 
         try:
             if self.visualizer:
-                self.visualizer.start()
+                self.start_visualizer_if_not_started()
                 self.visualizer.update_experiment_type(f"Experiment ID: {row['experiment_id']}")
 
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
@@ -255,7 +255,7 @@ class ExperimentManager:
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
                 self.env.camera.stop_recording()
             if self.visualizer:
-                self.visualizer.stop()
+                self.stop_visualizer_if_started()
 
     def run_value_difference_experiments(self,
                                          init_block_positions,
@@ -497,6 +497,14 @@ class ExperimentManager:
                                 pickup_attempt_points=failed_pickups,
                                 actual_states=actual_state,
                                 ret_as_image=ret_as_image)
+
+    def start_visualizer_if_not_started(self):
+        if self.visualizer is not None and not self.visualizer.running:
+            self.visualizer.start()
+
+    def stop_visualizer_if_started(self):
+        if self.visualizer is not None and self.visualizer.running:
+            self.visualizer.stop()
 
 
 class BlockPilesManager:
