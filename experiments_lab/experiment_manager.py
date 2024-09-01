@@ -107,6 +107,9 @@ class ExperimentManager:
 
             if self.visualizer is not None:
                 self.visualizer.update_detection_image(detections_im, "Help Detections")
+                self.visualizer.update_belief_image(self.plot_belief(init_block_belief,
+                                                                     actual_state=init_block_positions,
+                                                                     ret_as_image=True))
 
         results.beliefs.append(init_block_belief)
 
