@@ -26,7 +26,7 @@ app = typer.Typer()
 def run_experiments(
         n_blocks: int = 4,
         max_steps: int = 20,
-        max_planning_depth: int = typer.Option(5, help="Max planning depth for the planner,"
+        max_planning_depth: int = typer.Option(4, help="Max planning depth for the planner,"
                                                        "consult before changing it, deepening may cause"
                                                        "distribution shift because rollout policy always tries to pick up"),
         planner_n_iterations: int = 2000
@@ -84,6 +84,7 @@ def run_experiments(
               "then Press ENTER to continue with the next experiment...")
         experiment_mgr.piles_manager.reset()
 
+    experiment_mgr.stop_visualizer_if_started()
     logging.info("All experiments completed.")
 
 

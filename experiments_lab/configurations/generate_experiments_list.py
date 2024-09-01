@@ -11,7 +11,7 @@ from modeling.belief.block_position_belief import BlocksPositionsBelief, BlockPo
 app = typer.Typer()
 
 
-def sample_belief(n_blocks, min_std, max_std, ws_x_lims, ws_y_lims, min_distance_between_mus=0.1):
+def sample_belief(n_blocks, min_std, max_std, ws_x_lims, ws_y_lims, min_distance_between_mus=0.15):
     block_pos_mu = []
     for _ in range(n_blocks):
         while True:

@@ -240,6 +240,7 @@ class ExperimentManager:
 
             # Update CSV
             df = pd.read_csv(config_file)
+            df['conducted_datetime_stamp'] = df['conducted_datetime_stamp'].astype(str)
             df.loc[df['experiment_id'] == row['experiment_id'], 'conducted_datetime_stamp'] = str(datetime_stamp)
             df.to_csv(config_file, index=False)
 
@@ -254,8 +255,6 @@ class ExperimentManager:
         finally:
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
                 self.env.camera.stop_recording()
-            if self.visualizer:
-                self.stop_visualizer_if_started()
 
     def run_value_difference_experiments(self,
                                          init_block_positions,
