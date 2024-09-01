@@ -239,8 +239,10 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
         sigmas = []
         for i in range(self.n_blocks_on_table):
             if i in detections_to_blocks:
-                mus.append(detection_mus[detections_to_blocks[i]])
-                sigmas.append(detection_sigmas[detections_to_blocks[i]])
+                detected_mu = detection_mus[detections_to_blocks == i][0]
+                mus.append(detected_mu)
+                detected_sigma = detection_sigmas[detections_to_blocks == i][0]
+                sigmas.append(detected_sigma)
             else:
                 mus.append([-1, -1])
                 sigmas.append([-1, -1])
@@ -282,7 +284,7 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
         per_detection_likelihoods = np.array([block_belief.pdf(detection_mus) for block_belief in self.block_beliefs])
 
         # Initially associate each detection with the block that has the highest likelihood
-        detections_to_blocks = np.argmax(per_detection_likelihoods, axis=0)  # n_blocks x n_detections
+        detections_to_blocks = np.argmax(per_detection_likelihoods, axis=0)
 
         # Ensure unique association: resolve conflicts
         unique, counts = np.unique(detections_to_blocks, return_counts=True)

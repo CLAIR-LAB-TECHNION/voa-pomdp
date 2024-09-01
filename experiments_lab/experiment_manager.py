@@ -165,6 +165,10 @@ class ExperimentManager:
         detections_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
                                                              workspace_x_lims_default, workspace_y_lims_default)
 
+        # filter positions that are out of workspace:
+        positions = [p for p in positions if workspace_x_lims_default[0]< p[0] < workspace_x_lims_default[1] and
+                     workspace_y_lims_default[0] < p[1] < workspace_y_lims_default[1]]
+
         camera_position = self.env.r1_controller.getActualTCPPose()[:3]
         mus, sigmas = detections_to_distributions(positions, camera_position)
 
@@ -249,8 +253,6 @@ class ExperimentManager:
             # Cleanup and save cleanup image
             cleanup_detections = self.clean_up_workspace()
             cv2.imwrite(os.path.join(experiment_dir, "cleanup.png"), cleanup_detections)
-            if self.visualizer:
-                self.visualizer.update_detection_image(cleanup_detections, "Previous Experiment Cleanup")
 
         finally:
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
@@ -455,8 +457,14 @@ class ExperimentManager:
                                                                                        max_detections=self.env.n_blocks)
         plot_im = detections_plots_with_depth_as_image(annotations[0], annotations[1], annotations[2], positions,
                                                        workspace_x_lims_default, workspace_y_lims_default)
+        if self.visualizer is not None:
+            self.visualizer.update_detection_image(plot_im, "Last Clean Up Detections")
         self.clear_robot1()
         logging.info(f"detected {len(positions)} blocks")
+
+        # filter positions that are too far from workspace:
+        positions = [p for p in positions if workspace_x_lims_default[0] - 0.1 < p[0] < workspace_x_lims_default[1] + 0.1 and
+                     workspace_y_lims_default[0] - 0.1 < p[1] < workspace_y_lims_default[1] + 0.1 ]
 
         # now clean the blocks:
         if put_back_to_stack:

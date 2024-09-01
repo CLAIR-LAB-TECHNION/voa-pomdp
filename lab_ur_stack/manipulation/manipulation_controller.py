@@ -16,6 +16,15 @@ def canninical_last_joint_config(config):
 
     return config
 
+def to_valid_limits_config(config):
+    for i in range(6):
+        while config[i] >= 2 * np.pi:
+            config[i] -= 2 * np.pi
+
+        while config[i] <= - 2 * np.pi:
+            config[i] += 2 * np.pi
+
+    return config
 
 class ManipulationController(RobotInterfaceWithGripper):
     """
@@ -95,6 +104,7 @@ class ManipulationController(RobotInterfaceWithGripper):
             solution = self.getInverseKinematics(pose, qnear=qnear)
 
         solution = canninical_last_joint_config(solution)
+        solution = to_valid_limits_config(solution)
 
         if trial == max_tries:
             logging.error(f"{self.robot_name} Could not find a feasible IK solution after {max_tries} tries")
