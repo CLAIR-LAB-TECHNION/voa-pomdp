@@ -11,15 +11,20 @@ from modeling.belief.block_position_belief import BlocksPositionsBelief, BlockPo
 app = typer.Typer()
 
 
-def sample_belief(n_blocks, min_std, max_std, ws_x_lims, ws_y_lims):
-    block_pos_mu = np.random.uniform(low=[ws_x_lims[0], ws_y_lims[0]],
-                                     high=[ws_x_lims[1], ws_y_lims[1]],
-                                     size=(n_blocks, 2))
+def sample_belief(n_blocks, min_std, max_std, ws_x_lims, ws_y_lims, min_distance_between_mus=0.1):
+    block_pos_mu = []
+    for _ in range(n_blocks):
+        while True:
+            mu = np.random.uniform(low=[ws_x_lims[0], ws_y_lims[0]], high=[ws_x_lims[1], ws_y_lims[1]])
+            if all(np.linalg.norm(mu - other_mu) >= min_distance_between_mus for other_mu in block_pos_mu):
+                block_pos_mu.append(mu)
+                break
+    block_pos_mu = np.array(block_pos_mu)
     block_pos_sigma = np.random.uniform(low=min_std, high=max_std, size=(n_blocks, 2))
     return BlocksPositionsBelief(n_blocks, ws_x_lims, ws_y_lims, init_mus=block_pos_mu, init_sigmas=block_pos_sigma)
 
 
-def sample_state(belief: BlocksPositionsBelief, min_dist=0.08):
+def sample_state(belief: BlocksPositionsBelief, min_dist=0.1):
     return sample_block_positions_from_dists(belief.block_beliefs, min_dist=min_dist)
 
 
@@ -30,7 +35,7 @@ def load_help_configs(file_path="help_configs.npy"):
 @app.command(context_settings={"ignore_unknown_options": True})
 def generate_experiments(
         n_blocks: int = typer.Option(4, help="Number of blocks in the experiment"),
-        num_beliefs: int = typer.Option(3, help="Number of beliefs to sample"),
+        num_beliefs: int = typer.Option(2, help="Number of beliefs to sample"),
         min_std: float = typer.Option(0.02, help="Minimum standard deviation for belief sampling"),
         max_std: float = typer.Option(0.15, help="Maximum standard deviation for belief sampling"),
         n_states_per_belief: int = typer.Option(5, help="Number of states to sample per belief"),
