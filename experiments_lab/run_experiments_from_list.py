@@ -35,11 +35,6 @@ def run_experiments(
     os.makedirs(results_dir, exist_ok=True)
     chime.theme('pokemon')
 
-    # Load experiment configurations
-    df = pd.read_csv(config_file)
-
-    logging.info(f"Loaded {len(df)} experiments from {config_file}")
-
     # Setup environment and policy
     camera = RealsenseCameraWithRecording()
     motion_planner = MotionPlanner()
@@ -50,6 +45,10 @@ def run_experiments(
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
     r2_controller.speed, r2_controller.acceleration = 2.0, 4.0
+
+    # Load experiment configurations
+    df = pd.read_csv(config_file)
+    logging.info(f"Loaded {len(df)} experiments from {config_file}")
 
     env = LabBlockStackingEnv(n_blocks, max_steps, r1_controller, r2_controller, gt, camera, position_estimator)
 
@@ -71,7 +70,7 @@ def run_experiments(
 
     # Run experiments
     for _, row in df.iterrows():
-        if row['conducted_datetime_stamp']:
+        if pd.notna(row['conducted_datetime_stamp']) and row['conducted_datetime_stamp'] != '':
             continue  # Skip experiments that have already been conducted
 
         logging.info(f"Starting experiment ID: {row['experiment_id']}")

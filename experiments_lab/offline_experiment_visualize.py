@@ -34,8 +34,8 @@ def plot_belief(current_belief, history=[]):
 
 
 @app.command()
-def visualize_experiment(experiment_dir: str, with_help: bool = typer.Option(False, "--with_help")):
-    file_name = "with_help.pkl" if with_help else "no_help.pkl"
+def visualize_experiment(experiment_dir: str):
+    file_name = "results.pkl"
     file_path = os.path.join(experiment_dir, file_name)
 
     results = ExperimentResults.load(file_path)
@@ -47,7 +47,7 @@ def visualize_experiment(experiment_dir: str, with_help: bool = typer.Option(Fal
         i = 0
         while i < len(results.beliefs):
             visualizer.update_experiment_type(
-                f"{'With Help' if with_help else 'No Help'} - Step {i + 1}/{len(results.beliefs)}")
+                f"Step {i + 1}/{len(results.beliefs)}")
             visualizer.update_accumulated_reward(sum(results.rewards[:i + 1]))
 
             if i > 0:
@@ -61,11 +61,11 @@ def visualize_experiment(experiment_dir: str, with_help: bool = typer.Option(Fal
             belief_image = plot_belief(results.beliefs[i], history)
             visualizer.update_belief_image(belief_image)
 
-            if i == 0 and with_help:
-                detection_image_path = os.path.join(os.path.dirname(results._file_path), "help_detections.png")
-                if os.path.exists(detection_image_path):
-                    detection_image = cv2.imread(detection_image_path)
-                    visualizer.update_detection_image(detection_image, "Help Detections")
+            # if i == 0 and with_help:
+            #     detection_image_path = os.path.join(os.path.dirname(results._file_path), "help_detections.png")
+            #     if os.path.exists(detection_image_path):
+            #         detection_image = cv2.imread(detection_image_path)
+            #         visualizer.update_detection_image(detection_image, "Help Detections")
 
             print("Press 'n' for next, 'p' for previous, or 'q' to quit.")
             key = input().lower()

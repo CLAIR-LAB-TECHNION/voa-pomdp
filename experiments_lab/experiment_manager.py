@@ -201,7 +201,11 @@ class ExperimentManager:
             init_sigmas=np.array(eval(row['belief_sigmas']))
         )
         init_block_positions = np.array(eval(row['state']))
-        help_config = np.array(eval(row['help_config'])) if row['help_config'] != 'None' else None
+
+        if pd.isna(row['help_config']) or row['help_config'] == '' or row['help_config'] == 'None':
+            help_config = None
+        else:
+            help_config = np.array(eval(row['help_config']))
 
         # Setup experiment directory
         datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -234,16 +238,17 @@ class ExperimentManager:
             results.set_metadata('help_config_idx_local', row['help_config_idx_local'])
             results.save(os.path.join(experiment_dir, "results.pkl"))
 
-            # Cleanup and save cleanup image
-            cleanup_detections = self.clean_up_workspace()
-            cv2.imwrite(os.path.join(experiment_dir, "cleanup.png"), cv2.cvtColor(cleanup_detections, cv2.COLOR_RGB2BGR))
-
             # Update CSV
             df = pd.read_csv(config_file)
             df.loc[df['experiment_id'] == row['experiment_id'], 'conducted_datetime_stamp'] = datetime_stamp
             df.to_csv(config_file, index=False)
 
             logging.info(f"Experiment ID: {row['experiment_id']} completed and results saved.")
+
+            # Cleanup and save cleanup image
+            cleanup_detections = self.clean_up_workspace()
+            cv2.imwrite(os.path.join(experiment_dir, "cleanup.png"), cv2.cvtColor(cleanup_detections, cv2.COLOR_RGB2BGR))
+
         finally:
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
                 self.env.camera.stop_recording()
@@ -430,15 +435,16 @@ class ExperimentManager:
         self.clear_robot2()
 
         # now clean other blocks that remain on the table, first detect them:
-        lookat = [np.mean(self.ws_x_lims), np.mean(self.ws_y_lims), 0]
-        lookat[0] += 0.15
-        lookat[1] += 0.15
-        clean_up_sensor_config = lookat_verangle_horangle_distance_to_robot_config(lookat,
-                                                                                   vertical_angle=60,
-                                                                                   horizontal_angle=30,
-                                                                                   distance=0.7,
-                                                                                   gt=self.env.gt,
-                                                                                   robot_name="ur5e_1")
+        # lookat = [np.mean(self.ws_x_lims), np.mean(self.ws_y_lims), 0]
+        # lookat[0] += 0.15
+        # lookat[1] += 0.15
+        # clean_up_sensor_config = lookat_verangle_horangle_distance_to_robot_config(lookat,
+        #                                                                            vertical_angle=60,
+        #                                                                            horizontal_angle=30,
+        #                                                                            distance=0.7,
+        #                                                                            gt=self.env.gt,
+        #                                                                            robot_name="ur5e_1")
+        clean_up_sensor_config = [1.2861, -0.8437, 0.8167, -1.7062, -2.3100, 1.1541]
         clean_up_sensor_config = to_canonical_config(clean_up_sensor_config)
 
         self.env.r1_controller.plan_and_moveJ(clean_up_sensor_config)
