@@ -135,15 +135,17 @@ class ManipulationController(RobotInterfaceWithGripper):
             self.motion_planner.vis_config(self.robot_name, start_config,
                                            vis_name="start_config", rgba=(1, 0, 0, 0.5))
 
-        # plan until the ratio between length and distance is lower than 2, but stop if 8 seconds have passed
+        # plan until the ratio between length and distance is lower than 2, but stop if 15 seconds have passed
         path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
                                                                   start_config,
                                                                   q,
-                                                                  max_time=8,
+                                                                  max_time=15,
                                                                   max_length_to_distance_ratio=2)
 
         if path is None:
             logging.error(f"{self.robot_name} Could not find a path")
+            print("Could not find a path, not moving.")
+            return False
         else:
             logging.info(f"{self.robot_name} Found path with {len(path)} waypoints, moving...")
 
@@ -153,6 +155,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.move_path(path, speed, acceleration)
         # update the motion planner with the new configuration:
         self.update_mp_with_current_config()
+        return True
 
     def plan_and_move_home(self, speed=None, acceleration=None):
         """
@@ -186,7 +189,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         shoulder_constraint = 0.15 if z < 0.2 else 0.35
         goal_config = self.find_ik_solution(target_pose_robot, max_tries=50, for_down_movement=for_down_movement,)
-        self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
+        return self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
         # motion planner is automatically updated after movement
 
     def pick_up(self, x, y, rz, start_height=0.2):
@@ -202,7 +205,10 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.release_grasp()
 
         # move above pickup location:
-        self.plan_and_move_to_xyzrz(x, y, start_height, rz)
+        res = self.plan_and_move_to_xyzrz(x, y, start_height, rz)
+        if not res:
+            return
+
         above_pickup_config = self.getActualQ()
 
         # move down until contact, here we move a little bit slower than drop and sense
@@ -236,7 +242,10 @@ class ManipulationController(RobotInterfaceWithGripper):
         """
         logging.info(f"{self.robot_name} putting down at {x}{y}{rz} with start height {start_height}")
         # move above dropping location:
-        self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+        res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+        if not res:
+            return
+
         above_drop_config = self.getActualQ()
 
         logging.debug(f"{self.robot_name} moving down until contact to put down")
@@ -300,7 +309,10 @@ class ManipulationController(RobotInterfaceWithGripper):
         # move above point with the tip tilted:
         pose = self.gt.get_tilted_pose_6d_for_sensing(self.robot_name, [x, y, start_height])
         goal_config = self.find_ik_solution(pose, max_tries=50)
-        self.plan_and_moveJ(goal_config)
+        res = self.plan_and_moveJ(goal_config)
+
+        if not res:
+            return -1
 
         above_sensing_config = self.getActualQ()
 
