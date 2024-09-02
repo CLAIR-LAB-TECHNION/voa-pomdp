@@ -202,7 +202,6 @@ class ManipulationController(RobotInterfaceWithGripper):
         :return:
         """
         logging.info(f"{self.robot_name} picking up at {x}{y}{rz} with start height {start_height}")
-        self.release_grasp()
 
         # move above pickup location:
         res = self.plan_and_move_to_xyzrz(x, y, start_height, rz)
@@ -210,6 +209,7 @@ class ManipulationController(RobotInterfaceWithGripper):
             return
 
         above_pickup_config = self.getActualQ()
+        self.release_grasp()
 
         # move down until contact, here we move a little bit slower than drop and sense
         # because the gripper rubber may damage from the object at contact:
