@@ -9,12 +9,12 @@ from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTran
 
 
 def sample_help_config(gt,
-                       lookat_max_offset=0.2,
-                       verangle_min=30,
+                       lookat_max_offset=0.4,
+                       verangle_min=20,
                        verangle_max=90,
                        horangle_min=-10,
                        horangle_max=60,
-                       distance_min=0.5,
+                       distance_min=0.4,
                        distance_max=1.5,
                        ws_x_lims=workspace_x_lims_default,
                        ws_y_lims=workspace_y_lims_default,
@@ -61,19 +61,19 @@ app = typer.Typer()
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
-def generate_configs(n_samples: int = 1000,
+def generate_configs(n_samples: int = 100,
                      save_to_file_name="help_configs.npy",
-                     lookat_max_offset: float = 0.2,
-                     verangle_min: int = 30,
+                     lookat_max_offset: float = 0.4,
+                     verangle_min: int = 20,
                      verangle_max: int = 90,
                      horangle_min: int = -10,
                      horangle_max: int = 60,
-                     distance_min: float = 0.5,
+                     distance_min: float = 0.4,
                      distance_max: float = 1.5):
     gt = GeometryAndTransforms.build()
 
     help_configs = []
-    for i in range(n_samples):
+    while len(help_configs) < n_samples:
         help_config = sample_help_config(gt=gt,
                                          lookat_max_offset=lookat_max_offset,
                                          verangle_min=verangle_min,
@@ -82,6 +82,15 @@ def generate_configs(n_samples: int = 1000,
                                          horangle_max=horangle_max,
                                          distance_min=distance_min,
                                          distance_max=distance_max, )
+
+        # if this config is too close to an existing one, skip it
+        if len(help_configs) > 0:
+            min_dist = np.min(np.linalg.norm(np.array(help_configs) - np.array(help_config), axis=1))
+            print(f"min dist to existing configs: {min_dist}")
+            if min_dist < 0.75:
+                print(f"skipping, too close to existing config, min dist: {min_dist}")
+                continue
+
         help_configs.append(help_config)
 
     help_configs = np.array(help_configs)

@@ -39,7 +39,7 @@ def generate_experiments(
         min_std: float = typer.Option(0.02, help="Minimum standard deviation for belief sampling"),
         max_std: float = typer.Option(0.15, help="Maximum standard deviation for belief sampling"),
         n_states_per_belief: int = typer.Option(5, help="Number of states to sample per belief"),
-        n_helper_configs: int = typer.Option(10, help="Number of helper configurations to sample"),
+        n_helper_configs: int = typer.Option(8, help="Number of helper configurations to sample"),
         output_file: str = typer.Option("experiments", help="Output file name (without extension)"),
 ):
     # Use the default workspace limits from your utility module
