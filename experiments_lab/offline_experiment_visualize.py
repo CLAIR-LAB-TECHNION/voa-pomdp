@@ -52,7 +52,16 @@ def visualize_experiment(experiment_dir: str):
                 detection_image = cv2.imread(detection_image_path)
                 visualizer.update_detection_image(detection_image, "Help Detections")
 
-        i = -1 if results.is_with_help else 0 # -1 is before help
+            if results.help_detections_mus is not None:
+                observed_mus_and_sigmas = [(results.help_detections_mus[i], results.help_detections_sigmas[i])
+                                           for i in range(len(results.help_detections_mus))]
+                belief_im_with_detections = plot_belief(results.belief_before_help,
+                                                        actual_state=results.actual_initial_block_positions,
+                                                        history=[],
+                                                        observed_mus_and_sigmas=observed_mus_and_sigmas)
+                visualizer.add_detections_distributions(belief_im_with_detections)
+
+        i = 0
         while i < len(results.beliefs):
             visualizer.update_experiment_type(
                 f"Step {i}/{len(results.beliefs)}")
@@ -66,24 +75,12 @@ def visualize_experiment(experiment_dir: str):
                 )
 
             history = []
-            observed_mus_and_sigmas = None
-
-            if i == -1:
-                if results.help_detections_mus is not None:
-                    observed_mus_and_sigmas = [(results.help_detections_mus[i], results.help_detections_sigmas[i])
-                                               for i in range(len(results.help_detections_mus))]
-                    belief = results.belief_before_help
-                else:
-                    i += 1
-                    continue
-            else:
-                belief = results.beliefs[i]
-                history = list(zip(results.actions[:i], results.observations[:i]))
+            belief = results.beliefs[i]
+            history = list(zip(results.actions[:i], results.observations[:i]))
 
             belief_image = plot_belief(belief,
                                        actual_state=results.actual_initial_block_positions,
-                                       history=history,
-                                       observed_mus_and_sigmas=observed_mus_and_sigmas)
+                                       history=history,)
             visualizer.update_belief_image(belief_image)
 
             print("Press 'n' for next, 'p' for previous, or 'q' to quit.")

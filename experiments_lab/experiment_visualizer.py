@@ -6,6 +6,7 @@ import threading
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
 
+
 class ExperimentVisualizer:
     def __init__(self, window_name="Experiment Visualization", window_size=(1200, 1000)):
         self.window_name = window_name
@@ -16,9 +17,10 @@ class ExperimentVisualizer:
         self.accumulated_reward = 0
         self.additional_info = ""
         self.action_obs_reward_text = ""
-        self.detection_image = np.zeros((450, 500, 3), dtype=np.uint8)
+        self.detection_image = np.zeros((450, 400, 3), dtype=np.uint8)
         self.detection_header = "Last Detections"
-        self.belief_image = np.zeros((1000, 600, 3), dtype=np.uint8)
+        self.belief_image = np.zeros((1000, 348, 3), dtype=np.uint8)
+        self.detections_distributions_image = None
 
         self.running = False
         self.update_thread = None
@@ -39,9 +41,10 @@ class ExperimentVisualizer:
         self.accumulated_reward = 0
         self.additional_info = ""
         self.action_obs_reward_text = ""
-        self.detection_image = np.zeros((450, 500, 3), dtype=np.uint8)
+        self.detection_image = np.zeros((450, 400, 3), dtype=np.uint8)
         self.detection_header = "Last Detections"
-        self.belief_image = np.zeros((1000, 600, 3), dtype=np.uint8)
+        self.belief_image = np.zeros((1000, 348, 3), dtype=np.uint8)
+        self.detections_distributions_image = None
 
     def _update_loop(self):
         cv2.namedWindow(self.window_name, cv2.WINDOW_NORMAL)
@@ -50,7 +53,7 @@ class ExperimentVisualizer:
         while self.running:
             self._update_display()
             key = cv2.waitKey(1000) & 0xFF
-            if key == 27:  # ESC key
+            if key == 27:
                 self.running = False
 
     def update_experiment_type(self, experiment_type):
@@ -65,7 +68,7 @@ class ExperimentVisualizer:
     def update_action_obs_reward(self, actions, observations, rewards):
         text = "Actions | Observations | Rewards\n"
         text += "---------------------------------\n"
-        for a, o, r in list(zip(actions, observations, rewards))[-12:]:  # Show last 10 entries
+        for a, o, r in list(zip(actions, observations, rewards))[-12:]:
             next_line = ""
             if isinstance(a, ActionSense):
                 next_line += f"SE({a.x:5.4f}, {a.y:5.4f}) |"
@@ -92,16 +95,16 @@ class ExperimentVisualizer:
 
         h, w = image.shape[:2]
         aspect_ratio = w / h
-        new_w = min(500, w)
+        new_w = min(400, w)
         new_h = int(new_w / aspect_ratio)
         if new_h > 450:
             new_h = 450
             new_w = int(new_h * aspect_ratio)
         new_w, new_h = int(new_w), int(new_h)
         resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-        self.detection_image = np.zeros((450, 500, 3), dtype=np.uint8)
+        self.detection_image = np.zeros((450, 400, 3), dtype=np.uint8)
         y_offset = (450 - new_h) // 2
-        x_offset = (500 - new_w) // 2
+        x_offset = (400 - new_w) // 2
         self.detection_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
         if header is not None:
             self.detection_header = header
@@ -117,15 +120,36 @@ class ExperimentVisualizer:
         aspect_ratio = w / h
         new_h = min(1000, h)
         new_w = int(new_h * aspect_ratio)
-        if new_w > 600:
-            new_w = 600
+        if new_w > 348:
+            new_w = 348
             new_h = int(new_w / aspect_ratio)
         new_w, new_h = int(new_w), int(new_h)
         resized = cv2.resize(belief_image, (new_w, new_h), interpolation=cv2.INTER_AREA)
-        self.belief_image = np.zeros((1000, 600, 3), dtype=np.uint8)
+        self.belief_image = np.zeros((1000, 348, 3), dtype=np.uint8)
         y_offset = (1000 - new_h) // 2
-        x_offset = (600 - new_w) // 2
+        x_offset = (348 - new_w) // 2
         self.belief_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
+
+    def add_detections_distributions(self, image):
+        image = np.asarray(image, dtype=np.uint8)
+        if image.ndim == 2:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+        elif image.shape[2] == 4:
+            image = cv2.cvtColor(image, cv2.COLOR_RGBA2BGR)
+
+        h, w = image.shape[:2]
+        aspect_ratio = w / h
+        new_h = 1000
+        new_w = int(new_h * aspect_ratio)
+        if new_w > 348:
+            new_w = 348
+            new_h = int(new_w / aspect_ratio)
+        new_w, new_h = int(new_w), int(new_h)
+        resized = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
+        self.detections_distributions_image = np.zeros((1000, 348, 3), dtype=np.uint8)
+        y_offset = (1000 - new_h) // 2
+        x_offset = (348 - new_w) // 2
+        self.detections_distributions_image[y_offset:y_offset + new_h, x_offset:x_offset + new_w] = resized
 
     def _draw_text(self, image, text, position, font_scale=0.7, color=(255, 255, 255), thickness=1):
         for i, line in enumerate(text.split('\n')):
@@ -143,11 +167,19 @@ class ExperimentVisualizer:
         self._draw_text(self.canvas, self.action_obs_reward_text, (10, 150), font_scale=0.6)
 
         self._draw_text(self.canvas, self.detection_header, (10, 520))
-        self.canvas[550:1000, 10:510] = self.detection_image
+        self.canvas[550:1000, 10:410] = self.detection_image
 
-        self.canvas[:1000, 600:] = self.belief_image
+        if self.detections_distributions_image is not None:
+            self.canvas[:1000, 500:848] = self.belief_image
+            self.canvas[:1000, 852:1200] = self.detections_distributions_image
+            self._draw_text(self.canvas, "", (500, 20))
+            self._draw_text(self.canvas, "", (852, 20))
+        else:
+            self.canvas[:1000, 500:848] = self.belief_image
+            self._draw_text(self.canvas, "Belief", (500, 20))
 
         cv2.imshow(self.window_name, self.canvas)
+
 
 if __name__ == "__main__":
     visualizer = ExperimentVisualizer()
@@ -159,12 +191,20 @@ if __name__ == "__main__":
             visualizer.update_accumulated_reward(i * 10)
             visualizer.update_additional_info(f"Step {i}")
             visualizer.update_action_obs_reward(
-                [f"Action {j}" for j in range(i - 4, i + 1)],
-                [f"Obs {j}" for j in range(i - 4, i + 1)],
-                [j * 0.5 for j in range(i - 4, i + 1)]
+                [ActionSense(0.1 * j, 0.1 * j) if j % 2 == 0 else ActionAttemptStack(0.1 * j, 0.1 * j) for j in
+                 range(i - 11, i + 1)],
+                [ObservationSenseResult(j % 2 == 0, [0.1 * j, 0.1 * j],
+                                        1) if j % 2 == 0 else ObservationStackAttemptResult(j % 3 == 0,
+                                                                                            [0.1 * j, 0.1 * j], 1) for j
+                 in range(i - 11, i + 1)],
+                [j * 0.5 for j in range(i - 11, i + 1)]
             )
             visualizer.update_detection_image(np.random.randint(0, 255, (700, 700, 3)))
             visualizer.update_belief_image(np.random.randint(0, 255, (1000, 600, 3)))
-            time.sleep(0.5)  # Simulate some processing time
+
+            if i % 5 == 0:
+                visualizer.add_detections_distributions(np.random.randint(0, 255, (1000, 600, 3)))
+
+            time.sleep(0.5)
     finally:
         visualizer.stop()
