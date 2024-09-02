@@ -9,6 +9,7 @@ import pandas as pd
 from frozendict import frozendict
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.experiment_visualizer import ExperimentVisualizer
+from experiments_lab.utils import plot_belief_with_history
 from lab_ur_stack.camera.realsense_camera import RealsenseCameraWithRecording
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.manipulation.utils import to_canonical_config,  ur5e_2_collect_blocks_from_positions
@@ -107,9 +108,14 @@ class ExperimentManager:
 
             if self.visualizer is not None:
                 self.visualizer.update_detection_image(detections_im, "Help Detections")
-                self.visualizer.update_belief_image(self.plot_belief(init_block_belief,
-                                                                     actual_state=init_block_positions,
-                                                                     ret_as_image=True))
+                self.visualizer.update_belief_image(plot_belief_with_history(init_block_belief,
+                                                                            actual_state=init_block_positions,
+                                                                            ret_as_image=True))
+                observed_mus_and_sigmas = [(detection_mus[i], detections_sigmas[i]) for i in range(len(detection_mus))]
+                self.visualizer.add_detections_distributions(plot_belief_with_history(results.belief_before_help,
+                                                                                      actual_state=init_block_positions,
+                                                                                      observed_mus_and_sigmas=observed_mus_and_sigmas,
+                                                                                      ret_as_image=True))
 
         results.beliefs.append(init_block_belief)
 
@@ -121,7 +127,7 @@ class ExperimentManager:
         accumulated_reward = 0
         for i in range(self.env.max_steps):
             if plot_beliefs:
-                self.plot_belief(current_belief, history)
+                plot_belief_with_history(current_belief, actual_state=init_block_positions, history=history)
             action = self.policy.sample_action(current_belief, history)
             observation, reward = self.env.step(action)
 
@@ -137,8 +143,8 @@ class ExperimentManager:
 
             if self.visualizer is not None:
                 self.visualizer.update_action_obs_reward(results.actions, results.observations, results.rewards)
-                belief_im = self.plot_belief(current_belief, history, actual_state=init_block_positions,
-                                             ret_as_image=True)
+                belief_im = plot_belief_with_history(current_belief, history=history,
+                                                     actual_state=init_block_positions, ret_as_image=True)
                 self.visualizer.update_belief_image(belief_im)
                 self.visualizer.update_accumulated_reward(accumulated_reward)
                 self.visualizer.update_additional_info(f"Step {i + 1}/{self.env.max_steps}")
@@ -485,28 +491,6 @@ class ExperimentManager:
         logging.info("workspace cleaning procedure finished")
 
         return cv2.cvtColor(plot_im, cv2.COLOR_BGR2RGB)
-
-    def plot_belief(self, current_belief, history=[], actual_state=None, ret_as_image=False):
-        # use the history for points
-        positive_sens = []
-        negative_sens = []
-        failed_pickups = []
-        for a, o in history:
-            if isinstance(o, ObservationSenseResult):
-                if o.is_occupied:
-                    positive_sens.append((a.x, a.y))
-                else:
-                    negative_sens.append((a.x, a.y))
-            elif isinstance(o, ObservationStackAttemptResult):
-                if not o.is_object_picked:
-                    failed_pickups.append((a.x, a.y))
-
-        return plot_all_blocks_beliefs(current_belief,
-                                positive_sensing_points=positive_sens,
-                                negative_sensing_points=negative_sens,
-                                pickup_attempt_points=failed_pickups,
-                                actual_states=actual_state,
-                                ret_as_image=ret_as_image)
 
     def start_visualizer_if_not_started(self):
         if self.visualizer is not None and not self.visualizer.running:
