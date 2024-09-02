@@ -5,6 +5,7 @@ from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTran
 from lab_ur_stack.utils import logging_util
 import time
 import logging
+import chime
 
 
 def canninical_last_joint_config(config):
@@ -61,6 +62,8 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         motion_palnner.visualize()
         time.sleep(0.2)
+
+        chime.theme('pokemon')
 
     @classmethod
     def build_from_robot_name_and_ip(cls, robot_ip, robot_name):
@@ -135,11 +138,11 @@ class ManipulationController(RobotInterfaceWithGripper):
             self.motion_planner.vis_config(self.robot_name, start_config,
                                            vis_name="start_config", rgba=(1, 0, 0, 0.5))
 
-        # plan until the ratio between length and distance is lower than 2, but stop if 15 seconds have passed
+        # plan until the ratio between length and distance is lower than 2, but stop if 8 seconds have passed
         path = self.motion_planner.plan_from_start_to_goal_config(self.robot_name,
                                                                   start_config,
                                                                   q,
-                                                                  max_time=15,
+                                                                  max_time=8,
                                                                   max_length_to_distance_ratio=2)
 
         if path is None:
@@ -192,7 +195,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         return self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
         # motion planner is automatically updated after movement
 
-    def pick_up(self, x, y, rz, start_height=0.2):
+    def pick_up(self, x, y, rz, start_height=0.2, replan_from_home_if_failed=True):
         """
         TODO
         :param x:
@@ -205,8 +208,19 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         # move above pickup location:
         res = self.plan_and_move_to_xyzrz(x, y, start_height, rz)
+
         if not res:
-            return
+            if not replan_from_home_if_failed:
+                chime.error()
+                return
+
+            logging.warning(f"{self.robot_name} replanning from home, probably couldn't find path"
+                            f" from current position")
+            self.plan_and_move_home()
+            res = self.plan_and_move_to_xyzrz(x, y, start_height, rz)
+            if not res:
+                chime.error()
+                return
 
         above_pickup_config = self.getActualQ()
         self.release_grasp()
@@ -231,7 +245,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         # TODO measure weight and return if successful or not
 
-    def put_down(self, x, y, rz, start_height=0.2):
+    def put_down(self, x, y, rz, start_height=0.2, replan_from_home_if_failed=True):
         """
         TODO
         :param x:
@@ -244,7 +258,14 @@ class ManipulationController(RobotInterfaceWithGripper):
         # move above dropping location:
         res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
         if not res:
-            return
+            if not replan_from_home_if_failed:
+                chime.error()
+                return
+            self.plan_and_move_home()
+            res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+            if not res:
+                chime.error()
+                return
 
         above_drop_config = self.getActualQ()
 
@@ -289,7 +310,7 @@ class ManipulationController(RobotInterfaceWithGripper):
     #
     #     return height
 
-    def sense_height_tilted(self, x, y, start_height=0.15):
+    def sense_height_tilted(self, x, y, start_height=0.15, replan_from_home_if_failed=True):
         """
         TODO
         :param x:
@@ -312,7 +333,14 @@ class ManipulationController(RobotInterfaceWithGripper):
         res = self.plan_and_moveJ(goal_config)
 
         if not res:
-            return -1
+            if not replan_from_home_if_failed:
+                chime.error()
+                return -1
+            self.plan_and_move_home()
+            res = self.plan_and_moveJ(goal_config)
+            if not res:
+                chime.error()
+                return -1
 
         above_sensing_config = self.getActualQ()
 

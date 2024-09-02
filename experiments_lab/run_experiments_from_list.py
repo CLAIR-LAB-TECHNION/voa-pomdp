@@ -83,6 +83,7 @@ def run_experiments(
         input("Experiment completed. Make sure piles are reset and workspace is clean, "
               "then Press ENTER to continue with the next experiment...")
         experiment_mgr.piles_manager.reset()
+        experiment_mgr.visualizer.reset()
 
     experiment_mgr.stop_visualizer_if_started()
     logging.info("All experiments completed.")

@@ -64,7 +64,7 @@ def plot_all_blocks_beliefs(block_pos_belief: UnnormalizedBlocksPositionsBelief,
 
         else:
             observed_mus_and_sigmas = None
-            if per_block_observed_mus_and_sigmas is not None:
+            if per_block_observed_mus_and_sigmas is not None and len(per_block_observed_mus_and_sigmas) > i:
                 if not per_block_observed_mus_and_sigmas[i][1][0] == -1:
                     observed_mus_and_sigmas = per_block_observed_mus_and_sigmas[i]
 

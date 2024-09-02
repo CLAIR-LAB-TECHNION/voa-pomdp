@@ -514,7 +514,7 @@ class BlockPilesManager:
         """
          call this after piles are really reset! This does not change the actual environment!
         """
-        self.piles_current_heights = self.piles_max_heights
+        self.piles_current_heights = copy(self.piles_max_heights)
 
     def pop_next_block(self):
         """ return (position, height) of next pile. height is in blocks and position is xy and world frame"""

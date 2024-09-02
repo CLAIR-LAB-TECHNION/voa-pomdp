@@ -4,7 +4,7 @@ import numpy as np
 def detections_to_distributions(detected_positions,
                                 camera_position,
                                 minimal_std=0.005,  # 0.5 cm
-                                distance_coeff=0.01,  # 1 cm added for distance of 1m
+                                distance_coeff=0.02,  # 2 cm added for distance of 1m
                                 n_blocks_coeff=0.002,  # each block adds 0.2 cm
                                 inverse_nearest_block_coeff=0.0005  # block at 10 cm adds 0.5 cm
                                 ):
