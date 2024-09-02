@@ -261,6 +261,9 @@ class ManipulationController(RobotInterfaceWithGripper):
             if not replan_from_home_if_failed:
                 chime.error()
                 return
+
+            logging.warning(f"{self.robot_name} replanning from home, probably couldn't find path"
+                            f" from current position")
             self.plan_and_move_home()
             res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
             if not res:
@@ -336,6 +339,9 @@ class ManipulationController(RobotInterfaceWithGripper):
             if not replan_from_home_if_failed:
                 chime.error()
                 return -1
+
+            logging.warning(f"{self.robot_name} replanning from home, probably couldn't find path"
+                            f" from current position")
             self.plan_and_move_home()
             res = self.plan_and_moveJ(goal_config)
             if not res:

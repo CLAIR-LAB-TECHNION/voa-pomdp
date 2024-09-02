@@ -116,6 +116,12 @@ class ExperimentManager:
                                                                                       actual_state=init_block_positions,
                                                                                       observed_mus_and_sigmas=observed_mus_and_sigmas,
                                                                                       ret_as_image=True))
+        else:
+            results.is_with_help = False
+            self.visualizer.add_detections_distributions(plot_all_blocks_beliefs(init_block_belief,
+                                                                               actual_states=init_block_positions,
+                                                                               ret_as_image=True)) # initial belief
+
 
         results.beliefs.append(init_block_belief)
 
@@ -154,6 +160,9 @@ class ExperimentManager:
                 break
 
         results.total_reward = accumulated_reward
+
+        n_blocks_stacked = len(init_block_positions) - len(current_belief.block_beliefs)
+        print(f"Experiment finished with total reward: {accumulated_reward}. stacked {n_blocks_stacked} blocks")
 
         return results
 
