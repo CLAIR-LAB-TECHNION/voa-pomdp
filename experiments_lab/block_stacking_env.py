@@ -50,10 +50,12 @@ class LabBlockStackingEnv:
         self.steps = 0
         self.current_robot_position = None
         self.current_tower_height_blocks = 0
+        self.n_picked_blocks = 0
 
     def reset(self,):
         self.steps = 0
         self.current_tower_height_blocks = 0
+        self.n_picked_blocks = 0
 
         # for safety, just make sure r1 is clear enough
         r1_position = self.r1_controller.getActualTCPPose()[:3]
@@ -66,6 +68,9 @@ class LabBlockStackingEnv:
     def step(self, action: ActionBase) -> tuple[ObservationBase, float]:
         if self.steps >= self.max_steps:
             print("reached max steps, episode is already done")
+            return ObservationReachedTerminal(), 0
+        if self.n_picked_blocks == self.n_blocks:
+            print("all blocks are already picked, episode is done")
             return ObservationReachedTerminal(), 0
 
         self.steps += 1
@@ -86,18 +91,30 @@ class LabBlockStackingEnv:
             self.current_robot_position = (action.x, action.y)
 
         elif isinstance(action, ActionAttemptStack):
-            self.r2_controller.pick_up(action.x, action.y, 0.12)
-            self.r2_controller.put_down(goal_tower_position[0],
-                                        goal_tower_position[1],
-                                        0,
-                                        start_height=self.n_blocks * 0.04 + 0.1)
-            new_tower_height_blocks = self.sense_tower_height()
-            success_stack = self.current_tower_height_blocks < new_tower_height_blocks
-            self.current_tower_height_blocks = new_tower_height_blocks
-            is_finished = self.current_tower_height_blocks == self.n_blocks
+            # Note: The observation is whether the block is picked, but the reward is based on the tower height.
+            #  It can happen that the block is picked but the tower height remains the same because the block was
+            #  picked not in the center, and it falls when the robot tries to put it on the tower.
+            #  in that case there is no reward but the agent can update it's belief that the block is not there
+            #  anymore.
+            self.r2_controller.pick_up(action.x, action.y, 0, start_height=0.15)
+            is_picked = self.r2_controller.is_object_gripped()
+
+            if not is_picked:
+                success_stack = False
+                is_finished = False
+            else:
+                self.r2_controller.put_down(goal_tower_position[0],
+                                            goal_tower_position[1],
+                                            0,
+                                            start_height=self.n_blocks * 0.04 + 0.1)
+                new_tower_height_blocks = self.sense_tower_height()
+                success_stack = self.current_tower_height_blocks < new_tower_height_blocks
+                self.current_tower_height_blocks = new_tower_height_blocks
+                self.n_picked_blocks += 1
+                is_finished = self.n_picked_blocks == self.n_blocks
 
             observed_steps_left = steps_left if not is_finished else 0
-            observation = ObservationStackAttemptResult(success_stack,
+            observation = ObservationStackAttemptResult(is_picked,
                                                         robot_position=(action.x, action.y),
                                                         steps_left=observed_steps_left)
 

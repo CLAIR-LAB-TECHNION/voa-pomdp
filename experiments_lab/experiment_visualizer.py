@@ -78,7 +78,7 @@ class ExperimentVisualizer:
             if isinstance(o, ObservationSenseResult):
                 next_line += f" occupied |" if o.is_occupied else f" empty |"
             elif isinstance(o, ObservationStackAttemptResult):
-                next_line += f" success |" if o.is_object_picked else f" fail |"
+                next_line += f" picked |" if o.is_object_picked else f" not picked |"
 
             next_line += f" {r:5.4f}\n"
 

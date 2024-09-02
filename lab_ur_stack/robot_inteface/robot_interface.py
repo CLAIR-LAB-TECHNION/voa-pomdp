@@ -67,3 +67,6 @@ class RobotInterfaceWithGripper(RobotInterface):
         if res != 0:
             logging.warning(f"Failed to release grasp ({self._ip})")
         time.sleep(wait_time)
+
+    def is_object_gripped(self):
+        return self.gripper.twofg_get_grip_detected()

@@ -161,8 +161,7 @@ class ExperimentManager:
 
         results.total_reward = accumulated_reward
 
-        n_blocks_stacked = len(init_block_positions) - len(current_belief.block_beliefs)
-        print(f"Experiment finished with total reward: {accumulated_reward}. stacked {n_blocks_stacked} blocks")
+        print(f"Experiment finished with total reward: {accumulated_reward}. picked up {self.env.n_picked_blocks} blocks")
 
         return results
 
