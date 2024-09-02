@@ -152,7 +152,7 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
 
     if z.max() == 0:
         # no point with probability found. Just return empty image
-        return np.zeros((5, 5, 3), dtype=np.uint8)
+        return np.zeros((800, 600, 3), dtype=np.uint8)
 
     levels = np.linspace(0, np.max(z), n_levels)
     alpha = 1 if observed_mus_and_sigmas is not None else 1
