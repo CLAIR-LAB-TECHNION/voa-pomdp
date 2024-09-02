@@ -96,8 +96,11 @@ class UnnormalizedBlocksPositionsBelief:
 
     def _update_successful_pickup(self, pick_x, pick_y):
         block_to_remove_id = np.argmax([b.pdf((pick_x, pick_y)) for b in self.block_beliefs])
-        self.block_beliefs.pop(block_to_remove_id)
-        self.block_beliefs_original_position[block_to_remove_id] = None
+        removed = self.block_beliefs.pop(block_to_remove_id)
+        for i in range(len(self.block_beliefs_original_position)):
+            if self.block_beliefs_original_position[i] == removed:
+                self.block_beliefs_original_position[i] = None
+                break
         self.n_blocks_on_table -= 1
 
         half_block_size = self.block_size / 2

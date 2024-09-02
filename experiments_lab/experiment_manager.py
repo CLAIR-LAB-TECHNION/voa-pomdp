@@ -97,12 +97,12 @@ class ExperimentManager:
             results.is_with_help = True
             results.help_config = help_config
             results.belief_before_help = deepcopy(init_block_belief)
-            detection_muss, detections_sigmas, detections_im = \
+            detection_mus, detections_sigmas, detections_im = \
                 self.help_and_update_belief(init_block_belief, help_config)
             if help_detections_filename is not None:
                 cv2.imwrite(help_detections_filename, cv2.cvtColor(detections_im, cv2.COLOR_RGB2BGR))
 
-            results.help_detections_mus = detection_muss
+            results.help_detections_mus = detection_mus
             results.help_detections_sigmas = detections_sigmas
 
             if self.visualizer is not None:

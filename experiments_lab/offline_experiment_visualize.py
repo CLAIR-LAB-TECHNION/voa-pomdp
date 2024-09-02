@@ -10,7 +10,7 @@ from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 app = typer.Typer()
 
 
-def plot_belief(current_belief, actual_state, history=[]):
+def plot_belief(current_belief, actual_state, history=[], observed_mus_and_sigmas=None):
     # TODO: add actual block positions
     # TODO other details from Experiment results
     positive_sens = []
@@ -31,6 +31,7 @@ def plot_belief(current_belief, actual_state, history=[]):
                                    positive_sensing_points=positive_sens,
                                    negative_sensing_points=negative_sens,
                                    pickup_attempt_points=failed_pickups,
+                                   per_block_observed_mus_and_sigmas=observed_mus_and_sigmas,
                                    ret_as_image=True)
 
 
@@ -59,9 +60,12 @@ def visualize_experiment(experiment_dir: str):
                 )
 
             history = list(zip(results.actions[:i], results.observations[:i]))
+            observed_mus_and_sigmas = (results.help_detections_mus, results.help_detections_sigmas) \
+                if i == 0 and results.help_detections_mus is not None else None
             belief_image = plot_belief(results.beliefs[i],
                                        actual_state=results.actual_initial_block_positions,
-                                       history=history)
+                                       history=history,
+                                       observed_mus_and_sigmas=observed_mus_and_sigmas)
             visualizer.update_belief_image(belief_image)
 
             # if i == 0 and with_help:

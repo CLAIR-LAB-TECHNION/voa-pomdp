@@ -22,8 +22,8 @@ class ExperimentResults:
         self.is_with_help = help_config is not None
         self.help_config = help_config
         self.belief_before_help = None
-        self.help_detection_mus = None
-        self.help_detection_sigmas = None
+        self.help_detections_mus = None
+        self.help_detections_sigmas = None
 
         self.beliefs: List[BlocksPositionsBelief] = []
         self.actions: List[Any] = []
