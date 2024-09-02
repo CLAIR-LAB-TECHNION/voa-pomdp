@@ -46,10 +46,16 @@ def visualize_experiment(experiment_dir: str):
     visualizer.start()
 
     try:
-        i = 0
+        if results.is_with_help:
+            detection_image_path = os.path.join(experiment_dir, "help_detections.png")
+            if os.path.exists(detection_image_path):
+                detection_image = cv2.imread(detection_image_path)
+                visualizer.update_detection_image(detection_image, "Help Detections")
+
+        i = -1 if results.is_with_help else 0 # -1 is before help
         while i < len(results.beliefs):
             visualizer.update_experiment_type(
-                f"Step {i + 1}/{len(results.beliefs)}")
+                f"Step {i}/{len(results.beliefs)}")
             visualizer.update_accumulated_reward(sum(results.rewards[:i + 1]))
 
             if i > 0:
@@ -59,20 +65,26 @@ def visualize_experiment(experiment_dir: str):
                     results.rewards[:i]
                 )
 
-            history = list(zip(results.actions[:i], results.observations[:i]))
-            observed_mus_and_sigmas = (results.help_detections_mus, results.help_detections_sigmas) \
-                if i == 0 and results.help_detections_mus is not None else None
-            belief_image = plot_belief(results.beliefs[i],
+            history = []
+            observed_mus_and_sigmas = None
+
+            if i == -1:
+                if results.help_detections_mus is not None:
+                    observed_mus_and_sigmas = [(results.help_detections_mus[i], results.help_detections_sigmas[i])
+                                               for i in range(len(results.help_detections_mus))]
+                    belief = results.belief_before_help
+                else:
+                    i += 1
+                    continue
+            else:
+                belief = results.beliefs[i]
+                history = list(zip(results.actions[:i], results.observations[:i]))
+
+            belief_image = plot_belief(belief,
                                        actual_state=results.actual_initial_block_positions,
                                        history=history,
                                        observed_mus_and_sigmas=observed_mus_and_sigmas)
             visualizer.update_belief_image(belief_image)
-
-            # if i == 0 and with_help:
-            #     detection_image_path = os.path.join(os.path.dirname(results._file_path), "help_detections.png")
-            #     if os.path.exists(detection_image_path):
-            #         detection_image = cv2.imread(detection_image_path)
-            #         visualizer.update_detection_image(detection_image, "Help Detections")
 
             print("Press 'n' for next, 'p' for previous, or 'q' to quit.")
             key = input().lower()

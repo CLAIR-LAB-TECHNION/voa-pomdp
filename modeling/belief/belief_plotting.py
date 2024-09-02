@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 from PIL import Image
+from matplotlib.colors import ListedColormap
+
 from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief, BlockPosDist
 
 
@@ -152,14 +154,9 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
         # no point with probability found. Just return empty image
         return np.zeros((5, 5, 3), dtype=np.uint8)
 
-    # for debug, make sure the sum of z is 1
-    # sum_z_mid = np.sum(z) * (x[1] - x[0]) * (y[1] - y[0])
-    # print(f"Sum of z using midpoints: {sum_z_mid}")
-
     levels = np.linspace(0, np.max(z), n_levels)
     alpha = 1 if observed_mus_and_sigmas is not None else 1
 
-    # Plot the heatmap
     plt.figure(figsize=(8, 6))
 
     plt.contourf(xx, yy, z, levels=levels, cmap=color_map, alpha=alpha)
@@ -186,13 +183,18 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
             plt.plot(point[0], point[1], 'go', markersize=9, )
 
     if observed_mus_and_sigmas is not None:
-        # add plots of 2d gaussian with the observed mus and sigmas in gray, opacity is 0.5
+        # Create a custom colormap with transparency at lower values
+        cmap = plt.get_cmap('Grays')
+        colors = cmap(np.linspace(0, 1, 256))
+        colors[:, -1] = np.linspace(0, 1, 256) ** 1 # Alpha channel
+        custom_cmap = ListedColormap(colors)
+
         mus = observed_mus_and_sigmas[0]
         sigmas = observed_mus_and_sigmas[1]
         dist = BlockPosDist(x_lims, y_lims, mus[0], sigmas[0], mus[1], sigmas[1])
         z = dist.pdf(np.stack([xx.ravel(), yy.ravel()], axis=1)).reshape(xx.shape)
         levels = np.linspace(0, np.max(z), 20)
-        plt.contourf(xx, yy, z, levels=levels, cmap='Greys', alpha=0.2, antialiased=True)
+        plt.contourf(xx, yy, z, levels=levels, cmap=custom_cmap, antialiased=True, )
 
     plt.xlabel('x')
     plt.ylabel('y')
@@ -212,7 +214,6 @@ def plot_block_distribution(block_pos_dist: BlockPosDist,
         return img_np
 
     plt.show()
-
 
 def plot_distribution(distribution, lower, upper, samples=2000):
     x = np.linspace(lower, upper, samples)
