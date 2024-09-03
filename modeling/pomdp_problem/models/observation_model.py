@@ -29,7 +29,7 @@ class ObservationModel(pomdp_py.ObservationModel):
         # check if there is block within block_size distance from the point both in x and y
         # if there is, it is occupied
         for block_pos in next_state.block_positions:
-            if np.abs(block_pos[0] - action.x) < self.block_size and np.abs(block_pos[1] - action.y) < self.block_size:
+            if np.abs(block_pos[0] - action.x) < self.block_size/2 and np.abs(block_pos[1] - action.y) < self.block_size/2:
                 return ObservationSenseResult(True,
                                               steps_left=next_state.steps_left,
                                               robot_position=next_state.robot_position)

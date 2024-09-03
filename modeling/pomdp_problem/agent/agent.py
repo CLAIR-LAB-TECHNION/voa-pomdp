@@ -8,7 +8,7 @@ from modeling.pomdp_problem.domain.state import State
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack, ActionBase
 from modeling.pomdp_problem.models.policy_model import PolicyModel, BeliefModel
 from modeling.pomdp_problem.models.reward_model import RewardModel
-from modeling.pomdp_problem.models.obseration_model import ObservationModel
+from modeling.pomdp_problem.models.observation_model import ObservationModel
 from modeling.pomdp_problem.models.transition_model import TransitionModel
 import pomdp_py
 

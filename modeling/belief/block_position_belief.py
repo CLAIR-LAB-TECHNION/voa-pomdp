@@ -65,7 +65,7 @@ class UnnormalizedBlocksPositionsBelief:
 
         return init_mus, init_sigmas
 
-    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.01):
+    def update_from_point_sensing_observation(self, point_x, point_y, is_occupied, no_update_margin=0.002):
         if not is_occupied:
             self._update_negative_sensing(point_x, point_y, no_update_margin)
         else:
@@ -85,8 +85,8 @@ class UnnormalizedBlocksPositionsBelief:
         block_to_update.add_new_bounds(area_to_update)
 
     def _calculate_sensing_area(self, point_x, point_y, margin):
-        return [[point_x - self.block_size + margin, point_x + self.block_size - margin],
-                [point_y - self.block_size + margin, point_y + self.block_size - margin]]
+        return [[point_x - self.block_size/2 + margin, point_x + self.block_size/2 - margin],
+                [point_y - self.block_size/2 + margin, point_y + self.block_size/2 - margin]]
 
     def update_from_pickup_attempt(self, pick_x, pick_y, observed_success):
         if observed_success:

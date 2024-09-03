@@ -70,22 +70,22 @@ def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial
 
 @app.command()
 def run_experiments(
-        n_blocks: int = 3,
-        max_steps: int = 20,
+        n_blocks: int = 4,
+        max_steps: int = 30,
         stacking_reward: float = 1.0,
         sensing_cost_coeff: float = 0.05,
         stacking_cost_coeff: float = 0.05,
         finish_ahead_of_time_reward_coeff: float = 0.1,
         n_blocks_for_actions: int = 2,
-        points_to_sample_for_each_block: int = 150,
+        points_to_sample_for_each_block: int = 250,
         sensing_actions_to_sample_per_block: int = 2,
-        max_planning_depth: int = 6,
-        sigmin: float = 0.01,
+        max_planning_depth: int = 5,
+        sigmin: float = 0.02,
         sigmax: float = 0.15,
-        num_experiments: int = 1,
-        num_runs_per_experiment: int = 10
+        num_experiments: int = 5,
+        num_runs_per_experiment: int = 2
 ):
-    num_sims_list = [500, 1000, 2000, 5000, 10000]
+    num_sims_list = [1000, 2000]
     tower_pos = goal_tower_position
 
     experiment_params = {
