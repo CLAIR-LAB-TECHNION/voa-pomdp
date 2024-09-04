@@ -44,8 +44,9 @@ class ExperimentManager:
 
         self.help_configs = None
         self.piles_manager = BlockPilesManager()
-
         self.visualizer = ExperimentVisualizer() if visualize else None
+
+        self.curr_expr_start_time = 0
 
     @classmethod
     def from_params(cls,
@@ -80,6 +81,8 @@ class ExperimentManager:
         @param plot_beliefs: if True, plot the belief at each step
         @return: ExperimentResults object with the experiment trajectory and data
         """
+        self.experiment_start_time = time.time()  # will almost match the time in the video
+
         logging.info("running an experiment")
         self.clear_robot1()
         self.safe_distribute_blocks_in_positions(init_block_positions)
@@ -135,6 +138,7 @@ class ExperimentManager:
             if plot_beliefs:
                 plot_belief_with_history(current_belief, actual_state=init_block_positions, history=history)
             action = self.policy.sample_action(current_belief, history)
+            results.actions_time_stamps.append(time.time() - self.experiment_start_time)
             observation, reward = self.env.step(action)
 
             accumulated_reward += reward
@@ -190,13 +194,13 @@ class ExperimentManager:
         camera_position = self.env.r1_controller.getActualTCPPose()[:3]
         mus, sigmas = detections_to_distributions(positions, camera_position)
 
+        self.clear_robot1()
+
         if len(mus) == 0:
             return [], [], detections_im
 
         ordered_detection_mus, ordered_detection_sigmas = \
             block_belief.update_from_image_detections_position_distribution(mus, sigmas)
-
-        self.clear_robot1()
 
         return ordered_detection_mus, ordered_detection_sigmas, detections_im
 

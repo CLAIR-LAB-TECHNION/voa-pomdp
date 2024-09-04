@@ -30,6 +30,7 @@ class ExperimentResults:
         self.observations: List[Any] = []
         self.rewards: List[float] = []
 
+        self.actions_time_stamps = []
 
         self._metadata: Dict[str, Any] = {}
 

@@ -228,7 +228,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         # move down until contact, here we move a little bit slower than drop and sense
         # because the gripper rubber may damage from the object at contact:
         logging.debug(f"{self.robot_name} moving down until contact")
-        lin_speed = min(self.linear_speed / 2, 0.05)
+        lin_speed = min(self.linear_speed / 2, 0.04)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
 
         # retract one more centimeter to avoid gripper scratching the surface:
@@ -274,7 +274,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         logging.debug(f"{self.robot_name} moving down until contact to put down")
         # move down until contact:
-        lin_speed = min(self.linear_speed, 0.05)
+        lin_speed = min(self.linear_speed, 0.04)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # release grasp:
         self.release_grasp()
@@ -353,7 +353,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         logging.debug(f"moving down until contact with TCP set to tip of the finger")
 
         # move down until contact:
-        lin_speed = min(self.linear_speed, 0.05)
+        lin_speed = min(self.linear_speed, 0.04)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # measure height:
         pose = self.getActualTCPPose()

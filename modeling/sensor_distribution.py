@@ -27,10 +27,11 @@ def detections_to_distributions(detected_positions,
     stds = np.full((n_blocks, 2), minimal_std)
     stds += n_blocks_coeff * (n_blocks - 1)
 
-    blocks_distances_matrix = np.linalg.norm(detected_positions[:, None] - detected_positions[None, :], axis=-1)
-    np.fill_diagonal(blocks_distances_matrix, np.inf)
-    nearest_block_distances = np.min(blocks_distances_matrix, axis=1)
-    stds += inverse_nearest_block_coeff * nearest_block_distances[:, None]
+    if n_blocks > 1:
+        blocks_distances_matrix = np.linalg.norm(detected_positions[:, None] - detected_positions[None, :], axis=-1)
+        np.fill_diagonal(blocks_distances_matrix, np.inf)
+        nearest_block_distances = np.min(blocks_distances_matrix, axis=1)
+        stds += inverse_nearest_block_coeff * nearest_block_distances[:, None]
 
     # detected_positions_3d = np.concatenate([detected_positions, np.zeros((n_blocks, 1))], axis=-1)
     camera_distances = np.linalg.norm(detected_positions - camera_position, axis=-1)
