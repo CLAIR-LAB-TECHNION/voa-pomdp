@@ -2,6 +2,9 @@
 from copy import deepcopy
 from collections import namedtuple
 
+import mujoco as mj
+from mujoco import MjvCamera
+
 from .mujoco_env import MujocoEnv
 
 from .world_utils.object_manager import ObjectManager
@@ -31,6 +34,11 @@ class WorldVoA:
 
         self._object_manager = ObjectManager(self._mj_model, self._mj_data)
         self._grasp_manager = GraspManager(self._mj_model, self._mj_data, self._object_manager, min_grasp_distance=0.1)
+
+        self.renderer = mj.Renderer(self._mj_model, 480, 480)
+
+        self.camera = MjvCamera()
+        self.camera.type = mj.mjtCamera.mjCAMERA_FREE
 
         self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
         self.dt = self._mj_model.opt.timestep * frame_skip
@@ -179,6 +187,18 @@ class WorldVoA:
     def get_ee_pos(self):
         return deepcopy(self._ee_mj_data.xpos)
 
+    def render_image_from_pose(self, position, rotation_matrix):
+
+        look_at, distance, elevation_deg, azimuth_deg = pose_to_plane_intersection(position, rotation_matrix)
+        self.camera.lookat = look_at
+        self.camera.distance = distance
+        self.camera.elevation = -elevation_deg
+        self.camera.azimuth = -azimuth_deg
+
+        self.renderer.update_scene(self._mj_data, self.camera)
+
+        return self.renderer.render()
+
 
 def convert_mj_struct_to_namedtuple(mj_struct):
     """
@@ -186,3 +206,36 @@ def convert_mj_struct_to_namedtuple(mj_struct):
     """
     attrs = [attr for attr in dir(mj_struct) if not attr.startswith('__') and not callable(getattr(mj_struct, attr))]
     return namedtuple(mj_struct.__class__.__name__, attrs)(**{attr: getattr(mj_struct, attr) for attr in attrs})
+
+
+def pose_to_plane_intersection(position, rotation_matrix):
+    """
+    Calculate intersection point, distance, elevation, and azimuth from a 3D pose to the xy-plane.
+
+    :param position: 3D position vector [x, y, z]
+    :param rotation_matrix: 3x3 rotation matrix
+    :return: tuple (intersection_point, distance, elevation_deg, azimuth_deg)
+    """
+    direction = rotation_matrix[:, 2]
+
+    if direction[2] == 0:
+        raise ValueError("Direction is parallel to xy-plane, no intersection.")
+
+    t = -position[2] / direction[2]
+
+    intersection_point = position + t * direction
+    intersection_point[2] = 0  # Ensure z-coordinate is exactly 0
+
+    distance = np.linalg.norm(position - intersection_point)
+
+    elevation = np.arcsin((position[2] - intersection_point[2]) / distance)
+    elevation_deg = np.degrees(elevation)
+
+    delta_y = position[1] - intersection_point[1]
+    delta_x = position[0] - intersection_point[0]
+    azimuth = np.arctan2(delta_y, delta_x)
+    azimuth_deg = np.degrees(azimuth)
+
+    azimuth_deg = (azimuth_deg + 360) % 360
+
+    return intersection_point, distance, elevation_deg, azimuth_deg

@@ -94,8 +94,8 @@ class MotionExecutor:
             joint_velocities = state['robots_joint_velocities']
             self.motion_planner.update_robot_config(agent, joint_positions[agent])
 
-            if i % render_freq == 0:
-                frames.append(self.env.render())
+            # if i % render_freq == 0:
+            #     frames.append(self.env.render())
 
             i += 1
 
