@@ -176,6 +176,7 @@ class ExperimentManager:
         self.clear_robot2()
 
         self.env.r1_controller.plan_and_moveJ(help_config)
+        time.sleep(0.2)
         im, depth = self.env.camera.get_frame_rgb()
         positions, annotations = self.env.position_estimator.get_block_positions_depth(im, depth, help_config,
                                                                                        max_detections=self.env.n_blocks)
@@ -409,9 +410,9 @@ class ExperimentManager:
 
         for bpos in block_positions:
             pile_pos, h = self.piles_manager.pop_next_block()
-            start_height = 0.1 + 0.04 * h
+            start_height = 0.06 + 0.04 * h
             self.env.r2_controller.pick_up(pile_pos[0], pile_pos[1], np.pi/2, start_height)
-            self.env.r2_controller.put_down(bpos[0], bpos[1], 0, 0.12)
+            self.env.r2_controller.put_down(bpos[0], bpos[1], 0, 0.1)
 
         self.clear_robot2()
 

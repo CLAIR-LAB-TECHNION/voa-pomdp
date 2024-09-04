@@ -26,7 +26,7 @@ app = typer.Typer()
 def run_experiments(
         n_blocks: int = 4,
         max_steps: int = 20,
-        max_planning_depth: int = typer.Option(4, help="Max planning depth for the planner,"
+        max_planning_depth: int = typer.Option(5, help="Max planning depth for the planner,"
                                                        "consult before changing it, deepening may cause"
                                                        "distribution shift because rollout policy always tries to pick up"),
         planner_n_iterations: int = 2000

@@ -3,7 +3,6 @@ import pandas as pd
 import numpy as np
 import os
 from datetime import datetime
-
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, \
     sample_block_positions_from_dists
 from modeling.belief.block_position_belief import BlocksPositionsBelief, BlockPosDist
@@ -46,11 +45,11 @@ def generate_experiments(
     ws_x_lims = workspace_x_lims_default
     ws_y_lims = workspace_y_lims_default
 
-    # Load help configs
-    all_help_configs = load_help_configs()
-
-    # Sample helper configurations once
-    help_configs = all_help_configs[np.random.choice(len(all_help_configs), n_helper_configs, replace=False)]
+    # # Load help configs
+    # all_help_configs = load_help_configs()
+    # # Sample helper configurations once
+    # help_configs = all_help_configs[np.random.choice(len(all_help_configs), n_helper_configs, replace=False)]
+    help_configs = np.load("experiments_4_blocks_help_configs.npy")
 
     # Create empty list to store experiment data
     experiments = []
