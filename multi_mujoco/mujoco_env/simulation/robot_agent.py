@@ -203,16 +203,27 @@ class RobotAgent:
             for _, sensor in self.sensor_map.items()
         })
 
+        # out.update({
+        #     'camera': self.render_camera(renderer)
+        #     for _, renderer in self.camera_map.items()
+        # })
+        #
+        # pose_q = np.array(Transform(rotation=sim.data.cam_xmat[self.camera_id].reshape(3, 3),
+        #                             translation=sim.data.cam_xpos[self.camera_id]).to_pose_quaternion().tolist())
+        #
+        # out.update({
+        #     'camera_pose': pose_q
+        # })
+
         out.update({
-            'camera': self.render_camera(renderer)
-            for _, renderer in self.camera_map.items()
+            'camera': None
         })
 
         pose_q = np.array(Transform(rotation=sim.data.cam_xmat[self.camera_id].reshape(3, 3),
                                     translation=sim.data.cam_xpos[self.camera_id]).to_pose_quaternion().tolist())
 
         out.update({
-            'camera_pose': pose_q
+            'camera_pose': None
         })
 
         return out

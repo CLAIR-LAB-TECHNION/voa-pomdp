@@ -237,10 +237,10 @@ class MotionExecutor:
         return not self.check_point_in_block(x, y) is None, total_frames, state
 
     def pick_up(self, agent, x, y):
-        block_id = self.check_point_in_block(x, y)
-        if block_id is None:
-            print('There is no block below')
-            return False, None, self.env.get_state()
+        # block_id = self.check_point_in_block(x, y)
+        # if block_id is None:
+        #     print('There is no block below')
+        #     return False, None, self.env.get_state()
         target_position = [x, y, 0.06]
         target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
         target_config = self.facing_down_ik(agent, target_transform)

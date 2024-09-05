@@ -41,7 +41,7 @@ class WorldVoA:
         self.camera.type = mj.mjtCamera.mjCAMERA_FREE
 
         self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
-        self.dt = self._mj_model.opt.timestep * frame_skip
+        # self.dt = self._mj_model.opt.timestep * frame_skip
         # self._pid_controller = PIDController(kp, ki, kd, dt)
 
         self.reset()
