@@ -15,13 +15,16 @@ from multi_mujoco.mujoco_env.common.ur5e_fk import forward
 
 
 class BlockStackingSimulator:
-    def __init__(self):
+    def __init__(self, visualize_mp=True):
         self.mujoco_env = WorldVoA()
         self.motion_executor = MotionExecutor(env=self.mujoco_env)
         self.current_state = None
         self.reset()
         self.tower_counter = 0
         self.tower_pos = [-0.3, -1.]
+
+        if visualize_mp:
+            self.motion_executor.motion_planner.visualize()
 
     def reset(self, randomize=True, block_positions=None):
         """
