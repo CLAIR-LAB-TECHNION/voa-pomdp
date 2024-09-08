@@ -79,8 +79,9 @@ class WorldVoA:
         #     self._pid_controller.reset_endpoint(target_joint_pos)
         if gripper_closed is None:
             gripper_closed = self.gripper_state_closed
+        self.gripper_state_closed = gripper_closed
 
-        self._env_step(target_joint_pos, gripper_closed)
+        self._env_step(target_joint_pos)
         self._clip_joint_velocities()
 
         if gripper_closed:
@@ -123,33 +124,33 @@ class WorldVoA:
     def get_object_pos(self, block_id: int):
         return self._object_manager.get_block_position(block_id)
 
-    def move_to(self, agent, target_joint_pos, tolerance=0.05, end_vel=0.1, max_steps=None):
-        """
-        move robot joints to target config, until it is close within tolerance, or max_steps exceeded.
-        @param agent: agent id
-        @param target_joint_pos: position to move to
-        @param tolerance: distance withing configuration space to target to consider as reached
-        @param max_steps: maximum steps to take before stopping
-        @return: state, success
-
-        success is true if reached goal within tolerance, false otherwise
-        """
-        # self._pid_controller.reset_endpoint(target_joint_pos)
-
-        step = 0
-        actions = {}
-        for other_agents, pos in self.robots_joint_pos.items():
-            actions[other_agents] = pos
-        actions[agent] = target_joint_pos
-        while np.linalg.norm(self.robots_joint_pos[agent] - target_joint_pos) > tolerance \
-                or np.linalg.norm(self.robots_joint_velocities[agent]) > end_vel:
-            if max_steps is not None and step > max_steps:
-                return self.get_state(), False
-
-            self.step(actions, self.gripper_state_closed)
-            step += 1
-
-        return self.get_state(), True
+    # def move_to(self, agent, target_joint_pos, tolerance=0.05, end_vel=0.1, max_steps=None):
+    #     """
+    #     move robot joints to target config, until it is close within tolerance, or max_steps exceeded.
+    #     @param agent: agent id
+    #     @param target_joint_pos: position to move to
+    #     @param tolerance: distance withing configuration space to target to consider as reached
+    #     @param max_steps: maximum steps to take before stopping
+    #     @return: state, success
+    #
+    #     success is true if reached goal within tolerance, false otherwise
+    #     """
+    #     # self._pid_controller.reset_endpoint(target_joint_pos)
+    #
+    #     step = 0
+    #     actions = {}
+    #     for other_agents, pos in self.robots_joint_pos.items():
+    #         actions[other_agents] = pos
+    #     actions[agent] = target_joint_pos
+    #     while np.linalg.norm(self.robots_joint_pos[agent] - target_joint_pos) > tolerance \
+    #             or np.linalg.norm(self.robots_joint_velocities[agent]) > end_vel:
+    #         if max_steps is not None and step > max_steps:
+    #             return self.get_state(), False
+    #
+    #         self.step(actions, self.gripper_state_closed)
+    #         step += 1
+    #
+    #     return self.get_state(), True
 
     def set_gripper(self, closed: bool):
         """
@@ -157,7 +158,7 @@ class WorldVoA:
         @param closed: true if gripper should be closed, false otherwise
         @return: None
         """
-        self._env_step(self.robots_joint_pos, closed)
+        self.step(self.robots_joint_pos, closed)
 
     def _clip_joint_velocities(self):
         new_vel = self.robots_joint_velocities.copy()
@@ -166,7 +167,7 @@ class WorldVoA:
             self._env_entities[agent].set_state(velocity=new_vel[agent])
         self.robots_joint_velocities = new_vel
 
-    def _env_step(self, target_joint_pos, gripper_closed):
+    def _env_step(self, target_joint_pos):
         """ run environment step and update state of self accordingly"""
 
         # joint_control = self._pid_controller.control(self.robot_joint_pos)  # would be relevant if we change to force
@@ -187,7 +188,6 @@ class WorldVoA:
             self.robots_joint_velocities[agent] = ob['robot_state'][6:12]
             self.robots_force[agent] = obs[agent]['sensor']
             self.robots_camera[agent] = [obs[agent]['camera'], obs[agent]['camera_pose']]
-        self.gripper_state_closed = gripper_closed
 
     def get_ee_pos(self):
         return deepcopy(self._ee_mj_data.xpos)

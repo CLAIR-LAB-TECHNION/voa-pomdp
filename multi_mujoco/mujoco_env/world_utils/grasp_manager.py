@@ -28,7 +28,7 @@ class GraspManager:
         for i, object_position in enumerate(object_positions):
             if np.abs(object_position[0] - gripper_position[0]) < 0.015 and \
                     np.abs(object_position[1] - gripper_position[1]) < 0.015 and\
-                    np.abs(object_position[2] - gripper_position[2]) < 0.1:
+                    np.abs(object_position[2] - gripper_position[2]) < 0.05:
                 self.grasp_object(self.graspable_objects_names[i])
                 return True
 
@@ -51,7 +51,7 @@ class GraspManager:
         """
         attatch this object to the gripper position
         """
-        self.attatched_object_name = object_name
+        self.attached_object_name = object_name
         self.update_grasped_object_pose()
 
     def release_object(self):
@@ -64,7 +64,7 @@ class GraspManager:
         """
         update the pose of the object that is currently grasped to be on the gripper
         """
-        if self.attatched_object_name is None:
+        if self.attached_object_name is None:
             return
 
         target_position = self._ee_mj_data.xpos
@@ -76,5 +76,5 @@ class GraspManager:
         target_position_in_ee = np.array([0, 0, grasp_offset])
         target_position = target_position + self._ee_mj_data.xmat.reshape(3, 3) @ target_position_in_ee
 
-        self.object_manager.set_object_pose(self.attatched_object_name, target_position, target_orientation)
-        self.object_manager.set_object_vel(self.attatched_object_name, target_velocities)
+        self.object_manager.set_object_pose(self.attached_object_name, target_position, target_orientation)
+        self.object_manager.set_object_vel(self.attached_object_name, target_velocities)

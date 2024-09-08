@@ -170,12 +170,12 @@ class MotionExecutor:
 
         return self.move_to_config(agent, target_config)
 
-    def activate_grasp(self, wait_steps=10, render_freq=8):
+    def activate_grasp(self, wait_steps=5, render_freq=8):
         self.env.set_gripper(True)
         self.motion_planner.attach_box_to_ee()
         return self.wait(wait_steps, render_freq=render_freq)
 
-    def deactivate_grasp(self, wait_steps=10, render_freq=8):
+    def deactivate_grasp(self, wait_steps=5, render_freq=8):
         self.env.set_gripper(False)
         self.motion_planner.detach_box_from_ee()
         return self.wait(wait_steps, render_freq=render_freq)
@@ -188,8 +188,8 @@ class MotionExecutor:
         maintain_pos = self.env.robots_joint_pos
         for i in range(n_steps):
             state = self.env.step(maintain_pos)
-            if i % render_freq == 0:
-                frames.append(self.env.render())
+            # if i % render_freq == 0:
+                # frames.append(self.env.render())
 
         # account for falling objects
         # self.update_blocks_positions()
