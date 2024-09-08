@@ -30,7 +30,7 @@ muj_env_config = dict(
     ),
 )
 
-INIT_MAX_VELOCITY = np.array([1.5, 1.5, 1.5, 1.5, 1.5, 1.5])
+INIT_MAX_VELOCITY = np.array([2]*6)
 
 # relative position of grasped object from end effector
 grasp_offset = 0.02
