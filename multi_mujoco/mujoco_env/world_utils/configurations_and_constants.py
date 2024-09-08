@@ -6,7 +6,7 @@ from multi_mujoco.mujoco_env.tasks.null_task import NullTask
 muj_env_config = dict(
     scene=dict(
         resource='clairlab',
-        # render_camera='top-right'
+        render_camera='top-right'
     ),
     robots=dict(
         ur5e_1=dict(

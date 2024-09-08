@@ -92,13 +92,13 @@ class MotionExecutor:
             state = self.env.step(actions)
             joint_positions = state['robots_joint_pos']
             joint_velocities = state['robots_joint_velocities']
-            self.motion_planner.update_robot_config(agent, joint_positions[agent])
 
             # if i % render_freq == 0:
             #     frames.append(self.env.render())
 
             i += 1
 
+        self.motion_planner.update_robot_config(agent, joint_positions[agent])
         return True, frames, state
 
     def update_blocks_positions(self):
@@ -236,17 +236,16 @@ class MotionExecutor:
 
         return not self.check_point_in_block(x, y) is None, total_frames, state
 
-    def pick_up(self, agent, x, y):
-        # block_id = self.check_point_in_block(x, y)
-        # if block_id is None:
-        #     print('There is no block below')
-        #     return False, None, self.env.get_state()
-        target_position = [x, y, 0.06]
+    def pick_up(self, agent, x, y, start_height=0.15):
+        # move above position:
+        target_position = [x, y, start_height]
         target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
         target_config = self.facing_down_ik(agent, target_transform)
         success, frames, state = self.move_to_config(agent, target_config)
         if not success:
             return False, frames, state
+
+        # TODO moveL
 
         grasp_suc, grasp_frames, _ = self.activate_grasp()
 
@@ -271,13 +270,12 @@ class MotionExecutor:
 
         return grasp_suc and d_success, np.concatenate([frames, grasp_frames, d_frames]), state
 
-    def facing_down_ik(self, agent, target_transform):
+    def facing_down_ik(self, agent, target_transform, max_tries=20):
         # Use inverse kinematics to get the joint configuration for this pose
         target_config = self.motion_planner.ik_solve(agent, target_transform)
         if target_config is None:
             target_config = []
-        shoulder_constraint_for_down_movement = 0.15
-        max_tries = 10
+        shoulder_constraint_for_down_movement = 0.1
 
         def valid_shoulder_angle(q):
             return -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement

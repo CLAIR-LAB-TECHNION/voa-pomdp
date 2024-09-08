@@ -45,7 +45,7 @@ class BlockStackingSimulator:
         self.motion_executor.move_and_detect_height(agent, x, y)
 
     def pick_up(self, agent, x, y):
-        self.motion_executor.pick_up(agent, x, y)
+        self.motion_executor.pick_up(agent, x, y, start_height=0.06)
 
     def stack(self, agent):
         z = 0.04 + 0.05 * self.tower_counter

@@ -53,7 +53,12 @@ class WorldVoA:
         self.max_joint_velocities = INIT_MAX_VELOCITY
 
         obs, _ = self._env.reset()
-        for agent in obs.keys():
+        agents = obs.keys()
+
+        for agent in agents:
+            self._env_entities[agent].set_state(position=[-np.pi/2, -np.pi/2, 0, -np.pi/2, 0, 0])
+
+        for agent in agents:
             self.robots_joint_pos[agent] = obs[agent]['robot_state'][:6]
             self.robots_joint_velocities[agent] = obs[agent]["robot_state"][6:12]
             self.robots_force[agent] = obs[agent]['sensor']
@@ -82,7 +87,7 @@ class WorldVoA:
             if self._grasp_manager.attached_object_name is not None:
                 self._grasp_manager.update_grasped_object_pose()
             else:
-                self._grasp_manager.grasp_nearest_object_if_close_enough()
+                self._grasp_manager.grasp_block_if_close_enough()
         else:
             self._grasp_manager.release_object()
 

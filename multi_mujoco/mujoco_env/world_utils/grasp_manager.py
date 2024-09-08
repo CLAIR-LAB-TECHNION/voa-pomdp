@@ -17,24 +17,35 @@ class GraspManager:
 
         self.attached_object_name = None
 
-    def grasp_nearest_object_if_close_enough(self) -> bool:
+    def grasp_block_if_close_enough(self) -> bool:
         """
         find the nearest object and grasp it if it is close enough
         """
         object_positions = [self.object_manager.get_object_pos(name) for name in self.graspable_objects_names]
         gripper_position = self._ee_mj_data.xpos
 
-        # compute distances vectorized:
-        distances = np.linalg.norm(np.array(object_positions) - gripper_position, axis=1)
+        # a block is grasped if distance in x and distance in y are less than 0.015 and in z less than 0.03
+        for i, object_position in enumerate(object_positions):
+            if np.abs(object_position[0] - gripper_position[0]) < 0.015 and \
+                    np.abs(object_position[1] - gripper_position[1]) < 0.015 and\
+                    np.abs(object_position[2] - gripper_position[2]) < 0.1:
+                self.grasp_object(self.graspable_objects_names[i])
+                return True
 
-        closest_object_idx = np.argmin(distances)
-        distance = distances[closest_object_idx]
+        return False
 
-        if distance < self.min_grasp_distance:
-            self.grasp_object(self.graspable_objects_names[closest_object_idx])
-            return True
-        else:
-            return False
+
+        # # compute distances vectorized:
+        # distances = np.linalg.norm(np.array(object_positions) - gripper_position, axis=1)
+        #
+        # closest_object_idx = np.argmin(distances)
+        # distance = distances[closest_object_idx]
+        #
+        # if distance < self.min_grasp_distance:
+        #     self.grasp_object(self.graspable_objects_names[closest_object_idx])
+        #     return True
+        # else:
+        #     return False
 
     def grasp_object(self, object_name):
         """
@@ -63,7 +74,7 @@ class GraspManager:
 
         # add shift to target position to make sure object is a bit below end effector, but in ee frame
         target_position_in_ee = np.array([0, 0, grasp_offset])
-        target_position = target_position + self._ee_mj_data.xmat.reshape(3, 3).T @ target_position_in_ee
+        target_position = target_position + self._ee_mj_data.xmat.reshape(3, 3) @ target_position_in_ee
 
         self.object_manager.set_object_pose(self.attatched_object_name, target_position, target_orientation)
         self.object_manager.set_object_vel(self.attatched_object_name, target_velocities)

@@ -10,7 +10,7 @@ from .configurations import *
 
 class SimulationMotionPlanner(AbstractMotionPlanner):
     def __init__(self):
-        super().__init__(ee_offset=0.05)
+        super().__init__(ee_offset=0.00, eps=0.05)
         self.ee_link = self.ur5e_2.link("ee_link")
 
     def _get_klampt_world_path(self):
@@ -27,7 +27,7 @@ class SimulationMotionPlanner(AbstractMotionPlanner):
         """
         # Note that the order is different here, width is in z direction
         sx, sy, sz = block_size
-        box_obj = box(width=sz, height=sy, depth=sx, center=[grasp_offset, 0, 0])
+        box_obj = box(width=sz, height=sy, depth=sx, center=[0, 0, grasp_offset])
         box_geom = Geometry3D()
         box_geom.set(box_obj)
 
