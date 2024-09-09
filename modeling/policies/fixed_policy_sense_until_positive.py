@@ -47,3 +47,6 @@ class FixedSenseUntilPositivePolicy(AbastractPolicy):
     def get_params(self) -> dict:
         return {}
 
+    def reset(self):
+        pass
+

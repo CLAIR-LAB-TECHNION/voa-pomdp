@@ -309,3 +309,6 @@ class Masked2DTruncNorm(UnnormalizedMasked2DTruncNorm):
 
     def very_fast_sample(self, n_samples=1, ratio=1.5, max_retries=5, return_pdfs=True):
         raise NotImplementedError("This is not implemented for normalized version because it's optimized")
+
+    def cdf(self, minx, maxx, miny, maxy):
+        raise NotImplementedError("")
