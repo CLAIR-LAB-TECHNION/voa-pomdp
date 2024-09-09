@@ -75,7 +75,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         self.motion_planner.update_robot_config(self.robot_name, self.getActualQ())
         logging.info(f"{self.robot_name} Updated motion planner with current configuration {self.getActualQ()}")
 
-    def find_ik_solution(self, pose, max_tries=10, for_down_movement=True, shoulder_constraint_for_down_movement=0.3):
+    def find_ik_solution(self, pose, max_tries=10, for_down_movement=True, shoulder_constraint_for_down_movement=0.6):
         """
         if for_down_movement is True, there will be a heuristic check that tha shoulder is not facing down, so when
         movel will be called it won't collide with the table when movingL down.
@@ -228,16 +228,17 @@ class ManipulationController(RobotInterfaceWithGripper):
         # move down until contact, here we move a little bit slower than drop and sense
         # because the gripper rubber may damage from the object at contact:
         logging.debug(f"{self.robot_name} moving down until contact")
-        lin_speed = min(self.linear_speed / 2, 0.04)
+        lin_speed = min(self.linear_speed / 2, 0.05)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
 
         # retract one more centimeter to avoid gripper scratching the surface:
-        self.moveL_relative([0, 0, 0.01],
+        self.moveL_relative([0, 0, 0.005],
                             speed=0.1,
                             acceleration=0.1)
         logging.debug(f"{self.robot_name} grasping and picking up")
         # close gripper:
-        self.grasp(force_scale=force_scale)
+        self.grasp(force_scale=force_scale, wait_time=1.
+                   )
         # move up:
         self.moveJ(above_pickup_config, speed=self.speed, acceleration=self.acceleration)
         # update the motion planner with the new configuration:
@@ -245,7 +246,7 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         # TODO measure weight and return if successful or not
 
-    def put_down(self, x, y, rz, start_height=0.2, replan_from_home_if_failed=True):
+    def put_down(self, x, y, rz, start_height=0.2, replan_from_home_if_failed=True, speed=None, acceleration=None):
         """
         TODO
         :param x:
@@ -254,9 +255,12 @@ class ManipulationController(RobotInterfaceWithGripper):
         :param start_height:
         :return:
         """
+        speed = speed if speed is not None else self.speed
+        acceleration = acceleration if acceleration is not None else self.acceleration
+
         logging.info(f"{self.robot_name} putting down at {x}{y}{rz} with start height {start_height}")
         # move above dropping location:
-        res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+        res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=speed, acceleration=acceleration)
         if not res:
             if not replan_from_home_if_failed:
                 chime.error()
@@ -265,7 +269,7 @@ class ManipulationController(RobotInterfaceWithGripper):
             logging.warning(f"{self.robot_name} replanning from home, probably couldn't find path"
                             f" from current position")
             self.plan_and_move_home()
-            res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=self.speed, acceleration=self.acceleration)
+            res = self.plan_and_move_to_xyzrz(x, y, start_height, rz, speed=speed, acceleration=acceleration)
             if not res:
                 chime.error()
                 return
@@ -274,14 +278,14 @@ class ManipulationController(RobotInterfaceWithGripper):
 
         logging.debug(f"{self.robot_name} moving down until contact to put down")
         # move down until contact:
-        lin_speed = min(self.linear_speed, 0.04)
+        lin_speed = min(self.linear_speed, 0.05)
         self.moveUntilContact(xd=[0, 0, -lin_speed, 0, 0, 0], direction=[0, 0, -1, 0, 0, 0])
         # release grasp:
         self.release_grasp()
         # back up 10 cm in a straight line :
         self.moveL_relative([0, 0, 0.1], speed=self.linear_speed, acceleration=self.linear_acceleration)
         # move to above dropping location:
-        self.moveJ(above_drop_config, speed=self.speed, acceleration=self.acceleration)
+        self.moveJ(above_drop_config, speed=speed, acceleration=acceleration)
         # update the motion planner with the new configuration:
         self.update_mp_with_current_config()
 
