@@ -29,10 +29,9 @@ def run_experiments(
         max_planning_depth: int = typer.Option(5, help="Max planning depth for the planner,"
                                                        "consult before changing it, deepening may cause"
                                                        "distribution shift because rollout policy always tries to pick up"),
-        planner_n_iterations: int = 2000
+        planner_n_iterations: int = 2000,
+        config_file: str = typer.Option("configurations/experiments_4_blocks.csv")
 ):
-    # Setup paths
-    config_file = f"configurations/experiments_{n_blocks}_blocks.csv"
     results_dir = f"experiments/{n_blocks}blocks"
     os.makedirs(results_dir, exist_ok=True)
     chime.theme('pokemon')
