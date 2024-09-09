@@ -54,9 +54,11 @@ class RobotInterfaceWithGripper(RobotInterface):
             logging.warning(f"Failed to set gripper ({self._ip}), width: {width}, force: {force}, speed: {speed}")
         time.sleep(wait_time)
 
-    def grasp(self, wait_time=0.5):
+    def grasp(self, wait_time=0.5, force_scale=1.):
         logging.debug(f"Grasping ({self._ip}), min_width: {self.min_width}")
-        res = self.gripper.twofg_grip_external(self.min_width, 20, 100)
+        res = self.gripper.twofg_grip_external(self.min_width,
+                                               int(force_scale * 20),
+                                               int(force_scale * 100))
         if res != 0:
             logging.warning(f"Failed to grasp ({self._ip})")
         time.sleep(wait_time)

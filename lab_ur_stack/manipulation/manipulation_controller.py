@@ -195,7 +195,7 @@ class ManipulationController(RobotInterfaceWithGripper):
         return self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
         # motion planner is automatically updated after movement
 
-    def pick_up(self, x, y, rz, start_height=0.2, replan_from_home_if_failed=True):
+    def pick_up(self, x, y, rz, start_height=0.2, replan_from_home_if_failed=True, force_scale=1.):
         """
         TODO
         :param x:
@@ -237,7 +237,7 @@ class ManipulationController(RobotInterfaceWithGripper):
                             acceleration=0.1)
         logging.debug(f"{self.robot_name} grasping and picking up")
         # close gripper:
-        self.grasp()
+        self.grasp(force_scale=force_scale)
         # move up:
         self.moveJ(above_pickup_config, speed=self.speed, acceleration=self.acceleration)
         # update the motion planner with the new configuration:
