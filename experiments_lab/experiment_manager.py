@@ -244,8 +244,9 @@ class ExperimentManager:
         try:
             if self.visualizer:
                 self.start_visualizer_if_not_started()
-                self.visualizer.update_experiment_type(f"Experiment ID: {row['experiment_id']}")
-
+                config_file_no_dir = os.path.basename(config_file)
+                self.visualizer.update_experiment_type(f"Experiment ID: {row['experiment_id']}\n" +
+                                                       "**" + config_file_no_dir + "**")
             if isinstance(self.env.camera, RealsenseCameraWithRecording):
                 self.env.camera.start_recording(os.path.join(experiment_dir, "vid"), max_depth=5, fps=20)
 

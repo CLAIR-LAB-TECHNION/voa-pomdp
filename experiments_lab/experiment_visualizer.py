@@ -159,10 +159,10 @@ class ExperimentVisualizer:
     def _update_display(self):
         self.canvas.fill(0)
 
-        info_text = f"Experiment Type: {self.experiment_type}\n"
+        info_text = f"{self.experiment_type}\n"
         info_text += f"Accumulated Reward: {self.accumulated_reward:.4f}\n"
         info_text += self.additional_info
-        self._draw_text(self.canvas, info_text, (10, 30))
+        self._draw_text(self.canvas, info_text, (10, 30), font_scale=0.6)
 
         self._draw_text(self.canvas, self.action_obs_reward_text, (10, 150), font_scale=0.6)
 
