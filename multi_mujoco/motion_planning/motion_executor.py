@@ -1,4 +1,7 @@
+from copy import copy
+
 import numpy as np
+from scipy.interpolate import interp1d
 
 from .simulation_motion_planner import SimulationMotionPlanner
 from ..mujoco_env.voa_world import WorldVoA
@@ -58,36 +61,47 @@ class MotionExecutor:
         self.blocks_positions_dict = state['object_positions']
         return state
 
-    def move_to(self, agent, target_config, tolerance=0.05, end_vel=0.1, max_steps=None,
-                render_freq=8):
-        """
-        move robot joints to target config, until it is close within tolerance,
-        or max_steps exceeded.
-        @param agent: agent id to move
-        @param target_config: position to move to
-        @param tolerance: distance withing configuration space to target to consider
-         as reached
-        @param end_vel: end_vel
-        @param max_steps: maximum steps to take before stopping, no limit if None
-        @param render_freq: how often to render and append a frame
-        @return: success, frames
-        """
+    def move_to(self, agent, target_config, velocity=1.05, acceleration=1.4, tolerance=0.05, end_vel=0.1,
+                max_steps=None, render_freq=8):
         joint_positions = self.env.robots_joint_pos
         joint_velocities = self.env.robots_joint_velocities
-
         frames = []
+        actions = {other_agent: config for other_agent, config in joint_positions.items()}
 
-        actions = {}
-        for other_agent, config in joint_positions.items():
-            actions[other_agent] = config
-        actions[agent] = target_config
+        start_config = joint_positions[agent]
+        distance = np.linalg.norm(target_config - start_config)
+
+        # Calculate time needed for acceleration and deceleration
+        t_acc = velocity / acceleration
+        d_acc = 0.5 * acceleration * t_acc ** 2
+
+        if 2 * d_acc < distance:
+            # Trapezoidal profile (with constant velocity phase)
+            t_const = (distance - 2 * d_acc) / velocity
+            total_time = 2 * t_acc + t_const
+        else:
+            # Triangular profile (no constant velocity phase)
+            t_acc = np.sqrt(distance / acceleration)
+            total_time = 2 * t_acc
+            velocity = acceleration * t_acc
+
+        # Generate trajectory
+        dt = self.env._mj_model.opt.timestep * self.env.frame_skip
+        t = np.arange(0, total_time + dt, dt)
+        trajectory = self._generate_trajectory(start_config, target_config, t, velocity, acceleration)
 
         i = 0
         state = None
         while np.linalg.norm(joint_positions[agent] - target_config) > tolerance \
                 or np.linalg.norm(joint_velocities[agent]) > end_vel:
-            if max_steps is not None and i > max_steps:
+            if max_steps is not None and i >= max_steps:
                 return False, frames, self.env.get_state()
+
+            current_t = min(i * dt, total_time)
+            index = int(current_t / dt)
+            desired_pos = trajectory[index]
+
+            actions[agent] = desired_pos
 
             state = self.env.step(actions)
             joint_positions = state['robots_joint_pos']
@@ -95,44 +109,134 @@ class MotionExecutor:
 
             # if i % render_freq == 0:
             #     frames.append(self.env.render())
-
             i += 1
 
         self.motion_planner.update_robot_config(agent, joint_positions[agent])
         return True, frames, state
 
-    def update_blocks_positions(self):
-        blocks_positions_dict = self.env.get_state()['object_positions']
-        for name, pos in blocks_positions_dict.items():
-            self.motion_planner.move_block(name, pos)
+    def _generate_trajectory(self, start, end, t, velocity, acceleration):
+        distance = np.linalg.norm(end - start)
+        direction = (end - start) / distance if distance > 0 else np.zeros_like(start)
 
-    def execute_path(self, agent, path, tolerance=0.05, end_vel=0.1,
-                     max_steps_per_section=200, render_freq=8):
+        def position(time):
+            if time < velocity / acceleration:
+                # Acceleration phase
+                s = 0.5 * acceleration * time ** 2
+            elif time < t[-1] - velocity / acceleration:
+                # Constant velocity phase
+                s = 0.5 * velocity ** 2 / acceleration + velocity * (time - velocity / acceleration)
+            else:
+                # Deceleration phase
+                t_dec = t[-1] - time
+                s = distance - 0.5 * acceleration * t_dec ** 2
+
+            return start + direction * s
+
+        positions = np.array([position(time) for time in t])
+        return positions
+
+    def execute_path(self, agent, path, blending_radius=0.1, velocity=1.05, acceleration=1.4,
+                     tolerance=0.005, end_vel=0.1, max_steps_per_section=200, render_freq=8):
         """
-        execute a path of joint positions
+        Execute a path of joint positions with blending between waypoints
+
         @param agent: agent id to move
         @param path: list of joint positions to follow
-        @param tolerance: distance withing configuration space to target to consider as reached to each point
+        @param blending_radius: radius for blending between waypoints
+        @param velocity: maximum joint velocity (rad/s)
+        @param acceleration: joint acceleration (rad/s^2)
+        @param tolerance: distance within configuration space to target to consider as reached to each point
         @param end_vel: maximum velocity to consider as reached to each point
         @param max_steps_per_section: maximum steps to take before stopping at each section
         @param render_freq: how often to render and append a frame
-        @return: success, frames
+        @return: success, frames, final state
         """
         frames = []
         state = None
-        for config in path:
+
+        blended_path = self._blend_path(path, blending_radius) if blending_radius > 0 else path
+
+        for config in blended_path:
             success, frames_curr, state = self.move_to(
                 agent,
                 config,
-                tolerance=tolerance,
+                velocity=velocity,
+                acceleration=acceleration,
+                tolerance=0.05,
                 end_vel=end_vel,
                 max_steps=max_steps_per_section,
                 render_freq=render_freq)
             frames.extend(frames_curr)
-            if not success:
-                return False, frames, self.env.get_state()
-
+            # if not success:
+            #     return False, frames, self.env.get_state()
         return True, frames, state
+
+    def _blend_path(self, path, blending_radius):
+        blended_path = []
+        for i in range(len(path)):
+            if i == 0 or i == len(path) - 1:
+                blended_path.append(path[i])
+            else:
+                prev = np.asarray(path[i - 1])
+                curr = np.asarray(path[i])
+                next = np.asarray(path[i + 1])
+
+                # Calculate blending points
+                to_prev = prev - curr
+                to_next = next - curr
+                to_prev_norm = to_prev / np.linalg.norm(to_prev)
+                to_next_norm = to_next / np.linalg.norm(to_next)
+
+                blend_start = curr + to_prev_norm * blending_radius
+                blend_end = curr + to_next_norm * blending_radius
+
+                blended_path.append(blend_start)
+                blended_path.append(blend_end)
+
+        return blended_path
+
+    def moveL_relative(self, agent, direction, distance, velocity=0.1, acceleration=0.1,
+                       tolerance=0.001, end_vel=0.01, max_steps=1000, render_freq=8):
+        """
+        Move the robot's end-effector along a straight line in a specified Cartesian direction.
+
+        @param agent: agent id to move
+        @param direction: 3D vector specifying the direction of movement [x, y, z]
+        @param distance: distance to move along the specified direction
+        @param velocity: maximum linear velocity (m/s)
+        @param acceleration: linear acceleration (m/s^2)
+        @param tolerance: distance tolerance to consider target reached
+        @param end_vel: end velocity tolerance
+        @param max_steps: maximum steps to take before stopping
+        @param render_freq: how often to render and append a frame
+        @return: success, frames, final state
+        """
+        direction = np.array(direction) / np.linalg.norm(direction)
+        current_config = copy(self.env.robots_joint_pos[agent])
+        current_ee_transform = self.motion_planner.get_forward_kinematics(agent, current_config)
+        current_position = current_ee_transform[1]
+        current_orientation = current_ee_transform[0]
+        target_position = current_position + direction * distance
+
+        cartesian_path = np.linspace(current_position, target_position, 10)
+        joint_path = [self.motion_planner.ik_solve(agent, (current_orientation, pos)) for pos in cartesian_path]
+
+        success, frames, state = self.execute_path(agent,
+                                                   joint_path,
+                                                   velocity=velocity,
+                                                   acceleration=acceleration,
+                                                   blending_radius=0.01,
+                                                   tolerance=tolerance,
+                                                   end_vel=end_vel,
+                                                   max_steps_per_section=max_steps,
+                                                   render_freq=render_freq)
+
+        return success, frames, state
+
+    def update_blocks_positions(self):
+        blocks_positions_dict = self.env.get_state()['object_positions']
+        for name, pos in blocks_positions_dict.items():
+            self.motion_planner.move_block(name, pos)
 
     def move_to_config(self, agent, target_config, tolerance=0.05, end_vel=0.1, max_steps_per_section=400,
                        render_freq=8):
@@ -151,6 +255,8 @@ class MotionExecutor:
         success, frames, state = self.execute_path(
             agent,
             path,
+            velocity=200,
+            acceleration=200,
             tolerance=tolerance,
             end_vel=end_vel,
             max_steps_per_section=max_steps_per_section,
@@ -245,7 +351,7 @@ class MotionExecutor:
         if not success:
             return False, frames, state
 
-        # TODO moveL
+        success, frames, state = self.moveL_relative(agent, [0, 0, -1], 0.1, velocity=10, acceleration=10,)
 
         grasp_suc, grasp_frames, _ = self.activate_grasp()
 

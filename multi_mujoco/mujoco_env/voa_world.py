@@ -16,6 +16,7 @@ class WorldVoA:
     def __init__(self, render_mode='human', cfg=muj_env_config):
         self.render_mode = render_mode
         self._env = MujocoEnv.from_cfg(cfg=cfg, render_mode=render_mode, frame_skip=frame_skip)
+        self.frame_skip = frame_skip
         obs, info = self._env.reset()  # once, for info, later again
         self._mj_model = info['privileged']['model']
         self._mj_data = info['privileged']['data']
@@ -61,7 +62,7 @@ class WorldVoA:
         for agent in agents:
             self.robots_joint_pos[agent] = obs[agent]['robot_state'][:6]
             self.robots_joint_velocities[agent] = obs[agent]["robot_state"][6:12]
-            self.robots_force[agent] = obs[agent]['sensor']
+            # self.robots_force[agent] = obs[agent]['sensor']
             self.robots_camera[agent] = [obs[agent]['camera'], obs[agent]['camera_pose']]
         self.gripper_state_closed = False
         self._grasp_manager.release_object()
@@ -186,7 +187,7 @@ class WorldVoA:
         for agent, ob in obs.items():
             self.robots_joint_pos[agent] = ob['robot_state'][:6]
             self.robots_joint_velocities[agent] = ob['robot_state'][6:12]
-            self.robots_force[agent] = obs[agent]['sensor']
+            # self.robots_force[agent] = obs[agent]['sensor']
             self.robots_camera[agent] = [obs[agent]['camera'], obs[agent]['camera_pose']]
 
     def get_ee_pos(self):
