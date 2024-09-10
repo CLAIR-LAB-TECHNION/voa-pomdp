@@ -311,4 +311,40 @@ class Masked2DTruncNorm(UnnormalizedMasked2DTruncNorm):
         raise NotImplementedError("This is not implemented for normalized version because it's optimized")
 
     def cdf(self, minx, maxx, miny, maxy):
-        raise NotImplementedError("")
+        # Ensure the input bounds are within the distribution's bounds
+        minx = max(minx, self.bounds_x[0])
+        maxx = min(maxx, self.bounds_x[1])
+        miny = max(miny, self.bounds_y[0])
+        maxy = min(maxy, self.bounds_y[1])
+
+        # Calculate the CDF for the entire rectangle (without normalization)
+        cdf_x = self.dist_x.cdf(maxx) - self.dist_x.cdf(minx)
+        cdf_y = self.dist_y.cdf(maxy) - self.dist_y.cdf(miny)
+        total_cdf = cdf_x * cdf_y
+
+        # Subtract the probability mass of masked areas within the given bounds
+        for mask in self.non_overlapping_masked_areas:
+            mask_minx, mask_maxx = mask[0]
+            mask_miny, mask_maxy = mask[1]
+
+            # Check if the mask overlaps with the given bounds
+            if (minx < mask_maxx and maxx > mask_minx and
+                    miny < mask_maxy and maxy > mask_miny):
+                # Calculate the overlapping region
+                overlap_minx = max(minx, mask_minx)
+                overlap_maxx = min(maxx, mask_maxx)
+                overlap_miny = max(miny, mask_miny)
+                overlap_maxy = min(maxy, mask_maxy)
+
+                # Calculate the CDF of the overlapping region
+                overlap_cdf_x = self.dist_x.cdf(overlap_maxx) - self.dist_x.cdf(overlap_minx)
+                overlap_cdf_y = self.dist_y.cdf(overlap_maxy) - self.dist_y.cdf(overlap_miny)
+                overlap_cdf = overlap_cdf_x * overlap_cdf_y
+
+                # Subtract the overlapping masked area from the total CDF
+                total_cdf -= overlap_cdf
+
+        # Apply the normalization factor once at the end
+        normalized_cdf = total_cdf / self.normalization_constant
+
+        return normalized_cdf

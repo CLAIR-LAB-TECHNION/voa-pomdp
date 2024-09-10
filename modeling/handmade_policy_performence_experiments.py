@@ -9,7 +9,7 @@ import time
 
 from lab_ur_stack.utils.workspace_utils import sample_block_positions_uniform, workspace_x_lims_default, \
     workspace_y_lims_default, sample_block_positions_from_dists, goal_tower_position
-from modeling.belief.block_position_belief import UnnormalizedBlocksPositionsBelief
+from modeling.policies.hand_made_policy import HandMadePolicy
 from modeling.pomdp_problem.agent.agent import Agent
 from modeling.pomdp_problem.domain.observation import ObservationReachedTerminal
 from modeling.pomdp_problem.env.env import Environment
@@ -21,7 +21,7 @@ import pomdp_py
 app = typer.Typer()
 
 
-def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial_state, tower_pos, experiment_params):
+def run_single_experiment(n_blocks, max_steps, pickup_threshold, initial_belief, initial_state, tower_pos, experiment_params):
     agent = Agent(initial_blocks_position_belief=initial_belief,
                   max_steps=max_steps,
                   tower_position=tower_pos,
@@ -35,20 +35,12 @@ def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial
 
     env = Environment.from_agent(agent=agent, init_state=initial_state)
 
-    planner = pomdp_py.POUCT(max_depth=experiment_params['max_planning_depth'],
-                             num_sims=num_sims,
-                             discount_factor=1.0,
-                             rollout_policy=agent.policy_model,
-                             show_progress=False)
+    policy = HandMadePolicy(confidence_for_stack=pickup_threshold)
 
     total_reward = 0
-    planning_times = []
 
     for _ in range(max_steps):
-        actual_action = planner.plan(agent)
-        planning_time = planner.last_planning_time
-        planning_times.append(planning_time)
-
+        actual_action = policy.sample_action(agent.belief, agent.history)
         actual_reward = env.state_transition(actual_action, execute=True)
         actual_observation = env.provide_observation(agent.observation_model, actual_action)
 
@@ -57,7 +49,6 @@ def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial
         if isinstance(actual_observation, ObservationReachedTerminal):
             break
 
-        planner.update(agent, actual_action, actual_observation)  # updates tree but not belief
         agent.update(actual_action, actual_observation)
 
         belief = agent.belief
@@ -65,7 +56,7 @@ def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial
             # terminal state
             break
 
-    return total_reward, np.mean(planning_times)
+    return total_reward
 
 
 @app.command()
@@ -82,10 +73,10 @@ def run_experiments(
         max_planning_depth: int = 4,
         sigmin: float = 0.02,
         sigmax: float = 0.15,
-        num_experiments: int = 4,
-        num_runs_per_experiment: int = 3
+        num_experiments: int = 25,
+        num_runs_per_experiment: int = 2
 ):
-    num_sims_list = [100, 200, 400]
+    pickup_threshold = [0.5, 0.6, 0.7]
     tower_pos = goal_tower_position
 
     experiment_params = {
@@ -99,7 +90,7 @@ def run_experiments(
         'max_planning_depth': max_planning_depth,
     }
 
-    results = {ns: {'rewards': [], 'planning_times': []} for ns in num_sims_list}
+    results = {ns: {'rewards': []} for ns in pickup_threshold}
 
     for exp in range(num_experiments):
         print(f"Running experiment {exp + 1}/{num_experiments}")
@@ -113,19 +104,16 @@ def run_experiments(
         initial_block_positions = sample_block_positions_from_dists(initial_belief.block_beliefs)
         initial_state = State(steps_left=max_steps, block_positions=initial_block_positions, robot_position=tower_pos)
 
-        for num_sims in num_sims_list:
-            print(f"  Running with {num_sims} simulations")
+        for threshold in pickup_threshold:
+            print(f"  Running with {threshold} threshold")
             exp_rewards = []
-            exp_planning_times = []
 
             for run in range(num_runs_per_experiment):
-                reward, planning_time = run_single_experiment(n_blocks, max_steps, num_sims, initial_belief,
+                reward = run_single_experiment(n_blocks, max_steps, threshold, initial_belief,
                                                               initial_state, tower_pos, experiment_params)
                 exp_rewards.append(reward)
-                exp_planning_times.append(planning_time)
 
-            results[num_sims]['rewards'].extend(exp_rewards)
-            results[num_sims]['planning_times'].extend(exp_planning_times)
+            results[threshold]['rewards'].extend(exp_rewards)
 
     # Create results directory if it doesn't exist
     os.makedirs('results', exist_ok=True)
@@ -134,10 +122,7 @@ def run_experiments(
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     # Plot rewards
-    plot_results(num_sims_list, results, 'rewards', 'Accumulated Reward', timestamp)
-
-    # Plot planning times
-    plot_results(num_sims_list, results, 'planning_times', 'Average Planning Time per Step (s)', timestamp)
+    plot_results(pickup_threshold, results, 'rewards', 'Accumulated Reward', timestamp)
 
     # Save experiment parameters
     params = {

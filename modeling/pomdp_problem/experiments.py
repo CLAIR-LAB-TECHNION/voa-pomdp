@@ -12,6 +12,7 @@ from modeling.pomdp_problem.domain.observation import ObservationSenseResult, Ob
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 from pomdp_py.utils import TreeDebugger
+from modeling.policies.hand_made_policy import HandMadePolicy
 
 
 # def get_positions_and_init_belief():
@@ -67,12 +68,14 @@ if __name__ == "__main__":
                               robot_position=tower_pos,)
     env = Environment.from_agent(agent=agent, init_state=actual_init_state)
 
-    planner = pomdp_py.POUCT(max_depth=max_planning_depth,
-                             # planning_time=300,
-                             num_sims=2000,
-                             discount_factor=1.0,
-                             rollout_policy=agent.policy_model,
-                             show_progress=True)
+    # planner = pomdp_py.POUCT(max_depth=max_planning_depth,
+    #                          # planning_time=300,
+    #                          num_sims=2000,
+    #                          discount_factor=1.0,
+    #                          rollout_policy=agent.policy_model,
+    #                          show_progress=True)
+
+    policy = HandMadePolicy()
 
     print("init state", actual_init_state)
     plot_all_blocks_beliefs(agent.belief,
@@ -83,19 +86,20 @@ if __name__ == "__main__":
     negative_sensing_points = []
     pickup_attempt_points = []
     for i in range(max_steps):
-        actual_action = planner.plan(agent)
+        # actual_action = planner.plan(agent)
+        actual_action = policy.sample_action(agent.belief, agent.history)
         actual_reward = env.state_transition(actual_action, execute=True)
         actual_observation = env.provide_observation(agent.observation_model, actual_action)
 
         total_reward += actual_reward
 
-        dd = TreeDebugger(agent.tree)
-        dd.p(6)
+        # dd = TreeDebugger(agent.tree)
+        # dd.p(6)
 
         if isinstance(actual_observation, ObservationReachedTerminal):
             break
 
-        planner.update(agent, actual_action, actual_observation)
+        # planner.update(agent, actual_action, actual_observation)
         # planner.update only updates the tree, but not the belief and history of the agent!
         # I implemented agent.update to do both:
         agent.update(actual_action, actual_observation)
@@ -103,7 +107,7 @@ if __name__ == "__main__":
         print("------------")
         print(f"step: {i}, action: {actual_action}, observation: {actual_observation}, reward: {actual_reward}")
         print(f"total reward: {total_reward}, hidden_state={env.state}")
-        print("num_sims", planner.last_num_sims, "max depth reached", dd.depth)
+        # print("num_sims", planner.last_num_sims, "max depth reached", dd.depth)
         if isinstance(actual_observation, ObservationSenseResult):
             if actual_observation.is_occupied:
                 positive_sensing_points.append((actual_action.x, actual_action.y))
