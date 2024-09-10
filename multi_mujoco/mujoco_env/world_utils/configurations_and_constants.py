@@ -35,4 +35,4 @@ INIT_MAX_VELOCITY = np.array([3]*6)
 # relative position of grasped object from end effector
 grasp_offset = 0.02
 
-frame_skip = 5
+frame_skip = 10

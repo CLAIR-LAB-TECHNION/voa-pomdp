@@ -162,11 +162,12 @@ class WorldVoA:
         self.step(self.robots_joint_pos, closed)
 
     def _clip_joint_velocities(self):
-        new_vel = self.robots_joint_velocities.copy()
-        for agent, vel in new_vel.items():
-            new_vel[agent] = np.clip(vel, -self.max_joint_velocities, self.max_joint_velocities)
-            self._env_entities[agent].set_state(velocity=new_vel[agent])
-        self.robots_joint_velocities = new_vel
+        # new_vel = self.robots_joint_velocities.copy()
+        # for agent, vel in new_vel.items():
+        #     new_vel[agent] = np.clip(vel, -self.max_joint_velocities, self.max_joint_velocities)
+        #     self._env_entities[agent].set_state(velocity=new_vel[agent])
+        # self.robots_joint_velocities = new_vel
+        return
 
     def _env_step(self, target_joint_pos):
         """ run environment step and update state of self accordingly"""
