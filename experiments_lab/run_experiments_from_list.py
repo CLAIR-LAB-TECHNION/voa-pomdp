@@ -35,7 +35,9 @@ def run_experiments(
         planner_n_iterations: int = typer.Option(2000, help="Only relevant for POUCT policy"
                                                             "Number of iterations for the planner"),
         confidence_for_stack: float = typer.Option(0.6, help="Only relevant for HandMade policy."),
-        config_file: str = typer.Option("configurations/experiments_4_blocks.csv")
+        config_file: str = typer.Option("configurations/experiments_4_blocks.csv"),
+        two_experiments_at_a_time: bool = typer.Option(True, help="If True, will run two experiments at a time"
+                                                                   "assuming theer are two stacks on the pile"),
 ):
     results_dir = f"experiments/{n_blocks}blocks"
     os.makedirs(results_dir, exist_ok=True)
@@ -80,6 +82,7 @@ def run_experiments(
                                        policy=policy,
                                        visualize=True)
 
+    reset_pile = True
     # Run experiments
     for _, row in df.iterrows():
         if pd.notna(row['conducted_datetime_stamp']) and row['conducted_datetime_stamp'] != '':
@@ -90,9 +93,13 @@ def run_experiments(
         experiment_mgr.run_from_list_and_save_results(row, config_file, results_dir)
 
         chime.success()
-        input("Experiment completed. Make sure piles are reset and workspace is clean, "
-              "then Press ENTER to continue with the next experiment...")
-        experiment_mgr.piles_manager.reset()
+
+        reset_pile = True if not two_experiments_at_a_time else not reset_pile
+        if reset_pile:
+            input("Experiment completed. Make sure piles are reset and workspace is clean, "
+                  "then Press ENTER to continue with the next experiment...")
+            experiment_mgr.piles_manager.reset()
+
         experiment_mgr.visualizer.reset()
 
     experiment_mgr.stop_visualizer_if_started()
