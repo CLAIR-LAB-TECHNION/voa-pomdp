@@ -88,13 +88,13 @@ class UnnormalizedBlocksPositionsBelief:
         return [[point_x - self.block_size/2 + margin, point_x + self.block_size/2 - margin],
                 [point_y - self.block_size/2 + margin, point_y + self.block_size/2 - margin]]
 
-    def update_from_pickup_attempt(self, pick_x, pick_y, observed_success):
+    def update_from_pickup_attempt(self, pick_x, pick_y, observed_success, no_update_margin=0.005):
         if observed_success:
-            self._update_successful_pickup(pick_x, pick_y)
+            self._update_successful_pickup(pick_x, pick_y, no_update_margin)
         else:
-            self._update_failed_pickup(pick_x, pick_y)
+            self._update_failed_pickup(pick_x, pick_y, no_update_margin)
 
-    def _update_successful_pickup(self, pick_x, pick_y):
+    def _update_successful_pickup(self, pick_x, pick_y, no_update_margin):
         block_to_remove_id = np.argmax([b.pdf((pick_x, pick_y)) for b in self.block_beliefs])
         removed = self.block_beliefs.pop(block_to_remove_id)
         for i in range(len(self.block_beliefs_original_position)):
@@ -104,12 +104,14 @@ class UnnormalizedBlocksPositionsBelief:
         self.n_blocks_on_table -= 1
 
         half_block_size = self.block_size / 2
-        self._add_empty_area([pick_x - half_block_size, pick_x + half_block_size],
-                             [pick_y - half_block_size, pick_y + half_block_size])
+        self._add_empty_area([pick_x - half_block_size + no_update_margin, pick_x + half_block_size - no_update_margin],
+                             [pick_y - half_block_size + no_update_margin, pick_y + half_block_size - no_update_margin])
 
-    def _update_failed_pickup(self, pick_x, pick_y):
-        self._add_empty_area([pick_x - self.successful_grasp_margin_x, pick_x + self.successful_grasp_margin_x],
-                             [pick_y - self.successful_grasp_margin_y, pick_y + self.successful_grasp_margin_y])
+    def _update_failed_pickup(self, pick_x, pick_y, no_update_margin):
+        self._add_empty_area([pick_x - self.successful_grasp_margin_x + no_update_margin,
+                              pick_x + self.successful_grasp_margin_x - no_update_margin],
+                             [pick_y - self.successful_grasp_margin_y + no_update_margin,
+                             pick_y + self.successful_grasp_margin_y - no_update_margin])
 
     def _add_empty_area(self, area_x_bounds, area_y_bounds):
         for block_belief in self.block_beliefs:
