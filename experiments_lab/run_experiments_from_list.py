@@ -36,7 +36,7 @@ def run_experiments(
                                                             "Number of iterations for the planner"),
         confidence_for_stack: float = typer.Option(0.6, help="Only relevant for HandMade policy."),
         config_file: str = typer.Option("configurations/experiments_4_blocks.csv"),
-        two_experiments_at_a_time: bool = typer.Option(True, help="If True, will run two experiments at a time"
+        two_experiments_at_a_time: bool = typer.Option(False, help="If True, will run two experiments at a time"
                                                                    "assuming theer are two stacks on the pile"),
 ):
     results_dir = f"experiments/{n_blocks}blocks"

@@ -340,6 +340,73 @@ class MotionExecutor:
 
         return True, frames, state
 
+    def facing_down_ik(self, agent, target_transform, max_tries=20):
+        # Use inverse kinematics to get the joint configuration for this pose
+        target_config = self.motion_planner.ik_solve(agent, target_transform)
+        if target_config is None:
+            target_config = []
+        shoulder_constraint_for_down_movement = 0.1
+
+        def valid_shoulder_angle(q):
+            return -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
+
+        trial = 1
+        while (self.motion_planner.is_config_feasible(agent, target_config) is False or
+               valid_shoulder_angle(target_config) is False) \
+                and trial < max_tries:
+            trial += 1
+            # try to find another solution, starting from other random configurations:
+            q_near = np.random.uniform(-np.pi / 2, np.pi / 2, 6)
+            target_config = self.motion_planner.ik_solve(agent, target_transform, start_config=q_near)
+            if target_config is None:
+                target_config = []
+
+        return target_config
+
+    def check_point_in_block(self, x, y):
+        for block_id, pos in self.blocks_positions_dict.items():
+            box_center = pos[:2].tolist()
+            if point_in_square(square_center=box_center, edge_length=.04, point=[x, y]):
+                return block_id
+        return None
+
+    def pick_up(self, agent, x, y, start_height=0.15):
+
+        self.plan_and_move_to_xyz_facing_down(agent,
+                                              [x, y, start_height],
+                                              speed=3.,
+                                              acceleration=3.,
+                                              blend_radius=0.05,
+                                              tolerance=0.1, )
+        above_block_config = self.env.robots_joint_pos[agent]
+
+        self.moveL(agent,
+                   (x, y, 0.03),
+                   speed=0.1,
+                   acceleration=0.1,
+                   tolerance=0.003)
+        self.wait(5)
+        _ = self.activate_grasp()
+        self.wait(5)
+        self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
+
+    def put_down(self, agent, x, y, z):
+        if self.env.gripper_state_closed is False:
+            print('There is no block to put down')
+            return False, None, self.env.get_state()
+        target_position = [x, y, z]
+        target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
+        target_config = self.facing_down_ik(agent, target_transform)
+        success, frames, state = self.move_to_config(agent, target_config)
+        if not success:
+            return False, frames, state
+
+        grasp_suc, grasp_frames, state = self.deactivate_grasp()
+
+        d_success, d_frames, state = self.move_to_config(agent, self.default_config)
+
+        return grasp_suc and d_success, np.concatenate([frames, grasp_frames, d_frames]), state
+
     def move_and_detect_height(self, agent, x, y, start_z=0.1, step_size=0.01, force_threshold=10, max_steps=500):
         """
         Move the robot above a specified (x,y) point and lower it until contact is detected.
@@ -379,70 +446,3 @@ class MotionExecutor:
         total_frames.extend(frames)
 
         return not self.check_point_in_block(x, y) is None, total_frames, state
-
-    def pick_up(self, agent, x, y, start_height=0.15):
-
-        self.plan_and_move_to_xyz_facing_down(agent,
-                                              [x, y, start_height],
-                                              speed=3.,
-                                              acceleration=3.,
-                                              blend_radius=0.05,
-                                              tolerance=0.1, )
-        above_block_config = self.env.robots_joint_pos[agent]
-
-        self.moveL(agent,
-                   (x, y, 0.03),
-                   speed=0.1,
-                   acceleration=0.1,
-                   tolerance=0.003)
-        self.wait(5)
-        _ = self.activate_grasp()
-        self.wait(5)
-        self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
-
-    def put_down(self, agent, x, y, z):
-        if self.env.gripper_state_closed is False:
-            print('There is no block to put down')
-            return False, None, self.env.get_state()
-        target_position = [x, y, z]
-        target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
-        target_config = self.facing_down_ik(agent, target_transform)
-        success, frames, state = self.move_to_config(agent, target_config)
-        if not success:
-            return False, frames, state
-
-        grasp_suc, grasp_frames, state = self.deactivate_grasp()
-
-        d_success, d_frames, state = self.move_to_config(agent, self.default_config)
-
-        return grasp_suc and d_success, np.concatenate([frames, grasp_frames, d_frames]), state
-
-    def facing_down_ik(self, agent, target_transform, max_tries=20):
-        # Use inverse kinematics to get the joint configuration for this pose
-        target_config = self.motion_planner.ik_solve(agent, target_transform)
-        if target_config is None:
-            target_config = []
-        shoulder_constraint_for_down_movement = 0.1
-
-        def valid_shoulder_angle(q):
-            return -shoulder_constraint_for_down_movement > q[1] > -np.pi + shoulder_constraint_for_down_movement
-
-        trial = 1
-        while (self.motion_planner.is_config_feasible(agent, target_config) is False or
-               valid_shoulder_angle(target_config) is False) \
-                and trial < max_tries:
-            trial += 1
-            # try to find another solution, starting from other random configurations:
-            q_near = np.random.uniform(-np.pi / 2, np.pi / 2, 6)
-            target_config = self.motion_planner.ik_solve(agent, target_transform, start_config=q_near)
-            if target_config is None:
-                target_config = []
-
-        return target_config
-
-    def check_point_in_block(self, x, y):
-        for block_id, pos in self.blocks_positions_dict.items():
-            box_center = pos[:2].tolist()
-            if point_in_square(square_center=box_center, edge_length=.04, point=[x, y]):
-                return block_id
-        return None
