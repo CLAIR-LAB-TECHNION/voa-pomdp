@@ -17,6 +17,7 @@ from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default, goal_tower_position)
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.policies.pouct_planner_policy import POUCTPolicy
+from modeling.policies.hand_made_policy import HandMadePolicy
 from experiments_lab.experiment_manager import ExperimentManager
 
 app = typer.Typer()
@@ -26,10 +27,14 @@ app = typer.Typer()
 def run_experiments(
         n_blocks: int = 4,
         max_steps: int = 20,
-        max_planning_depth: int = typer.Option(5, help="Max planning depth for the planner,"
+        policy_type: str = typer.Option("pouct", help="policy type, pouct or hand_made"),
+        max_planning_depth: int = typer.Option(5, help=" Only relevant for POUCT policy."
+                                                       "Max planning depth for the planner,"
                                                        "consult before changing it, deepening may cause"
                                                        "distribution shift because rollout policy always tries to pick up"),
-        planner_n_iterations: int = 2000,
+        planner_n_iterations: int = typer.Option(2000, help="Only relevant for POUCT policy"
+                                                            "Number of iterations for the planner"),
+        confidence_for_stack: float = typer.Option(0.6, help="Only relevant for HandMade policy."),
         config_file: str = typer.Option("configurations/experiments_4_blocks.csv")
 ):
     results_dir = f"experiments/{n_blocks}blocks"
@@ -55,16 +60,22 @@ def run_experiments(
 
     dummy_initial_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
                                                  np.zeros((n_blocks, 2)), np.ones((n_blocks, 2)))
-
-    policy = POUCTPolicy(dummy_initial_belief, env.max_steps, goal_tower_position,
-                         num_sims=planner_n_iterations,
-                         stacking_reward=env.stacking_reward,
-                         sensing_cost_coeff=env.sensing_cost_coeff,
-                         stacking_cost_coeff=env.stacking_cost_coeff,
-                         finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff,
-                         max_planning_depth=max_planning_depth,
-                         show_progress=True)
-
+    
+    if policy_type == "pouct":
+        policy = POUCTPolicy(dummy_initial_belief, env.max_steps, goal_tower_position,
+                             num_sims=planner_n_iterations,
+                             stacking_reward=env.stacking_reward,
+                             sensing_cost_coeff=env.sensing_cost_coeff,
+                             stacking_cost_coeff=env.stacking_cost_coeff,
+                             finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff,
+                             max_planning_depth=max_planning_depth,
+                             show_progress=True)
+    elif policy_type == "hand_made":
+        policy = HandMadePolicy(confidence_for_stack=confidence_for_stack)
+    else:
+        raise ValueError(f"Unknown policy type: {policy_type}")
+        
+    
     experiment_mgr = ExperimentManager(env=env,
                                        policy=policy,
                                        visualize=True)

@@ -68,7 +68,7 @@ class HandMadePolicy(AbastractPolicy):
         all_sensed_points = np.array(all_sensed_points)
         distances = np.linalg.norm(all_sensed_points - point_to_sense, axis=1)
         while np.min(distances) < 0.003:
-            point_to_sense += np.random.uniform(-0.002, 0.002, 2)
+            point_to_sense += np.random.uniform(-0.005, 0.005, 2)
             distances = np.linalg.norm(all_sensed_points - point_to_sense, axis=1)
 
         return ActionSense(*point_to_sense)
@@ -79,6 +79,6 @@ class HandMadePolicy(AbastractPolicy):
                 "confidence_for_stack": self.confidence_for_stack,
                 "points_to_sample": self.points_to_sample}
 
-    def reset(self):
+    def reset(self, initial_belief):
         pass
 

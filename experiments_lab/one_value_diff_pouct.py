@@ -12,7 +12,6 @@ from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default, goal_tower_position)
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
-from modeling.policies.fixed_policy_sense_until_positive import FixedSenseUntilPositivePolicy
 from modeling.policies.pouct_planner_policy import POUCTPolicy
 from modeling.pomdp_problem.domain.action import *
 from modeling.pomdp_problem.domain.observation import *
