@@ -21,7 +21,7 @@ class BlockStackingSimulator:
         self.current_state = None
         self.reset()
         self.tower_counter = 0
-        self.tower_pos = [-0.3, -1.]
+        self.tower_pos = [-0.45, -1.15]
 
         if visualize_mp:
             self.motion_executor.motion_planner.visualize()
@@ -45,11 +45,10 @@ class BlockStackingSimulator:
         self.motion_executor.move_and_detect_height(agent, x, y)
 
     def pick_up(self, agent, x, y):
-        self.motion_executor.pick_up(agent, x, y, start_height=0.15)
+        self.motion_executor.pick_up(agent, x, y)
 
     def stack(self, agent):
-        z = 0.04 + 0.05 * self.tower_counter
-        self.motion_executor.put_down(agent, x=self.tower_pos[0], y=self.tower_pos[1], z=z)
+        self.motion_executor.put_down(agent, x=self.tower_pos[0], y=self.tower_pos[1])
         self.tower_counter += 1
 
     def sense_camera(self, camera_position, camera_orientation):
