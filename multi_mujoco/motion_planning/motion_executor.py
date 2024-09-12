@@ -240,74 +240,57 @@ class MotionExecutor:
                             max_planning_time=max_planning_time,
                             max_length_to_distance_ratio=max_length_to_distance_ratio)
 
-    def moveL(self, robot_name, target_position, speed=0.1, acceleration=0.1, tolerance=0.003):
-        """
-        Move the robot's end-effector in a straight line to the target pose.
-
-        :param robot_name: Name of the robot to move
-        :param target_pose: Target pose as a 4x4 transformation matrix
-        :param speed: Maximum linear speed of the end-effector (m/s)
-        :param acceleration: Maximum linear acceleration of the end-effector (m/s^2)
-        :param tolerance: Tolerance for considering the target reached
-        """
+    def moveL(self, robot_name, target_position, speed=0.1, tolerance=0.003, facing_down=True, max_steps=1000):
         current_joints = self.env.robots_joint_pos[robot_name]
         current_pose = self.motion_planner.get_forward_kinematics(robot_name, current_joints)
+        goal_orientation = current_pose[0] if not facing_down else np.array(FACING_DOWN_R).flatten()
+        start_pos = np.array(current_pose[1])
+        end_pos = np.array(target_position)
 
+        # Calculate direction and distance
+        direction = end_pos - start_pos
+        distance = np.linalg.norm(direction)
+        unit_direction = direction / distance
 
-        # Extract start and end positions
-        start_pos = np.asarray(current_pose[1])
-        end_pos = target_position
+        # Calculate step size based on speed
+        step_size = speed * self.time_step
 
-        # Calculate the total distance
-        distance = np.linalg.norm(np.asarray(end_pos) - np.asarray(start_pos))
+        steps_executed = 0
+        while steps_executed < max_steps:
+            current_pos = np.array(self.motion_planner.get_forward_kinematics(robot_name, current_joints)[1])
+            remaining_vector = end_pos - current_pos
+            remaining_distance = np.linalg.norm(remaining_vector)
 
-        # Calculate the time needed for the movement
-        time_to_max_speed = speed / acceleration
-        distance_at_max_speed = distance - acceleration * time_to_max_speed ** 2
+            if remaining_distance < tolerance:
+                return True
 
-        if distance_at_max_speed > 0:
-            total_time = 2 * time_to_max_speed + distance_at_max_speed / speed
-        else:
-            total_time = 2 * np.sqrt(distance / acceleration)
+            # Calculate next position
+            move_distance = min(step_size, remaining_distance)
+            next_pos = current_pos + (remaining_vector / remaining_distance) * move_distance
 
-        # Calculate the number of steps
-        num_steps = int(total_time / self.time_step)
-        max_steps = num_steps * 2  # Set a maximum number of steps
-
-        # Generate the linear trajectory
-        trajectory = []
-        for t in np.linspace(0, 1, num_steps):
-            interpolated_pos = start_pos + (end_pos - start_pos) * t
-
-            # Compute inverse kinematics for the interpolated pose
-            target_joints = self.motion_planner.ik_solve(robot_name, (current_pose[0], interpolated_pos),
-                                                         start_config=current_joints)
-            if target_joints is None or target_joints == []:
-                print(f"WARNING: IK solution not found for {robot_name} at step {t}")
+            # Compute IK for the next position
+            next_joints = self.motion_planner.ik_solve(robot_name, (goal_orientation, next_pos),
+                                                       start_config=current_joints)
+            if next_joints is None or len(next_joints) == 0:
+                print(f"WARNING: IK solution not found for {robot_name} at attempt {steps_executed + 1}")
+                steps_executed += 1
                 continue
 
-            trajectory.append(target_joints)
-
-        # Execute the trajectory
-        for step in range(max_steps):
-            if step < len(trajectory):
-                target_positions = trajectory[step]
-            else:
-                target_positions = trajectory[-1]
-
+            # Move the robot
             actions = {robot: self.env.robots_joint_pos[robot] for robot in self.env.robots_joint_pos if
                        robot != robot_name}
-            actions[robot_name] = target_positions
+            actions[robot_name] = next_joints
             self.env.step(actions)
 
-            # Check if we've reached the final configuration
+            # Update current joints
             current_joints = self.env.robots_joint_pos[robot_name]
-            current_pose = self.motion_planner.get_forward_kinematics(robot_name, current_joints)
-            if np.linalg.norm(np.asarray(current_pose[1]) - np.asarray(end_pos)) < tolerance:
-                break
+            steps_executed += 1
 
-        if step == max_steps - 1:
-            print(f"WARNING: Linear movement for {robot_name} timed out before reaching the target pose.")
+            print(f"Attempt {steps_executed}, Current position: {current_pos}, Remaining distance: {remaining_distance}")
+
+        print(
+            f"WARNING: Linear movement for {robot_name} completed, but target not reached within tolerance after {max_steps} attempts")
+        return False
 
     def reset(self, randomize=True, block_positions=None):
         state = self.env.reset(randomize=randomize, block_positions=block_positions)
@@ -325,20 +308,9 @@ class MotionExecutor:
         return self.wait(wait_steps, render_freq=render_freq)
 
     def wait(self, n_steps, render_freq=8):
-        frames = []
-        state = None
-
-        # move to current position, i.e., stay in place
         maintain_pos = self.env.robots_joint_pos
         for i in range(n_steps):
-            state = self.env.step(maintain_pos)
-            # if i % render_freq == 0:
-            # frames.append(self.env.render())
-
-        # account for falling objects
-        # self.update_blocks_positions()
-
-        return True, frames, state
+            self.env.step(maintain_pos)
 
     def facing_down_ik(self, agent, target_transform, max_tries=20):
         # Use inverse kinematics to get the joint configuration for this pose
@@ -375,37 +347,38 @@ class MotionExecutor:
         self.plan_and_move_to_xyz_facing_down(agent,
                                               [x, y, start_height],
                                               speed=3.,
-                                              acceleration=3.,
+                                              acceleration=2.,
                                               blend_radius=0.05,
-                                              tolerance=0.1, )
+                                              tolerance=0.03, )
         above_block_config = self.env.robots_joint_pos[agent]
 
         self.moveL(agent,
-                   (x, y, 0.03),
-                   speed=0.1,
-                   acceleration=0.1,
-                   tolerance=0.003)
-        self.wait(5)
+                   (x, y, 0.05),
+                   speed=1.,
+                   tolerance=0.001)
+        self.wait(20)
         _ = self.activate_grasp()
         self.wait(5)
         self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
 
-    def put_down(self, agent, x, y, z):
-        if self.env.gripper_state_closed is False:
-            print('There is no block to put down')
-            return False, None, self.env.get_state()
-        target_position = [x, y, z]
-        target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
-        target_config = self.facing_down_ik(agent, target_transform)
-        success, frames, state = self.move_to_config(agent, target_config)
-        if not success:
-            return False, frames, state
+    def put_down(self, agent, x, y, start_height=0.15):
+        self.plan_and_move_to_xyz_facing_down(agent,
+                                              [x, y, start_height],
+                                              speed=3.,
+                                              acceleration=3.,
+                                              blend_radius=0.05,
+                                              tolerance=0.03, )
+        above_block_config = self.env.robots_joint_pos[agent]
 
-        grasp_suc, grasp_frames, state = self.deactivate_grasp()
+        self.moveL(agent,
+                   (x, y, 0.05),
+                   speed=2.,
+                   tolerance=0.001)
+        self.wait(20)
+        _ = self.deactivate_grasp()
+        self.wait(20)
+        self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
 
-        d_success, d_frames, state = self.move_to_config(agent, self.default_config)
-
-        return grasp_suc and d_success, np.concatenate([frames, grasp_frames, d_frames]), state
 
     def move_and_detect_height(self, agent, x, y, start_z=0.1, step_size=0.01, force_threshold=10, max_steps=500):
         """
