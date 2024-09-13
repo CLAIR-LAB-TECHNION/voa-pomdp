@@ -43,7 +43,7 @@ class WorldVoA:
         self.camera = MjvCamera()
         self.camera.type = mj.mjtCamera.mjCAMERA_FREE
 
-        self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
+        self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_robotiq_2f85/base')
         # self.dt = self._mj_model.opt.timestep * frame_skip
         # self._pid_controller = PIDController(kp, ki, kd, dt)
 
@@ -59,11 +59,11 @@ class WorldVoA:
         agents = obs.keys()
 
         for agent in agents:
-            self._env_entities[agent].set_state(position=[-np.pi/2, -np.pi/2, 0, -np.pi/2, 0, 0])
+            self._env_entities[agent].set_state(position=[-np.pi/2, -np.pi/2, 0, -np.pi/2, 0, 0] + [0]*8)
 
         for agent in agents:
             self.robots_joint_pos[agent] = obs[agent]['robot_state'][:6]
-            self.robots_joint_velocities[agent] = obs[agent]["robot_state"][6:12]
+            self.robots_joint_velocities[agent] = obs[agent]["robot_state"][14:20]
             # self.robots_force[agent] = obs[agent]['sensor']
             self.robots_camera[agent] = [obs[agent]['camera'], obs[agent]['camera_pose']]
         self.gripper_state_closed = False
@@ -111,6 +111,9 @@ class WorldVoA:
     def render(self):
         return self._env.render()
 
+    def get_grasped_object_name(self):
+        return self._grasp_manager.attached_object_name
+
     def get_state(self):
         # object_positions = self._object_manager.get_all_block_positions_dict()
         state = {"robots_joint_pos": self.robots_joint_pos,
@@ -119,7 +122,7 @@ class WorldVoA:
                  # "robots_camera": self.robots_camera,
                  "gripper_state_closed": self.gripper_state_closed,
                  # "object_positions": object_positions,
-                 "grasped_object": self._grasp_manager.attached_object_name,}
+                 "grasped_object": self.get_grasped_object_name(),}
                  # "geom_contact": convert_mj_struct_to_namedtuple(self._env.sim.data.contact)}
 
         return deepcopy(state)
@@ -172,7 +175,7 @@ class WorldVoA:
         obs, r, term, trunc, info = self._env.step(actions)
         for agent, ob in obs.items():
             self.robots_joint_pos[agent] = ob['robot_state'][:6]
-            self.robots_joint_velocities[agent] = ob['robot_state'][6:12]
+            self.robots_joint_velocities[agent] = ob['robot_state'][14:20]
             # self.robots_force[agent] = obs[agent]['sensor']
             self.robots_camera[agent] = [obs[agent]['camera'], obs[agent]['camera_pose']]
 

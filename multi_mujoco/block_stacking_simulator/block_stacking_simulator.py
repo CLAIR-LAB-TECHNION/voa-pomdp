@@ -45,7 +45,7 @@ class BlockStackingSimulator:
         return self.motion_executor.sense_for_block(agent, x, y)
 
     def pick_up(self, agent, x, y):
-        self.motion_executor.pick_up(agent, x, y)
+        return self.motion_executor.pick_up(agent, x, y)
 
     def stack(self, agent):
         self.motion_executor.put_down(agent, x=self.tower_pos[0], y=self.tower_pos[1])

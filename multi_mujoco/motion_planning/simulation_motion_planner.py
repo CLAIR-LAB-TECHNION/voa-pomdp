@@ -10,7 +10,7 @@ from .configurations import *
 
 class SimulationMotionPlanner(AbstractMotionPlanner):
     def __init__(self):
-        super().__init__(ee_offset=0.00, eps=0.05)
+        super().__init__(ee_offset=0.12, eps=0.05)
         self.ee_link = self.ur5e_2.link("ee_link")
 
     def _get_klampt_world_path(self):

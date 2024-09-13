@@ -13,7 +13,7 @@ class GraspManager:
         self.graspable_objects_names = object_manager.object_names
 
         # Only considers one robot (we can expand it to a dictionary)
-        self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
+        self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_robotiq_2f85/base')
 
         self.attached_object_name = None
 
@@ -28,7 +28,7 @@ class GraspManager:
         for i, object_position in enumerate(object_positions):
             if np.abs(object_position[0] - gripper_position[0]) < 0.015 and \
                     np.abs(object_position[1] - gripper_position[1]) < 0.015 and\
-                    np.abs(object_position[2] - gripper_position[2]) < 0.05:
+                    np.abs(object_position[2] - gripper_position[2]) < 0.17:
                 self.grasp_object(self.graspable_objects_names[i])
                 return True
 
