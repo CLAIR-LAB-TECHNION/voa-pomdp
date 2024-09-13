@@ -41,8 +41,8 @@ class BlockStackingSimulator:
     def close(self):
         self.mujoco_env.close()
 
-    def sense_height(self, agent, x, y):
-        self.motion_executor.move_and_detect_height(agent, x, y)
+    def sense_for_block(self, agent, x, y):
+        return self.motion_executor.sense_for_block(agent, x, y)
 
     def pick_up(self, agent, x, y):
         self.motion_executor.pick_up(agent, x, y)
@@ -56,24 +56,3 @@ class BlockStackingSimulator:
         # if success:
         return self.mujoco_env.render_image_from_pose(np.array(camera_position), np.array(camera_orientation))
 
-
-if __name__ == '__main__':
-    simulator = BlockStackingSimulator()
-
-    FACING_DOWN_R = [[1, 0, 0],
-                     [0, -1, 0],
-                     [0, 0, -1]]
-
-    simulator.motion_executor.move_to_config('ur5e_2', np.array([1.1, -1.2, 0.8419, -1.3752, -1.5739, -2.3080]))
-    box = simulator.mujoco_env.get_state()['object_positions']['block0_fj']
-    simulator.pick_up('ur5e_2', box[0], box[1])
-    simulator.stack('ur5e_2')
-
-    box = simulator.mujoco_env.get_state()['object_positions']['block1_fj']
-    simulator.pick_up('ur5e_2', box[0], box[1])
-    simulator.stack('ur5e_2')
-    img = simulator.sense_camera([-0.17428016, -0.63361125, 0.59896269],
-                                 [[0.24620755, -0.96735704, -0.06001828], [-0.9639793, -0.23797787, -0.11878736],
-                                  [0.10062677, 0.08710273, -0.99110412]])
-
-    simulator.close()

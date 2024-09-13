@@ -69,7 +69,7 @@ class ObjectManager:
         vel_adr = self._mj_model.jnt_dofadr[joint_id]
         self._mj_data.qvel[vel_adr:vel_adr + 6] = cvel
 
-    def get_block_position(self, block_id: int) -> np.ndarray:
+    def get_block_position_from_mj_id(self, block_id: int) -> np.ndarray:
         """
         Get the position of a block in the simulation.
         Args:
@@ -85,7 +85,7 @@ class ObjectManager:
         Returns:
             a dictionary of block names to their positions, positions will be in format {name: [x, y ,z], ...}.
         """
-        return {name: self.get_block_position(self.objects_mjdata_dict[name].id) for name in self.object_names}
+        return {name: self.get_block_position_from_mj_id(self.objects_mjdata_dict[name].id) for name in self.object_names}
 
     def get_all_block_positions(self) -> List[np.ndarray]:
         """
@@ -93,7 +93,7 @@ class ObjectManager:
         Returns:
             a dictionary of block names to their positions, positions will be in format {name: [x, y ,z], ...}.
         """
-        return [self.get_block_position(self.objects_mjdata_dict[name].id) for name in self.object_names]
+        return [self.get_block_position_from_mj_id(self.objects_mjdata_dict[name].id) for name in self.object_names]
 
     def set_block_position(self, block_id, position):
         """

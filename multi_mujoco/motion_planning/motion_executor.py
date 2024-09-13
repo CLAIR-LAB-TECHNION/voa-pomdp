@@ -1,11 +1,10 @@
 import time
 from copy import copy
-
 import numpy as np
 from scipy.interpolate import interp1d
-
 from .simulation_motion_planner import SimulationMotionPlanner
 from ..mujoco_env.voa_world import WorldVoA
+from multi_mujoco.mujoco_env.world_utils.configurations_and_constants import *
 
 FACING_DOWN_R = [[1, 0, 0],
                  [0, -1, 0],
@@ -54,7 +53,6 @@ class MotionExecutor:
         self.default_config = [0.0, -1.2, 0.8419, -1.3752, -1.5739, -2.3080]
 
         state = self.env.get_state()
-        self.blocks_positions_dict = state['object_positions']
 
         # set current configuration
         for robot, pose in state['robots_joint_pos'].items():
@@ -228,6 +226,9 @@ class MotionExecutor:
         target_transform = compose_transformation_matrix(FACING_DOWN_R, target_xyz)
         goal_config = self.facing_down_ik(robot_name, target_transform, max_tries=50)
 
+        if goal_config is None or len(goal_config) == 0:
+            print(f"WARNING: IK solution not found for {robot_name}")
+
         if cannonized_config:
             goal_config = canonize_config(goal_config)
 
@@ -286,15 +287,12 @@ class MotionExecutor:
             current_joints = self.env.robots_joint_pos[robot_name]
             steps_executed += 1
 
-            print(f"Attempt {steps_executed}, Current position: {current_pos}, Remaining distance: {remaining_distance}")
-
         print(
             f"WARNING: Linear movement for {robot_name} completed, but target not reached within tolerance after {max_steps} attempts")
         return False
 
     def reset(self, randomize=True, block_positions=None):
         state = self.env.reset(randomize=randomize, block_positions=block_positions)
-        self.blocks_positions_dict = state['object_positions']
         return state
 
     def activate_grasp(self, wait_steps=5, render_freq=8):
@@ -355,13 +353,17 @@ class MotionExecutor:
         self.moveL(agent,
                    (x, y, 0.05),
                    speed=1.,
-                   tolerance=0.001)
+                   tolerance=0.003,
+                   max_steps=400)
         self.wait(20)
         _ = self.activate_grasp()
         self.wait(5)
         self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
 
     def put_down(self, agent, x, y, start_height=0.15):
+        release_height = self.env.get_tower_height_at_point((x,y)) + 0.04 + 0.025
+        start_height = max(start_height, release_height + 0.05)
+
         self.plan_and_move_to_xyz_facing_down(agent,
                                               [x, y, start_height],
                                               speed=3.,
@@ -371,51 +373,36 @@ class MotionExecutor:
         above_block_config = self.env.robots_joint_pos[agent]
 
         self.moveL(agent,
-                   (x, y, 0.05),
+                   (x, y, release_height),
                    speed=2.,
-                   tolerance=0.001)
+                   tolerance=0.003,
+                   max_steps=400)
         self.wait(20)
         _ = self.deactivate_grasp()
         self.wait(20)
         self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
 
 
-    def move_and_detect_height(self, agent, x, y, start_z=0.1, step_size=0.01, force_threshold=10, max_steps=500):
-        """
-        Move the robot above a specified (x,y) point and lower it until contact is detected.
+    def sense_for_block(self, agent, x, y, start_height=0.15):
+        self.plan_and_move_to_xyz_facing_down(agent,
+                                              [x, y, start_height],
+                                              speed=3.,
+                                              acceleration=3.,
+                                              blend_radius=0.05,
+                                              tolerance=0.03, )
 
-        @param agent: agent id to move
-        @param x: x-coordinate to move above
-        @param y: y-coordinate to move above
-        @param start_z: starting z-coordinate (height above the surface)
-        @param step_size: how much to lower the end-effector in each step
-        @param force_threshold: force threshold to detect contact
-        @param max_steps: maximum number of steps to take before stopping
-        @return: success, frames, final_height
-        """
-        # First, move to the position above (x, y, start_z)
-        target_position = [x, y, start_z]
-        target_transform = compose_transformation_matrix(FACING_DOWN_R, target_position)
+        self.moveL(agent, (x, y, 0.05), speed=3., tolerance=0.003, max_steps=400)
 
-        target_config = self.facing_down_ik(agent, target_transform)
+        occupied = False
 
-        success, frames, state = self.move_to_config(agent, target_config)
-        if not success:
-            return False, frames, state
+        for bpos in self.env.get_block_positions():
+            if point_in_square(square_center=bpos[:2], edge_length=.04, point=[x, y]):
+                occupied = True
+                break
 
-        # Now, start moving down until contact is detected
-        target_transform[1][2] = 0.06
-        total_frames = frames
+        self.moveL(agent, (x, y, start_height), speed=3., tolerance=0.005, max_steps=400)
 
-        sense_config = self.facing_down_ik(agent, target_transform)
-        success, new_frames, state = self.move_to_config(agent, sense_config, tolerance=0.001,
-                                                         max_steps_per_section=50)
-        total_frames.extend(new_frames)
+        return occupied
 
-        force_data_z = self.env.get_state()['robots_force'][agent][2]
 
-        success, frames, state = self.move_to_config(agent, self.default_config)
 
-        total_frames.extend(frames)
-
-        return not self.check_point_in_block(x, y) is None, total_frames, state

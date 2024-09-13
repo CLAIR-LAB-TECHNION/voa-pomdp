@@ -76,7 +76,6 @@ class ExperimentResults:
         for i in range(start_idx, end_idx, step):
             plot_all_blocks_beliefs(self.beliefs[i], grid_size=200)
 
-
 # Testing :
 
 def create_experiment_results(initial_belief, actions, observations, rewards, actual_initial_block_positions):
