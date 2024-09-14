@@ -360,6 +360,8 @@ class MotionExecutor:
         self.wait(5)
         self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
 
+        return self.env.is_object_grasped()
+
     def put_down(self, agent, x, y, start_height=0.15):
         release_height = self.env.get_tower_height_at_point((x,y)) + 0.04 + 0.025
         start_height = max(start_height, release_height + 0.05)

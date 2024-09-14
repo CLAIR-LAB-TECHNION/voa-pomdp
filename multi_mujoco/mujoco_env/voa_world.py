@@ -52,6 +52,15 @@ class WorldVoA:
     def close(self):
         self._env.close()
 
+    def set_robot_joints(self, robot_name, joint_pos, joint_vel=(0,)*6, simulate_step=True):
+        self._env_entities[robot_name].set_state(position=joint_pos, velocity=joint_vel)
+        if simulate_step:
+            self.simulate_steps(1)
+
+    def set_block_positions_on_table(self, block_positions_xy):
+        z = 0.03
+        self._object_manager.set_all_block_positions([[x, y, z] for x, y in block_positions_xy])
+
     def reset(self, randomize=True, block_positions=None):
         self.max_joint_velocities = INIT_MAX_VELOCITY
 
@@ -59,7 +68,7 @@ class WorldVoA:
         agents = obs.keys()
 
         for agent in agents:
-            self._env_entities[agent].set_state(position=[-np.pi/2, -np.pi/2, 0, -np.pi/2, 0, 0])
+            self.set_robot_joints(agent, [-np.pi/2, -np.pi/2, 0, -np.pi/2, 0, 0], simulate_step=False)
 
         for agent in agents:
             self.robots_joint_pos[agent] = obs[agent]['robot_state'][:6]
@@ -132,8 +141,9 @@ class WorldVoA:
 
         blocks_near_point = not_grasped_block_positions[
             np.linalg.norm(not_grasped_block_positions[:, :2] - point, axis=1) < 0.03]
-        highest_block = np.max(blocks_near_point[:, 2]) if blocks_near_point.size > 0 else 0
-        return highest_block
+        highest_block_height = np.max(blocks_near_point[:, 2]) if blocks_near_point.size > 0 \
+            else not_grasped_block_positions[:, 2].min()
+        return highest_block_height
 
     def get_block_positions(self):
         return list(self._object_manager.get_all_block_positions_dict().values())
@@ -191,6 +201,8 @@ class WorldVoA:
 
         return self.renderer.render()
 
+    def is_object_grasped(self):
+        return self._grasp_manager.attached_object_name is not None
 
 def convert_mj_struct_to_namedtuple(mj_struct):
     """
