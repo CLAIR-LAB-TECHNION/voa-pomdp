@@ -11,13 +11,25 @@ from multi_mujoco.mujoco_env.common.ur5e_fk import forward
 
 class BlockStackingSimulator:
     def __init__(self,
-                 visualize_mp=True,
                  max_steps=20,
                  stacking_reward=1,
                  finish_ahead_of_time_reward_coeff=0.1,
                  sensing_cost_coeff=0.05,
-                 stacking_cost_coeff=0.05
+                 stacking_cost_coeff=0.05,
+                 visualize_mp=True,
+                 render_sleep_to_maintain_fps=True,
                  ):
+        """
+
+        @param max_steps:
+        @param stacking_reward:
+        @param finish_ahead_of_time_reward_coeff:
+        @param sensing_cost_coeff:
+        @param stacking_cost_coeff:
+        @param visualize_mp:
+        @param render_sleep_to_maintain_fps: only relevant when render_mode is 'human'
+        """
+
         self.n_blocks = 4
 
         self.max_steps = max_steps
@@ -26,7 +38,7 @@ class BlockStackingSimulator:
         self.sensing_cost_coeff = sensing_cost_coeff
         self.stacking_cost_coeff = stacking_cost_coeff
 
-        self.mujoco_env = WorldVoA()
+        self.mujoco_env = WorldVoA(render_sleep_to_maintain_fps=render_sleep_to_maintain_fps)
         self.motion_executor = MotionExecutor(env=self.mujoco_env)
 
         if visualize_mp:

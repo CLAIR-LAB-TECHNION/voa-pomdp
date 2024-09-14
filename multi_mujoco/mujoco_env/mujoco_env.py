@@ -23,8 +23,11 @@ class MujocoEnv(Env, EzPickle):
             episode_sampler: EpisodeSampler,
             render_mode: Optional[Literal['human', 'rgb_array', 'segmentation', 'depth_array']] = None,
             frame_skip: int = 1,
-            reset_on_init: bool = True
+            reset_on_init: bool = True,
+            sleep_to_maintain_fps: bool = True
     ) -> None:
+        self.sleep_to_maintain_fps = sleep_to_maintain_fps
+
         EzPickle.__init__(self, episode_sampler, frame_skip, render_mode, reset_on_init)
         self.episode_sampler = episode_sampler
         self.frame_skip = frame_skip
@@ -45,9 +48,11 @@ class MujocoEnv(Env, EzPickle):
             cfg: Config,
             render_mode: Optional[Literal['human', 'rgb_array', 'segmentation', 'depth_array']] = None,
             frame_skip: int = 1,
-            reset_on_init: bool = True
+            reset_on_init: bool = True,
+            sleep_to_maintain_fps: bool = True
     ) -> MujocoEnv:
-        return cls(CfgEpisodeSampler(cfg), render_mode, frame_skip, reset_on_init)
+        return cls(CfgEpisodeSampler(cfg), render_mode, frame_skip, reset_on_init,
+                   sleep_to_maintain_fps=sleep_to_maintain_fps)
 
     @classmethod
     def from_cfg_file(
@@ -150,6 +155,7 @@ class MujocoEnv(Env, EzPickle):
         if self.render_mode == 'human':
             self.renderer = WindowRenderer(self.sim.model, self.sim.data, self.episode.scene.render_camera,
                                            render_fps=self.metadata["render_fps"],
+                                           sleep_to_maintain_fps=self.sleep_to_maintain_fps,
                                            **self.episode.scene.renderer_cfg)
         else:
             self.renderer = OffscreenRenderer(self.sim.model, self.sim.data, self.episode.scene.render_camera,

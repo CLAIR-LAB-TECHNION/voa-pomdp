@@ -9,8 +9,10 @@ import mujoco.viewer as mj_viewer
 
 class WindowRenderer(BaseRenderer):
     def _initialize(self, render_fps: int = 60, scene_flags: Optional[mujoco.mjtRndFlag] = None,
-                    vis_flags: Optional[mujoco.mjtRndFlag] = None) -> None:
+                    vis_flags: Optional[mujoco.mjtRndFlag] = None, sleep_to_maintain_fps=True) -> None:
         self.render_spf = 1 / render_fps
+
+        self.sleep_to_maintain_fps = sleep_to_maintain_fps
 
         # initialize viewer
         self.viewer = mj_viewer.launch_passive(self._model, self._data)
@@ -50,11 +52,11 @@ class WindowRenderer(BaseRenderer):
     def perturbations(self) -> mujoco.MjvPerturb:
         return self.viewer.perturb
 
-    def render(self) -> None:
+    def render(self,) -> None:
         # sleep to maintain FPS
         cur_time = time.time()
         time_to_next_frame = self.render_spf - (cur_time - self.prev_render_time)
-        if time_to_next_frame > 0:
+        if time_to_next_frame > 0 and self.sleep_to_maintain_fps:
             time.sleep(time_to_next_frame)
 
         # update render window

@@ -9,10 +9,10 @@ blocks_pos = [[-0.8, -0.8],
               [-0.6, -0.6],]
 
 
-simulator = BlockStackingSimulator(False, max_steps=7)
+simulator = BlockStackingSimulator(visualize_mp=False, max_steps=7, render_sleep_to_maintain_fps=False)
 
 for i in range(4):
-    blocks_pos[0][1] += 0.1
+    blocks_pos[0][0] += 0.1
     print("resetting with blocks_pos", blocks_pos)
     simulator.reset(block_positions=blocks_pos)
 
