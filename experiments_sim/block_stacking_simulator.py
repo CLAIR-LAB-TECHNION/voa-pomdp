@@ -1,11 +1,11 @@
 import numpy as np
+import logging
 
 from modeling.pomdp_problem.domain.action import ActionBase, ActionSense, ActionAttemptStack
 from modeling.pomdp_problem.domain.observation import ObservationBase, ObservationReachedTerminal, \
     ObservationSenseResult, ObservationStackAttemptResult
 from multi_mujoco.mujoco_env.voa_world import WorldVoA
-from multi_mujoco.motion_planning.motion_executor import MotionExecutor, FACING_DOWN_R
-
+from multi_mujoco.motion_planning.motion_executor import MotionExecutor, FACING_DOWN_R, canonize_config
 from multi_mujoco.mujoco_env.common.ur5e_fk import forward
 
 
@@ -42,7 +42,7 @@ class BlockStackingSimulator:
         self.motion_executor = MotionExecutor(env=self.mujoco_env)
 
         if visualize_mp:
-            self.motion_executor.motion_planner.visualize()
+            self.motion_executor.motion_planner.visualize(window_name="sim_motion_planner")
 
         self.steps = 0
         self.n_picked_blocks = 0
@@ -51,6 +51,8 @@ class BlockStackingSimulator:
         self.tower_pos = [-0.45, -1.15]
 
     def reset(self, block_positions):
+        logging.info(f"resetting with block_positions: {block_positions}")
+
         self.clear_r1_no_motion()
         self.clear_r2_no_motion()
         self.mujoco_env.set_block_positions_on_table(block_positions)
@@ -58,6 +60,7 @@ class BlockStackingSimulator:
         self.steps = 0
         self.n_picked_blocks = 0
         self.current_robot_position = self.get_r2_xy()
+        self.motion_executor.wait(1)
 
     def step(self, action: ActionBase) -> tuple[ObservationBase, float]:
         if self.steps >= self.max_steps:
@@ -66,6 +69,8 @@ class BlockStackingSimulator:
         if self.n_picked_blocks == self.n_blocks:
             print("all blocks are already picked, episode is done")
             return ObservationReachedTerminal(), 0
+
+        logging.info(f"performing step {self.steps}, action: {action}")
 
         self.steps += 1
         steps_left = self.max_steps - self.steps
@@ -112,6 +117,8 @@ class BlockStackingSimulator:
         else:
             raise ValueError(f"Invalid action type: {action}")
 
+        logging.info(f"performed action, reward: {reward}, observation: {observation}")
+
         return observation, reward
 
 
@@ -138,4 +145,5 @@ class BlockStackingSimulator:
     def clear_r2_no_motion(self):
         pose = [np.array(FACING_DOWN_R).flatten(), [self.tower_pos[0], self.tower_pos[1], 0.3]]
         config = self.motion_executor.facing_down_ik("ur5e_2", pose)
+        config = canonize_config(config)
         self.mujoco_env.set_robot_joints("ur5e_2", config)

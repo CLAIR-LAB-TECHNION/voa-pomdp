@@ -5,6 +5,7 @@ from scipy.interpolate import interp1d
 from .simulation_motion_planner import SimulationMotionPlanner
 from ..mujoco_env.voa_world import WorldVoA
 from multi_mujoco.mujoco_env.world_utils.configurations_and_constants import *
+import logging
 
 FACING_DOWN_R = [[1, 0, 0],
                  [0, -1, 0],
@@ -35,7 +36,7 @@ def point_in_square(square_center, edge_length, point):
     return (left_bound <= point[0] <= right_bound) and (bottom_bound <= point[1] <= top_bound)
 
 
-def canonize_config(config, boundries=(1.3 * np.pi,) * 6):
+def canonize_config(config, boundries=(1.2 * np.pi, np.pi, np.pi, 1.5 * np.pi, 1.5 * np.pi, 1.2 * np.pi) * 6):
     for i in range(6):
         while config[i] > boundries[i]:
             config[i] -= 2 * np.pi
@@ -67,8 +68,12 @@ class MotionExecutor:
         #     self.pid_controllers[robot] = [PIDController(kp=1.0, ki=0.1, kd=0.05) for _ in range(6)]
 
     def moveJ(self, robot_name, target_joints, speed=1.0, acceleration=1.0, tolerance=0.003):
+        self.zero_all_robots_vels_except(robot_name)
+
         current_joints = self.env.robots_joint_pos[robot_name]
         current_velocities = self.env.robots_joint_velocities[robot_name]
+
+        logging.info(f"MovingJ {robot_name} from {current_joints} to {target_joints}")
 
         # Calculate the joint differences
         joint_diffs = target_joints - current_joints
@@ -85,6 +90,7 @@ class MotionExecutor:
 
         # Calculate the number of steps based on the frame skip and simulation timestep
         num_steps = int(total_time / self.time_step)
+        num_steps = max(num_steps, 1)
         max_steps = num_steps * 2  # Set a maximum number of steps (2x the expected number)
 
         # Generate smooth joint trajectories
@@ -103,7 +109,7 @@ class MotionExecutor:
             else:
                 target_positions = target_joints
 
-            actions = {robot: self.env.robots_joint_pos[robot] for robot in self.env.robots_joint_pos if
+            actions = {robot: self.env.robots_joint_pos[robot] for robot in self.env.robots_joint_pos.keys() if
                        robot != robot_name}
             actions[robot_name] = target_positions
             self.env.step(actions)
@@ -137,6 +143,10 @@ class MotionExecutor:
         """
         if len(path_configs) == 1:
             return self.moveJ(robot_name, path_configs[0], speed, acceleration, tolerance)
+
+        self.zero_all_robots_vels_except(robot_name)
+
+        logging.info(f"MovingJ path {robot_name} {path_configs}")
 
         path_configs = np.asarray(path_configs)
         full_trajectory = []
@@ -213,12 +223,42 @@ class MotionExecutor:
             print(f"WARNING: Movement for {robot_name} timed out before reaching the final configuration.")
 
     def plan_and_moveJ(self, robot_name, target_joints, speed=1.0, acceleration=1.0, blend_radius=0.05, tolerance=0.003,
-                       max_planning_time=5, max_length_to_distance_ratio=2):
+                       max_planning_time=5, max_length_to_distance_ratio=2, replan_from_other_if_not_found=True):
         curr_joint_state = self.env.robots_joint_pos[robot_name]
+
+        logging.info(f"Planning and movingJ {robot_name} from {curr_joint_state} to {target_joints}")
+
         path = self.motion_planner.plan_from_start_to_goal_config(robot_name, curr_joint_state, target_joints,
                                                                   max_time=max_planning_time,
                                                                   max_length_to_distance_ratio=max_length_to_distance_ratio)
+
+        if path is None:
+            # retry from another start config
+            print(f"coudn't find path from {curr_joint_state} to {target_joints}"
+                  "trying from another initial config")
+
+            logging.info("couldn't find plan.")
+
+            if not replan_from_other_if_not_found:
+                return False
+            else:
+                start_config = [0.2, -1.2, 1.7, -2., -1.5, 0]
+                path_to_start = self.motion_planner.plan_from_start_to_goal_config(robot_name, start_config,
+                                                                                   target_joints,
+                                                                                   max_time=max_planning_time,
+                                                                                   max_length_to_distance_ratio=max_length_to_distance_ratio)
+                path_from_start = self.motion_planner.plan_from_start_to_goal_config(robot_name, start_config,
+                                                                                     target_joints,
+                                                                                     max_time=max_planning_time,
+                                                                                     max_length_to_distance_ratio=max_length_to_distance_ratio)
+                if path_to_start is None or path_from_start is None:
+                    print(f"couldn't plan through intermediate config as well...")
+                    logging.info("couldn't plan through intermediate config as well...")
+                    return False
+                path = path_to_start + path_from_start
+
         self.moveJ_path(robot_name, path, speed, acceleration, blend_radius=blend_radius, tolerance=tolerance)
+        return True
 
     def plan_and_move_to_xyz_facing_down(self, robot_name, target_xyz, speed=1.0, acceleration=1.0, blend_radius=0.05,
                                          tolerance=0.003, max_planning_time=5, max_length_to_distance_ratio=2,
@@ -226,27 +266,35 @@ class MotionExecutor:
         target_transform = compose_transformation_matrix(FACING_DOWN_R, target_xyz)
         goal_config = self.facing_down_ik(robot_name, target_transform, max_tries=50)
 
+        logging.info(f"Planning and moving to xyz facing down {robot_name} from"
+                     f" {self.env.robots_joint_pos[robot_name]} to {goal_config}"
+                     f" target: {target_xyz}")
+
         if goal_config is None or len(goal_config) == 0:
             print(f"WARNING: IK solution not found for {robot_name}")
 
         if cannonized_config:
             goal_config = canonize_config(goal_config)
 
-        self.plan_and_moveJ(robot_name=robot_name,
-                            target_joints=goal_config,
-                            speed=speed,
-                            acceleration=acceleration,
-                            blend_radius=blend_radius,
-                            tolerance=tolerance,
-                            max_planning_time=max_planning_time,
-                            max_length_to_distance_ratio=max_length_to_distance_ratio)
+        return self.plan_and_moveJ(robot_name=robot_name,
+                                   target_joints=goal_config,
+                                   speed=speed,
+                                   acceleration=acceleration,
+                                   blend_radius=blend_radius,
+                                   tolerance=tolerance,
+                                   max_planning_time=max_planning_time,
+                                   max_length_to_distance_ratio=max_length_to_distance_ratio)
 
     def moveL(self, robot_name, target_position, speed=0.1, tolerance=0.003, facing_down=True, max_steps=1000):
+        self.zero_all_robots_vels_except(robot_name)
+
         current_joints = self.env.robots_joint_pos[robot_name]
         current_pose = self.motion_planner.get_forward_kinematics(robot_name, current_joints)
         goal_orientation = current_pose[0] if not facing_down else np.array(FACING_DOWN_R).flatten()
         start_pos = np.array(current_pose[1])
         end_pos = np.array(target_position)
+
+        logging.info(f"MovingL {robot_name} from {start_pos} to {end_pos}")
 
         # Calculate direction and distance
         direction = end_pos - start_pos
@@ -273,7 +321,7 @@ class MotionExecutor:
             next_joints = self.motion_planner.ik_solve(robot_name, (goal_orientation, next_pos),
                                                        start_config=current_joints)
             if next_joints is None or len(next_joints) == 0:
-                print(f"WARNING: IK solution not found for {robot_name} at attempt {steps_executed + 1}")
+                logging.warning(f" IK solution not found for {robot_name} at attempt {steps_executed + 1}")
                 steps_executed += 1
                 continue
 
@@ -287,9 +335,14 @@ class MotionExecutor:
             current_joints = self.env.robots_joint_pos[robot_name]
             steps_executed += 1
 
-        print(
-            f"WARNING: Linear movement for {robot_name} completed, but target not reached within tolerance after {max_steps} attempts")
+        logging.warning(
+            f"Linear movement for {robot_name} completed, but target not reached within tolerance after {max_steps} attempts")
         return False
+
+    def zero_all_robots_vels_except(self, robot_name):
+        for r in self.env.robots_joint_velocities.keys():
+            if r != robot_name:
+                self.env.set_robot_joints(r, self.env.robots_joint_pos[r], np.zeros(6), simulate_step=False)
 
     def reset(self, randomize=True, block_positions=None):
         state = self.env.reset(randomize=randomize, block_positions=block_positions)
@@ -341,13 +394,17 @@ class MotionExecutor:
         return None
 
     def pick_up(self, agent, x, y, start_height=0.15):
+        logging.info(f"pick up block at {x, y} start_height {start_height}")
 
-        self.plan_and_move_to_xyz_facing_down(agent,
-                                              [x, y, start_height],
-                                              speed=3.,
-                                              acceleration=2.,
-                                              blend_radius=0.05,
-                                              tolerance=0.03, )
+        res = self.plan_and_move_to_xyz_facing_down(agent,
+                                                    [x, y, start_height],
+                                                    speed=3.,
+                                                    acceleration=2.,
+                                                    blend_radius=0.05,
+                                                    tolerance=0.03, )
+        if not res:
+            return False
+
         above_block_config = self.env.robots_joint_pos[agent]
 
         self.moveL(agent,
@@ -363,15 +420,20 @@ class MotionExecutor:
         return self.env.is_object_grasped()
 
     def put_down(self, agent, x, y, start_height=0.15):
-        release_height = self.env.get_tower_height_at_point((x,y)) + 0.04 + 0.025
+        release_height = self.env.get_tower_height_at_point((x, y)) + 0.04 + 0.025
         start_height = max(start_height, release_height + 0.05)
 
-        self.plan_and_move_to_xyz_facing_down(agent,
-                                              [x, y, start_height],
-                                              speed=3.,
-                                              acceleration=3.,
-                                              blend_radius=0.05,
-                                              tolerance=0.03, )
+        logging.info(f"put down block at {x, y} start_height {start_height}")
+
+        res = self.plan_and_move_to_xyz_facing_down(agent,
+                                                    [x, y, start_height],
+                                                    speed=3.,
+                                                    acceleration=3.,
+                                                    blend_radius=0.05,
+                                                    tolerance=0.03, )
+        if not res:
+            return False
+
         above_block_config = self.env.robots_joint_pos[agent]
 
         self.moveL(agent,
@@ -384,14 +446,18 @@ class MotionExecutor:
         self.wait(20)
         self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
 
-
     def sense_for_block(self, agent, x, y, start_height=0.15):
-        self.plan_and_move_to_xyz_facing_down(agent,
-                                              [x, y, start_height],
-                                              speed=3.,
-                                              acceleration=3.,
-                                              blend_radius=0.05,
-                                              tolerance=0.03, )
+        logging.info(f"sense for block at {x, y} start_height {start_height}")
+
+        res = self.plan_and_move_to_xyz_facing_down(agent,
+                                                    [x, y, start_height],
+                                                    speed=3.,
+                                                    acceleration=3.,
+                                                    blend_radius=0.05,
+                                                    tolerance=0.03, )
+
+        if not res:
+            return False
 
         self.moveL(agent, (x, y, 0.05), speed=3., tolerance=0.003, max_steps=400)
 
@@ -405,6 +471,3 @@ class MotionExecutor:
         self.moveL(agent, (x, y, start_height), speed=3., tolerance=0.005, max_steps=400)
 
         return occupied
-
-
-

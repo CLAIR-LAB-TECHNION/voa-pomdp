@@ -1,15 +1,13 @@
 import logging
 import os
-import logging
-import os
 from datetime import datetime
 import sys
 
+
 def setup_logging(log_dir="logs"):
-    # Check if logging is already configured
-    if len(logging.getLogger().handlers) > 0:
-        logging.info("Logging is already set up. Skipping reconfiguration.")
-        return
+    # Remove all existing handlers
+    for handler in logging.root.handlers[:]:
+        logging.root.removeHandler(handler)
 
     # Ensure the log directory exists
     os.makedirs(log_dir, exist_ok=True)
@@ -26,19 +24,13 @@ def setup_logging(log_dir="logs"):
         filemode='a',
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S',
-        level=logging.DEBUG
+        level=logging.DEBUG,
+        force=True  # This forces reconfiguration
     )
 
     # Log a message indicating the logging setup is complete
     logging.info(f"Logging setup complete for {script_name}")
 
 
-if __name__ == "__main__":
-    setup_logging()
-    setup_logging()
-
-    logging.info("This is an info message")
-    logging.debug("This is a debug message")
-    logging.warning("This is a warning message")
-    logging.error("This is an error message")
-    logging.critical("This is a critical message")
+# Usage in your main script or at the top of your module:
+setup_logging()

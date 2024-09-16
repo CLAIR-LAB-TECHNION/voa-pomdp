@@ -1,15 +1,14 @@
 """ a wrapper around spear env to simplify and fix some issues with the environment """
 from copy import deepcopy
 from collections import namedtuple
-
 import mujoco as mj
 from mujoco import MjvCamera
-
 from .mujoco_env import MujocoEnv
-
 from .world_utils.object_manager import ObjectManager
 from .world_utils.grasp_manager import GraspManager
 from .world_utils.configurations_and_constants import *
+from multi_mujoco.utils.logging_util import setup_logging
+import logging
 
 
 class WorldVoA:
@@ -48,7 +47,7 @@ class WorldVoA:
         # self.dt = self._mj_model.opt.timestep * frame_skip
         # self._pid_controller = PIDController(kp, ki, kd, dt)
 
-        self.reset()
+        setup_logging()
 
     def close(self):
         self._env.close()
