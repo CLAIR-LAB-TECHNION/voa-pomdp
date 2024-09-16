@@ -122,10 +122,14 @@ class BlockStackingSimulator:
         return observation, reward
 
 
-    def sense_camera(self, camera_position, camera_orientation):
-        # success, _, _ = self.motion_executor.move_to_pose(agent, camera_position, camera_orientation)
-        # if success:
-        return self.mujoco_env.render_image_from_pose(np.array(camera_position), np.array(camera_orientation))
+    def sense_camera_r1(self, robot_config):
+        self.motion_executor.plan_and_moveJ("ur5e_1", robot_config)
+
+        actual_config = self.mujoco_env.robots_joint_pos["ur5e_1"]
+        camera_pose = self.motion_executor.motion_planner.get_forward_kinematics("ur5e_1", actual_config)
+        position = np.array(camera_pose[1])
+        orientation = np.array(camera_pose[0]).reshape(3, 3)
+        return self.mujoco_env.render_image_from_pose(position, orientation)
 
     def move_r2_above_tower(self):
         self.motion_executor.plan_and_move_to_xyz_facing_down("ur5e_2",

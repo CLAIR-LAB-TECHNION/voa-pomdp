@@ -55,17 +55,18 @@ class MotionExecutor:
 
         state = self.env.get_state()
 
-        # set current configuration
-        for robot, pose in state['robots_joint_pos'].items():
-            self.motion_planner.update_robot_config(robot, pose)
-        # for block_name, pos in blocks_positions_dict.items():
-        #     self.motion_planner.add_block(name=block_name, position=pos)
+        self.update_all_robots_configs_in_mp()
 
         self.time_step = self.env._mj_model.opt.timestep * self.env.frame_skip
 
         # self.pid_controllers = {}
         # for robot in self.env.robots_joint_pos.keys():
         #     self.pid_controllers[robot] = [PIDController(kp=1.0, ki=0.1, kd=0.05) for _ in range(6)]
+
+    def update_all_robots_configs_in_mp(self):
+        state = self.env.get_state()
+        for robot, pose in state['robots_joint_pos'].items():
+            self.motion_planner.update_robot_config(robot, pose)
 
     def moveJ(self, robot_name, target_joints, speed=1.0, acceleration=1.0, tolerance=0.003):
         self.zero_all_robots_vels_except(robot_name)
@@ -119,11 +120,10 @@ class MotionExecutor:
             if np.allclose(current_joints, target_joints, atol=tolerance):
                 break
 
-        # TODO: Handle cases where target joints are unreachable
+        self.update_all_robots_configs_in_mp()
 
         if step == max_steps - 1:
-            # TODO: Log that the movement timed out
-            pass
+            logging.warning(f"Movement for {robot_name} timed out before reaching the target joints.")
 
     def generate_smooth_trajectory(self, start, end, num_steps):
         t = np.linspace(0, 1, num_steps)
@@ -173,6 +173,8 @@ class MotionExecutor:
 
         # Execute the full trajectory
         self.execute_trajectory(robot_name, full_trajectory, tolerance)
+
+        self.update_all_robots_configs_in_mp()
 
     def generate_trajectory(self, start_config, end_config, speed, acceleration, blend_radius, blend_start=True,
                             blend_end=True):

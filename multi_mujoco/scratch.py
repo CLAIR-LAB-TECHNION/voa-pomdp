@@ -1,5 +1,5 @@
 import numpy as np
-
+from matplotlib import pyplot as plt
 from experiments_sim.block_stacking_simulator import BlockStackingSimulator
 from modeling.pomdp_problem.domain.action import ActionSense, ActionAttemptStack
 
@@ -11,12 +11,18 @@ blocks_pos = [[-0.8, -0.8],
 
 simulator = BlockStackingSimulator(visualize_mp=False, max_steps=7, render_sleep_to_maintain_fps=False)
 
+help_configs = np.load("../experiments_lab/configurations/help_configs.npy")
+
 for i in range(10):
     blocks_pos[0][0] += 0.01
     print("resetting with blocks_pos", blocks_pos)
     simulator.reset(block_positions=blocks_pos)
-    simulator.motion_executor.plan_and_moveJ("ur5e_1", [+1.0776e+00, -1.57137098e+00, 1.06499581e-04, -1.57132691e+00,
-                                                        -2.73702160e-06, 4.52766e-07])
+
+
+    im = simulator.sense_camera_r1([-0.5567808869537451, -1.215127556940363, -1.8444974285294637, 1.258726315197987, -0.6591467161558847, -0.20351355710407049])
+    plt.imshow(im)
+    plt.show()
+
     obs = None
 
     while True:
