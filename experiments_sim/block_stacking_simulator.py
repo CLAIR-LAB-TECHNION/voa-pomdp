@@ -129,8 +129,20 @@ class BlockStackingSimulator:
         camera_pose = self.motion_executor.motion_planner.get_forward_kinematics("ur5e_1", actual_config)
         position = np.array(camera_pose[1])
         orientation = np.array(camera_pose[0]).reshape(3, 3)
-        return self.mujoco_env.render_image_from_pose(position, orientation)
 
+        # the ee transform is to look into the robot tool flange. need to reverse that.
+        orientation[:3] = -orientation[:3]
+
+        ee_forward_direction = orientation[:, 2]
+        position -= 0.05 * ee_forward_direction
+        ee_up_direction = orientation[:, 1]
+        position += 0.1 * ee_up_direction
+
+        im = self.mujoco_env.render_image_from_pose(position, orientation)
+
+        self.motion_executor.plan_and_moveJ("ur5e_1", [0, -np.pi / 2, 0, -np.pi / 2, 0, 0])
+
+        return im
     def move_r2_above_tower(self):
         self.motion_executor.plan_and_move_to_xyz_facing_down("ur5e_2",
                                                               (self.tower_pos[0], self.tower_pos[1], 0.3),
@@ -144,7 +156,7 @@ class BlockStackingSimulator:
         return ee_transform[1][:2]
 
     def clear_r1_no_motion(self):
-        self.mujoco_env.set_robot_joints("ur5e_1", [-np.pi / 2, -np.pi / 2, 0, -np.pi / 2, 0, 0])
+        self.mujoco_env.set_robot_joints("ur5e_1", [0, -np.pi / 2, 0, -np.pi / 2, 0, 0])
 
     def clear_r2_no_motion(self):
         pose = [np.array(FACING_DOWN_R).flatten(), [self.tower_pos[0], self.tower_pos[1], 0.3]]
