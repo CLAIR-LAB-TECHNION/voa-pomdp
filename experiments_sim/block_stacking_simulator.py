@@ -124,7 +124,7 @@ class BlockStackingSimulator:
 
 
     def sense_camera_r1(self, robot_config):
-        self.motion_executor.plan_and_moveJ("ur5e_1", robot_config)
+        self.motion_executor.plan_and_moveJ("ur5e_1", robot_config, speed=2.0, acceleration=2.)
 
         actual_config = self.mujoco_env.robots_joint_pos["ur5e_1"]
         camera_pose = self.motion_executor.motion_planner.get_forward_kinematics("ur5e_1", actual_config)
@@ -141,7 +141,10 @@ class BlockStackingSimulator:
 
         im = self.mujoco_env.render_image_from_pose(position, orientation)
 
-        self.motion_executor.plan_and_moveJ("ur5e_1", [0, -np.pi / 2, 0, -np.pi / 2, 0, 0])
+        self.motion_executor.plan_and_moveJ("ur5e_1",
+                                            [0, -np.pi / 2, 0, -np.pi / 2, 0, 0],
+                                            speed=2.0,
+                                            acceleration=2.)
 
         return im
     def move_r2_above_tower(self):

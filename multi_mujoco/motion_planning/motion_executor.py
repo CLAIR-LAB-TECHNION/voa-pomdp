@@ -400,8 +400,8 @@ class MotionExecutor:
 
         res = self.plan_and_move_to_xyz_facing_down(agent,
                                                     [x, y, start_height],
-                                                    speed=3.,
-                                                    acceleration=2.,
+                                                    speed=4.,
+                                                    acceleration=4.,
                                                     blend_radius=0.05,
                                                     tolerance=0.03, )
         if not res:
@@ -411,13 +411,13 @@ class MotionExecutor:
 
         self.moveL(agent,
                    (x, y, 0.05),
-                   speed=1.,
+                   speed=2.,
                    tolerance=0.003,
                    max_steps=400)
         self.wait(20)
         _ = self.activate_grasp()
         self.wait(5)
-        self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
+        self.moveJ(agent, above_block_config, speed=4., acceleration=4., tolerance=0.1)
 
         return self.env.is_object_grasped()
 
@@ -429,8 +429,8 @@ class MotionExecutor:
 
         res = self.plan_and_move_to_xyz_facing_down(agent,
                                                     [x, y, start_height],
-                                                    speed=3.,
-                                                    acceleration=3.,
+                                                    speed=4.,
+                                                    acceleration=4.,
                                                     blend_radius=0.05,
                                                     tolerance=0.03, )
         if not res:
@@ -446,15 +446,15 @@ class MotionExecutor:
         self.wait(20)
         _ = self.deactivate_grasp()
         self.wait(20)
-        self.moveJ(agent, above_block_config, speed=3., acceleration=3., tolerance=0.1)
+        self.moveJ(agent, above_block_config, speed=4., acceleration=4., tolerance=0.1)
 
     def sense_for_block(self, agent, x, y, start_height=0.15):
         logging.info(f"sense for block at {x, y} start_height {start_height}")
 
         res = self.plan_and_move_to_xyz_facing_down(agent,
                                                     [x, y, start_height],
-                                                    speed=3.,
-                                                    acceleration=3.,
+                                                    speed=4.,
+                                                    acceleration=4.,
                                                     blend_radius=0.05,
                                                     tolerance=0.03, )
 

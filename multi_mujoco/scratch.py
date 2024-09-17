@@ -9,8 +9,8 @@ blocks_pos = [[-0.8, -0.8],
               [-0.6, -0.6],]
 
 
-simulator = BlockStackingSimulator(visualize_mp=False, max_steps=7, render_sleep_to_maintain_fps=False,
-                                   render_mode=None)
+simulator = BlockStackingSimulator(visualize_mp=False, max_steps=7, render_sleep_to_maintain_fps=True,
+                                   render_mode="human")
 
 help_configs = np.load("../experiments_lab/configurations/help_configs.npy")
 

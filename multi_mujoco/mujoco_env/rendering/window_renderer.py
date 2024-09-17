@@ -15,7 +15,7 @@ class WindowRenderer(BaseRenderer):
         self.sleep_to_maintain_fps = sleep_to_maintain_fps
 
         # initialize viewer
-        self.viewer = mj_viewer.launch_passive(self._model, self._data)
+        self.viewer = mj_viewer.launch_passive(self._model, self._data, show_right_ui=False)
 
         with self.viewer.lock():
             # set render flags
