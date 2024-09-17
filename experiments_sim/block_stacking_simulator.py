@@ -17,6 +17,7 @@ class BlockStackingSimulator:
                  sensing_cost_coeff=0.05,
                  stacking_cost_coeff=0.05,
                  visualize_mp=True,
+                 render_mode='human',
                  render_sleep_to_maintain_fps=True,
                  ):
         """
@@ -38,7 +39,7 @@ class BlockStackingSimulator:
         self.sensing_cost_coeff = sensing_cost_coeff
         self.stacking_cost_coeff = stacking_cost_coeff
 
-        self.mujoco_env = WorldVoA(render_sleep_to_maintain_fps=render_sleep_to_maintain_fps)
+        self.mujoco_env = WorldVoA(render_sleep_to_maintain_fps=render_sleep_to_maintain_fps, render_mode=render_mode)
         self.motion_executor = MotionExecutor(env=self.mujoco_env)
 
         if visualize_mp:

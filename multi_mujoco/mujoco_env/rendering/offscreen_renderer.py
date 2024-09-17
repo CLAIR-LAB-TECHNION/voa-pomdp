@@ -3,7 +3,7 @@ import numpy as np
 
 
 class OffscreenRenderer:
-    def __init__(self, model, data, camera_id, width, height, depth=False, segmentation=False):
+    def __init__(self, model, data, camera_id, width=1280, height=720, depth=False, segmentation=False):
         self.model = model
         self.data = data
         self.camera_id = camera_id

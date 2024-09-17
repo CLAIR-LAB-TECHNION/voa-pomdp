@@ -116,7 +116,9 @@ class WorldVoA:
             self.step(config)
 
     def render(self):
-        return self._env.render()
+        if self.render_mode == "human":
+            return self._env.render()
+        return None
 
     def get_state(self):
         # object_positions = self._object_manager.get_all_block_positions_dict()
