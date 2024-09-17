@@ -9,12 +9,14 @@ from numpy import pi
 from scipy.spatial.transform import Rotation as R
 from lab_ur_stack.camera.configurations_and_params import camera_in_ee
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
+from lab_ur_stack.motion_planning.abstract_motion_planner import AbstractMotionPlanner
 
 
 class GeometryAndTransforms:
-    def __init__(self, motion_planner: MotionPlanner):
+    def __init__(self, motion_planner: AbstractMotionPlanner, camera_in_ee=camera_in_ee):
         self.motion_planner = motion_planner
         self.robot_name_mapping = motion_planner.robot_name_mapping
+        self.camera_in_ee = camera_in_ee
 
     @classmethod
     def from_motion_planner(cls, motion_planner):
@@ -60,7 +62,7 @@ class GeometryAndTransforms:
         """
         # we assume camera is z forward, x right, y down (like in the image). this is already the ee frame orientation,
         # so we just need to translate it
-        return se3.from_translation(np.array(camera_in_ee))
+        return se3.from_translation(np.array(self.camera_in_ee))
 
     def ee_to_camera_transform(self, ):
         """
@@ -68,7 +70,7 @@ class GeometryAndTransforms:
         """
         # we assume camera is z forward, x right, y down (like in the image). this is already the ee frame orientation,
         # so we just need to translate it
-        return se3.from_translation(-np.array(camera_in_ee))
+        return se3.from_translation(-np.array(self.camera_in_ee))
 
     def world_to_camera_transform(self, robot_name, config):
         """

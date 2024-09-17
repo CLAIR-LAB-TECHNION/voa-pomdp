@@ -39,7 +39,9 @@ class WorldVoA:
 
         self.num_blocks = len(self._object_manager.object_names)
 
-        self.renderer = mj.Renderer(self._mj_model, 720, 1280)
+        self.image_res_h = 720
+        self.image_res_w = 1280
+        self.renderer = mj.Renderer(self._mj_model, self.image_res_h, self.image_res_w)
 
         self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
         # self.dt = self._mj_model.opt.timestep * frame_skip
@@ -198,6 +200,28 @@ class WorldVoA:
         self.renderer.update_scene(self._mj_data, "robot-cam")
 
         return self.renderer.render()
+
+    def get_robot_cam_intrinsic_matrix(self):
+        cam_model = self._mj_model.camera("robot-cam")
+        fovy = cam_model.fovy[0]
+        rex_x = self.image_res_w
+        rex_y = self.image_res_h
+
+        # Calculate focal length
+        f = rex_y / (2 * np.tan(fovy / 2))
+
+        # Calculate principal point
+        cx = rex_x / 2
+        cy = rex_y / 2
+
+        # Create intrinsic matrix
+        intrinsic_matrix = np.array([
+            [f, 0, cx],
+            [0, f, cy],
+            [0, 0, 1]
+        ])
+
+        return intrinsic_matrix
 
     def is_object_grasped(self):
         return self._grasp_manager.attached_object_name is not None

@@ -108,6 +108,8 @@ def detections_plots_no_depth_as_image(cropped_image, orig_image, pred_positions
     axs[2].set_xlim(extended_x_lim_for_plot)
     axs[2].set_ylim(extended_y_lim_for_plot)
 
+    fig.tight_layout()
+
     # instead of showing, return as image:
     buf = io.BytesIO()
     plt.savefig(buf, format='png')
@@ -138,6 +140,8 @@ def detections_plots_with_depth_as_image(cropped_image, orig_image, depth_image,
     extended_y_lim_for_plot = [ws_lim_y[0] - 0.1, ws_lim_y[1] + 0.1]
     axs[1, 1].set_xlim(extended_x_lim_for_plot)
     axs[1, 1].set_ylim(extended_y_lim_for_plot)
+
+    fig.tight_layout()
 
     # instead of showing, return as image:
     buf = io.BytesIO()
