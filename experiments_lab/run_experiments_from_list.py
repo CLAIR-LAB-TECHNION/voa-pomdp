@@ -35,7 +35,7 @@ def run_experiments(
         planner_n_iterations: int = typer.Option(2000, help="Only relevant for POUCT policy"
                                                             "Number of iterations for the planner"),
         confidence_for_stack: float = typer.Option(0.6, help="Only relevant for HandMade policy."),
-        config_file: str = typer.Option("configurations/experiments_4_blocks.csv"),
+        config_file: str = typer.Option("configurations/experiments_4_blocks_for_demo.csv"),
         two_experiments_at_a_time: bool = typer.Option(False, help="If True, will run two experiments at a time"
                                                                    "assuming theer are two stacks on the pile"),
 ):
