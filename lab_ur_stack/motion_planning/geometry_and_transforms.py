@@ -13,10 +13,10 @@ from lab_ur_stack.motion_planning.abstract_motion_planner import AbstractMotionP
 
 
 class GeometryAndTransforms:
-    def __init__(self, motion_planner: AbstractMotionPlanner, camera_in_ee=camera_in_ee):
+    def __init__(self, motion_planner: AbstractMotionPlanner, cam_in_ee=camera_in_ee):
         self.motion_planner = motion_planner
         self.robot_name_mapping = motion_planner.robot_name_mapping
-        self.camera_in_ee = camera_in_ee
+        self.camera_in_ee = cam_in_ee
 
     @classmethod
     def from_motion_planner(cls, motion_planner):

@@ -25,7 +25,7 @@ blocks_pos = [[-0.8, -0.8],
 simulator = BlockStackingSimulator(visualize_mp=False, max_steps=7, render_sleep_to_maintain_fps=False,
                                    render_mode='human')
 
-gt = GeometryAndTransforms(simulator.motion_executor.motion_planner, camera_in_ee=-np.array(simulator.helper_camera_translation_from_ee))
+gt = GeometryAndTransforms(simulator.motion_executor.motion_planner, cam_in_ee=-np.array(simulator.helper_camera_translation_from_ee))
 position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt, "ur5e_1",
                                                  intrinsic_camera_matrix=simulator.mujoco_env.get_robot_cam_intrinsic_matrix())
 
@@ -36,16 +36,13 @@ for i in range(10):
     print("resetting with blocks_pos", blocks_pos)
     simulator.reset(block_positions=blocks_pos)
 
-    im, actual_config_for_im = simulator.sense_camera_r1([-0.5567808869537451, -1.215127556940363, -1.8444974285294637, 1.258726315197987, -0.6591467161558847, -0.20351355710407049])
+    im, actual_config_for_im = simulator.sense_camera_r1([-0.5567808869537451, -1.215127556940363, -1.8444974285294637, 1.258726315197987, -0.6591467161558847, -1.20351355710407049])
     # plt.imshow(im)
     # plt.show()
 
-    im_bgr = cv2.cvtColor(im, cv2.COLOR_RGB2BGR)
-    pred_positions, annotations = position_estimator.get_block_position_plane_projection(im_bgr, actual_config_for_im,
-                                                                                    plane_z=0.025)
-    a0 = cv2.cvtColor(annotations[0], cv2.COLOR_BGR2RGB)
-    a1 = cv2.cvtColor(annotations[1], cv2.COLOR_BGR2RGB)
-    detections_plot = detections_plots_no_depth_as_image(a0, a1, pred_positions,
+    pred_positions, annotations = position_estimator.get_block_position_plane_projection(im, actual_config_for_im,
+                                                                                    plane_z=0.024)
+    detections_plot = detections_plots_no_depth_as_image(annotations[0], annotations[1], pred_positions,
                                                          workspace_x_lims_default, workspace_y_lims_default,
                                                          actual_positions=blocks_pos)
 
@@ -70,8 +67,3 @@ for i in range(10):
 
         if obs.steps_left == 0:
             break
-
-
-# for bpos in blocks_pos:
-#     simulator.pick_up(agent='ur5e_2', x=bpos[0], y=bpos[1])
-#     simulator.stack(agent='ur5e_2')

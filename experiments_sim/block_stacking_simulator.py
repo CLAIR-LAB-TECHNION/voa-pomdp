@@ -51,7 +51,7 @@ class BlockStackingSimulator:
 
         self.tower_pos = [-0.45, -1.15]
 
-        self.helper_camera_translation_from_ee = np.array([0.0, 0.0, -0.01])
+        self.helper_camera_translation_from_ee = np.array([0.0, 0.1, -0.01])
 
     def reset(self, block_positions):
         logging.info(f"resetting with block_positions: {block_positions}")
