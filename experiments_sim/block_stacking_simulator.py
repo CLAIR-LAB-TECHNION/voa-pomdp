@@ -51,7 +51,7 @@ class BlockStackingSimulator:
 
         self.tower_pos = [-0.45, -1.15]
 
-        self.helper_camera_translation_from_ee = np.array([0.0, 0.1, 0.05])
+        self.helper_camera_translation_from_ee = np.array([0.0, 0.0, -0.01])
 
     def reset(self, block_positions):
         logging.info(f"resetting with block_positions: {block_positions}")
@@ -139,11 +139,13 @@ class BlockStackingSimulator:
         ee_forward_direction = orientation[:, 2]
         ee_up_direction = orientation[:, 1]
         ee_right_direction = orientation[:, 0]
-        position -= -self.helper_camera_translation_from_ee[2] * ee_forward_direction\
+
+        position += + self.helper_camera_translation_from_ee[2] * ee_forward_direction\
                     + self.helper_camera_translation_from_ee[1] * ee_up_direction\
                     + self.helper_camera_translation_from_ee[0] * ee_right_direction
 
         im = self.mujoco_env.render_image_from_pose(position, orientation)
+
 
         self.motion_executor.plan_and_moveJ("ur5e_1",
                                             [0, -np.pi / 2, 0, -np.pi / 2, 0, 0],
@@ -151,6 +153,7 @@ class BlockStackingSimulator:
                                             acceleration=2.)
 
         return im, actual_config
+
     def move_r2_above_tower(self):
         self.motion_executor.plan_and_move_to_xyz_facing_down("ur5e_2",
                                                               (self.tower_pos[0], self.tower_pos[1], 0.3),

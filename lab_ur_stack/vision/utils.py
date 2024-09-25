@@ -10,7 +10,8 @@ import logging
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 
 
-def project_points_to_image(points, gt: GeometryAndTransforms, robot_name, robot_config):
+def project_points_to_image(points, gt: GeometryAndTransforms, robot_name, robot_config,
+                            intrinsic_matrix=color_camera_intrinsic_matrix):
     """
     Project points from the world coordinates to the image coordinates
     :param points: points to project nx3 array
@@ -34,7 +35,7 @@ def project_points_to_image(points, gt: GeometryAndTransforms, robot_name, robot
     # points are column vectors as required
     points_camera_frame_homogenous = world_2_camera @ points_homogenous  # 4x4 @ 4xn = 4xn
     points_camera_frame = points_camera_frame_homogenous[:3]
-    points_image_homogenous = color_camera_intrinsic_matrix @ points_camera_frame  # 3x3 @ 3xn = 3xn
+    points_image_homogenous = intrinsic_matrix @ points_camera_frame  # 3x3 @ 3xn = 3xn
     points_image = points_image_homogenous / points_image_homogenous[2]  # normalize
 
     return points_image[:2].T
@@ -47,7 +48,8 @@ def crop_workspace(image,
                    workspace_limits_y,
                    z=-0.0,
                    robot_name="ur5e_1",
-                   extension_radius=0.04, ):
+                   extension_radius=0.04,
+                   intrinsic_matrix=color_camera_intrinsic_matrix):
     """
     crop the workspace that is within given workspace limits and return the cropped image and coordinates of
      the cropped image in the original image
@@ -74,7 +76,7 @@ def crop_workspace(image,
                         [extended_x_lim[1], extended_y_lim[1], z_lim[0]],
                         [extended_x_lim[1], extended_y_lim[1], z_lim[1]]])
 
-    corners_image = project_points_to_image(corners, gt, robot_name, robot_config)
+    corners_image = project_points_to_image(corners, gt, robot_name, robot_config, intrinsic_matrix)
     corners_image = corners_image.astype(int)
     x_min, y_min = np.min(corners_image, axis=0)
     x_max, y_max = np.max(corners_image, axis=0)

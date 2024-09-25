@@ -290,7 +290,8 @@ class ImageBlockPositionEstimator:
             cropped_images_xyxy = []
             for image, robot_config in zip(images, robot_configurations):
                 cropped_image, xyxy = crop_workspace(image, robot_config, self.gt, self.workspace_limits_x,
-                                                     self.workspace_limits_y)
+                                                     self.workspace_limits_y,
+                                                     intrinsic_matrix=self.intrinsic_camera_matrix)
                 if cropped_image.shape[0] == 0 or cropped_image.shape[1] == 0:
                     print("workspace is out of image, trying to detect on original image anyway")
                     cropped_image = image
