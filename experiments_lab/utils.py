@@ -1,5 +1,17 @@
+from copy import deepcopy
+
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 from modeling.pomdp_problem.domain.observation import ObservationSenseResult, ObservationStackAttemptResult
+
+
+def update_belief(belief, action, observation):
+    """ doesn't change inplace! """
+    updated_belief = deepcopy(belief)
+    if isinstance(observation, ObservationSenseResult):
+        updated_belief.update_from_point_sensing_observation(action.x, action.y, observation.is_occupied)
+    elif isinstance(observation, ObservationStackAttemptResult):
+        updated_belief.update_from_pickup_attempt(action.x, action.y, observation.is_object_picked)
+    return updated_belief
 
 
 def plot_belief_with_history(current_belief,

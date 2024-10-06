@@ -9,7 +9,7 @@ import pandas as pd
 from frozendict import frozendict
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.experiment_visualizer import ExperimentVisualizer
-from experiments_lab.utils import plot_belief_with_history
+from experiments_lab.utils import plot_belief_with_history, update_belief
 from lab_ur_stack.camera.realsense_camera import RealsenseCameraWithRecording
 from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
 from lab_ur_stack.manipulation.utils import to_canonical_config,  ur5e_2_collect_blocks_from_positions
@@ -207,12 +207,7 @@ class ExperimentManager:
     @staticmethod
     def update_belief(belief, action, observation):
         """ doesn't change inplace! """
-        updated_belief = deepcopy(belief)
-        if isinstance(observation, ObservationSenseResult):
-            updated_belief.update_from_point_sensing_observation(action.x, action.y, observation.is_occupied)
-        elif isinstance(observation, ObservationStackAttemptResult):
-            updated_belief.update_from_pickup_attempt(action.x, action.y, observation.is_object_picked)
-        return updated_belief
+        return update_belief(belief, action, observation)
 
 
     def run_from_list_and_save_results(self, row, config_file, results_dir):
