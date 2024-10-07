@@ -128,16 +128,16 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             per_block_points_for_sensing = []
             per_block_pdfs_for_sensing = []
             for points, pdfs in zip(per_block_points, per_block_pdfs):
-                far_points = []
-                far_pdfs = []
-                for point, pdf in zip(points, pdfs):
-                    if np.min(np.linalg.norm(prev_actions_points - np.array(point), axis=1)) > 0.035:
-                        far_points.append(point)
-                        far_pdfs.append(pdf)
-                # if less than two found, just add all
+                points_array = np.asarray(points)
+                distances = np.linalg.norm(points_array[:, np.newaxis] - prev_actions_points, axis=2)
+                far_mask = np.min(distances, axis=1) > 0.035
+
+                far_points = points_array[far_mask]
+                far_pdfs = np.asarray(pdfs)[far_mask]
                 if len(far_points) < 2:
                     far_points = points
                     far_pdfs = pdfs
+
                 per_block_points_for_sensing.append(far_points)
                 per_block_pdfs_for_sensing.append(far_pdfs)
 
@@ -151,7 +151,8 @@ class PolicyModel(pomdp_py.RolloutPolicy):
                 per_block_sense_points.append([])
             else:
                 sense_points = [points[np.argmax(pdfs)]]
-                sense_points += random.choices(points, k=k)
+                if k > 0:
+                    sense_points += random.choices(points, k=k)
                 per_block_sense_points.append(sense_points)
 
         # choose a pickup action for each block. It should be picking up at approximately maximum likelihood position.

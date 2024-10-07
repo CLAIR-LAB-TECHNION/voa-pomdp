@@ -49,7 +49,7 @@ finish_ahead_of_time_reward_coeff = 0.1
 
 num_sims=1000
 n_blocks_for_actions = 2
-points_to_sample_for_each_block = 10
+points_to_sample_for_each_block = 50
 sensing_actions_to_sample_per_block = 2
 max_planning_depth = 5
 tower_pos = goal_tower_position

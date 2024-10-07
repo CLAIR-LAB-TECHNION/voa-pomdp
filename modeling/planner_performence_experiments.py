@@ -82,7 +82,7 @@ def run_experiments(
         sensing_actions_to_sample_per_block: int = 2,
         sigmin: float = 0.02,
         sigmax: float = 0.15,
-        num_experiments: int = 20,
+        num_experiments: int = 2,
         num_runs_per_experiment: int = 2,
         name=""
 ):
