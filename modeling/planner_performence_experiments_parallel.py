@@ -21,7 +21,8 @@ import pomdp_py
 app = typer.Typer()
 
 
-def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial_state, tower_pos, experiment_params):
+def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial_state, tower_pos,
+                          max_planning_depth, experiment_params):
     agent = Agent(initial_blocks_position_belief=initial_belief,
                   max_steps=max_steps,
                   tower_position=tower_pos,
@@ -35,7 +36,7 @@ def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial
 
     env = Environment.from_agent(agent=agent, init_state=initial_state)
 
-    planner = pomdp_py.POUCT(max_depth=experiment_params['max_planning_depth'],
+    planner = pomdp_py.POUCT(max_depth=max_planning_depth,
                              num_sims=num_sims,
                              discount_factor=1.0,
                              rollout_policy=agent.policy_model,
@@ -69,18 +70,19 @@ def run_single_experiment(n_blocks, max_steps, num_sims, initial_belief, initial
 
 
 def run_experiment_set(args):
-    exp_id, n_blocks, max_steps, num_sims_list, initial_belief, initial_state, tower_pos, experiment_params, num_runs_per_experiment = args
+    exp_id, n_blocks, max_steps, num_sims_list, max_planning_depths, initial_belief, initial_state, tower_pos, experiment_params, num_runs_per_experiment = args
     print(f"Running experiment {exp_id + 1}")
     exp_results = {ns: {'rewards': [], 'planning_times': []} for ns in num_sims_list}
 
-    for num_sims in num_sims_list:
+    for num_sims, max_planning_depth in zip(num_sims_list, max_planning_depths):
         print(f"  Running with {num_sims} simulations")
         exp_rewards = []
         exp_planning_times = []
 
         for run in range(num_runs_per_experiment):
             reward, planning_time = run_single_experiment(n_blocks, max_steps, num_sims, initial_belief,
-                                                          initial_state, tower_pos, experiment_params)
+                                                          initial_state, tower_pos, max_planning_depth,
+                                                          experiment_params)
             exp_rewards.append(reward)
             exp_planning_times.append(planning_time)
 
@@ -92,25 +94,29 @@ def run_experiment_set(args):
 
 @app.command()
 def run_experiments(
-        n_blocks: int = 3,
+        n_blocks: int = 4,
         max_steps: int = 20,
         stacking_reward: float = 1.0,
-        sensing_cost_coeff: float = 0.1,
-        stacking_cost_coeff: float = 0.2,
+        sensing_cost_coeff: float = 0.05,
+        stacking_cost_coeff: float = 0.05,
         finish_ahead_of_time_reward_coeff: float = 0.1,
         n_blocks_for_actions: int = 2,
-        points_to_sample_for_each_block: int = 150,
+        points_to_sample_for_each_block: int = 50,
         sensing_actions_to_sample_per_block: int = 2,
-        max_planning_depth: int = 6,
-        sigmin: float = 0.01,
+        sigmin: float = 0.02,
         sigmax: float = 0.15,
-        num_experiments: int = 1,
-        num_runs_per_experiment: int = 10
+        num_experiments: int = 2,
+        num_runs_per_experiment: int = 2,
+        name: str = ""
 ):
-    raise NotImplementedError("copy mew changes from non parallel - setting seed and max planning depth for example")
-    # num_sims_list = [500, 1000, 2000, 5000, 10000]
-    num_sims_list = [500, 1000, 2000, 5000]
+    t = time.time()
+
+    num_sims_list = [200, 1000, 2000]
+    max_planning_depths = [4, 5, 5]
     tower_pos = goal_tower_position
+
+    # set random seed:
+    np.random.seed(42)
 
     experiment_params = {
         'stacking_reward': stacking_reward,
@@ -120,7 +126,7 @@ def run_experiments(
         'n_blocks_for_actions': n_blocks_for_actions,
         'points_to_sample_for_each_block': points_to_sample_for_each_block,
         'sensing_actions_to_sample_per_block': sensing_actions_to_sample_per_block,
-        'max_planning_depth': max_planning_depth,
+        'name': name
     }
 
     results = {ns: {'rewards': [], 'planning_times': []} for ns in num_sims_list}
@@ -136,11 +142,11 @@ def run_experiments(
         initial_block_positions = sample_block_positions_from_dists(initial_belief.block_beliefs)
         initial_state = State(steps_left=max_steps, block_positions=initial_block_positions, robot_position=tower_pos)
 
-        experiment_args.append((exp, n_blocks, max_steps, num_sims_list, initial_belief,
+        experiment_args.append((exp, n_blocks, max_steps, num_sims_list, max_planning_depths, initial_belief,
                                 initial_state, tower_pos, experiment_params, num_runs_per_experiment))
 
     # Use all available CPU cores
-    num_processes = cpu_count()
+    num_processes = cpu_count() - 1
 
     with Pool(processes=num_processes) as pool:
         experiment_results = pool.map(run_experiment_set, experiment_args)
@@ -174,6 +180,8 @@ def run_experiments(
     }
     with open(f'results/params_{timestamp}.json', 'w') as f:
         json.dump(params, f, indent=2)
+
+    print(f"Total time: {time.time() - t:.2f} seconds")
 
 
 def plot_results(num_sims_list: List[int], results: dict, key: str, ylabel: str, timestamp: str):
