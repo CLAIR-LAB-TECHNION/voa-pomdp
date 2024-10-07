@@ -108,7 +108,7 @@ class PolicyModel(pomdp_py.RolloutPolicy):
 
         actions_to_return: list[ActionBase] = []
 
-        # first, sample 200 points from each block belief, and compute their pdfs
+        # first, sample points from each block belief, and compute their pdfs
         per_block_points = []
         per_block_pdfs = []
         for block_dist in focused_blocks:
@@ -118,10 +118,33 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             per_block_points.append(points)
             per_block_pdfs.append(pdfs)
 
+        # filter samples that are at least 0.035 m away from previous actions:
+        prev_actions_points = np.array([(action.x, action.y) for action, _ in history])
+        if len(prev_actions_points) == 0:
+            # this is all irrelevant if no previous actions
+            per_block_pdfs_for_sensing = per_block_pdfs
+            per_block_points_for_sensing = per_block_points
+        else:
+            per_block_points_for_sensing = []
+            per_block_pdfs_for_sensing = []
+            for points, pdfs in zip(per_block_points, per_block_pdfs):
+                far_points = []
+                far_pdfs = []
+                for point, pdf in zip(points, pdfs):
+                    if np.min(np.linalg.norm(prev_actions_points - np.array(point), axis=1)) > 0.035:
+                        far_points.append(point)
+                        far_pdfs.append(pdf)
+                # if less than two found, just add all
+                if len(far_points) < 2:
+                    far_points = points
+                    far_pdfs = pdfs
+                per_block_points_for_sensing.append(far_points)
+                per_block_pdfs_for_sensing.append(far_pdfs)
+
         # take sample with max likelihood and k more random samples
         k = self.sensing_actions_to_sample_per_block - 1
         per_block_sense_points = []
-        for pdfs, points in zip(per_block_pdfs, per_block_points):
+        for pdfs, points in zip(per_block_pdfs_for_sensing, per_block_points_for_sensing):
             if len(points) == 0:
                 # if no point sample after all attempts, belief maybe wrong due to wrong block accusation
                 # of positive sensing. Nothing to do in that case...

@@ -107,6 +107,7 @@ def run_experiments(
         num_experiments: int = 1,
         num_runs_per_experiment: int = 10
 ):
+    raise NotImplementedError("copy mew changes from non parallel - setting seed and max planning depth for example")
     # num_sims_list = [500, 1000, 2000, 5000, 10000]
     num_sims_list = [500, 1000, 2000, 5000]
     tower_pos = goal_tower_position
