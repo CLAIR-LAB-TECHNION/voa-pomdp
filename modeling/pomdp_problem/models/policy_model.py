@@ -119,7 +119,8 @@ class PolicyModel(pomdp_py.RolloutPolicy):
             per_block_pdfs.append(pdfs)
 
         # filter samples that are at least 0.035 m away from previous actions:
-        prev_actions_points = np.array([(action.x, action.y) for action, _ in history])
+        prev_actions_points = np.array([(action.x, action.y) for action, _ in history
+                                        if not isinstance(action, DummyAction)])
         if len(prev_actions_points) == 0:
             # this is all irrelevant if no previous actions
             per_block_pdfs_for_sensing = per_block_pdfs
