@@ -35,7 +35,7 @@ app = typer.Typer()
     context_settings={"ignore_unknown_options": True})
 def main(n_blocks: int = 4,
          max_steps: int = 20,
-         max_planning_depth: int = 6,
+         max_planning_depth: int = 5,
          planner_n_iterations: int = 2000):
 
     camera = RealsenseCameraWithRecording()
