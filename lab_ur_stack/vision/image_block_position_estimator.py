@@ -9,12 +9,14 @@ from lab_ur_stack.camera.configurations_and_params import color_camera_intrinsic
 
 
 class ImageBlockPositionEstimator:
-    def __init__(self, workspace_limits_x, workspace_limits_y, gt: GeometryAndTransforms, robot_name='ur5e_1'):
+    def __init__(self, workspace_limits_x, workspace_limits_y, gt: GeometryAndTransforms, robot_name='ur5e_1',
+                 intrinsic_camera_matrix=color_camera_intrinsic_matrix):
         self.workspace_limits_x = workspace_limits_x
         self.workspace_limits_y = workspace_limits_y
         self.gt = gt
         self.detector = ObjectDetection()
         self.robot_name = robot_name
+        self.intrinsic_camera_matrix = intrinsic_camera_matrix
 
     def bboxes_cropped_to_orig(self, bboxes, xyxy):
         bboxes_orig = bboxes.cpu().numpy().copy()
@@ -31,10 +33,10 @@ class ImageBlockPositionEstimator:
         :param z_depth: depth of the points nx1
         :return: points in camera frame coordinates nx3
         """
-        fx = color_camera_intrinsic_matrix[0, 0]
-        fy = color_camera_intrinsic_matrix[1, 1]
-        cx = color_camera_intrinsic_matrix[0, 2]
-        cy = color_camera_intrinsic_matrix[1, 2]
+        fx = self.intrinsic_camera_matrix[0, 0]
+        fy = self.intrinsic_camera_matrix[1, 1]
+        cx = self.intrinsic_camera_matrix[0, 2]
+        cy = self.intrinsic_camera_matrix[1, 2]
 
         x_camera = (points_image_xy[:, 0] - cx) * z_depth / fx
         y_camera = (points_image_xy[:, 1] - cy) * z_depth / fy
@@ -288,7 +290,8 @@ class ImageBlockPositionEstimator:
             cropped_images_xyxy = []
             for image, robot_config in zip(images, robot_configurations):
                 cropped_image, xyxy = crop_workspace(image, robot_config, self.gt, self.workspace_limits_x,
-                                                     self.workspace_limits_y)
+                                                     self.workspace_limits_y,
+                                                     intrinsic_matrix=self.intrinsic_camera_matrix)
                 if cropped_image.shape[0] == 0 or cropped_image.shape[1] == 0:
                     print("workspace is out of image, trying to detect on original image anyway")
                     cropped_image = image

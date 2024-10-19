@@ -39,7 +39,10 @@ class WorldVoA:
 
         self.num_blocks = len(self._object_manager.object_names)
 
-        self.renderer = mj.Renderer(self._mj_model, 720, 1280)
+        self.image_res_h = 720
+        self.image_res_w = 1280
+        self.renderer = mj.Renderer(self._mj_model, self.image_res_h, self.image_res_w)
+        self._mj_model.camera("robot-cam").fovy[0] = 45
 
         self._ee_mj_data = self._mj_data.body('robot_1_ur5e/robot_1_adhesive gripper/')
         # self.dt = self._mj_model.opt.timestep * frame_skip
@@ -50,7 +53,7 @@ class WorldVoA:
     def close(self):
         self._env.close()
 
-    def set_robot_joints(self, robot_name, joint_pos, joint_vel=(0,)*6, simulate_step=True):
+    def set_robot_joints(self, robot_name, joint_pos, joint_vel=(0,) * 6, simulate_step=True):
         self._env_entities[robot_name].set_state(position=joint_pos, velocity=joint_vel)
         if simulate_step:
             self.simulate_steps(1)
@@ -66,7 +69,7 @@ class WorldVoA:
         agents = obs.keys()
 
         for agent in agents:
-            self.set_robot_joints(agent, [-np.pi/2, -np.pi/2, 0, -np.pi/2, 0, 0], simulate_step=False)
+            self.set_robot_joints(agent, [-np.pi / 2, -np.pi / 2, 0, -np.pi / 2, 0, 0], simulate_step=False)
 
         for agent in agents:
             self.robots_joint_pos[agent] = obs[agent]['robot_state'][:6]
@@ -193,14 +196,41 @@ class WorldVoA:
 
         cam = self._mj_data.camera("robot-cam")
         cam.xpos = position
-        cam.xmat = rotation_matrix.flatten()
+        cam.xmat = rotation_matrix.T.flatten()
 
         self.renderer.update_scene(self._mj_data, "robot-cam")
 
         return self.renderer.render()
 
+    def get_robot_cam_intrinsic_matrix(self):
+        cam_model = self._mj_model.camera("robot-cam")
+        fovy = cam_model.fovy[0]
+        res_x = self.image_res_w
+        res_y = self.image_res_h
+
+        # Convert fovy from degrees to radians
+        fovy_rad = np.deg2rad(fovy)
+
+        # Calculate focal length
+        f = res_y / (2 * np.tan(fovy_rad / 2))
+
+        # Calculate principal point
+        cx = res_x / 2
+        cy = res_y / 2
+
+        # Create intrinsic matrix
+        intrinsic_matrix = np.array([
+            [f, 0, cx],
+            [0, f, cy],
+            [0, 0, 1]
+        ])
+
+
+        return intrinsic_matrix
+
     def is_object_grasped(self):
         return self._grasp_manager.attached_object_name is not None
+
 
 def convert_mj_struct_to_namedtuple(mj_struct):
     """
