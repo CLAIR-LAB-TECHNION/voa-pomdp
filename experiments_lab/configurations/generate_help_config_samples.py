@@ -70,7 +70,8 @@ def generate_configs(n_samples: int = 50,
                      horangle_min: int = -20,
                      horangle_max: int = 90,
                      distance_min: float = 0.35,
-                     distance_max: float = 2.):
+                     distance_max: float = 2.,
+                     min_dist_between_poses: float = .5):
     gt = GeometryAndTransforms.build()
 
     help_configs = []
@@ -98,7 +99,7 @@ def generate_configs(n_samples: int = 50,
 
             min_dist_pose = np.min(np.linalg.norm(np.array(poses) - np.array(pose), axis=1))
             print(f"min dist to existing poses: {min_dist_pose}")
-            if min_dist_pose < .5:
+            if min_dist_pose < min_dist_between_poses:
                 print(f"skipping, too close to existing pose, min dist: {min_dist_pose}")
                 continue
 
