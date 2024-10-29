@@ -1,9 +1,16 @@
+import os
+import time
 from copy import deepcopy
+
+import cv2
 import numpy as np
 import typer
+from matplotlib import pyplot as plt
+
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.utils import plot_belief_with_history, update_belief
 from experiments_sim.block_stacking_simulator import BlockStackingSimulator
+from experiments_sim.utils import build_position_estimator, help_and_update_belief
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.policies.abstract_policy import AbastractPolicy
 from modeling.policies.pouct_planner_policy import POUCTPolicy
@@ -20,6 +27,7 @@ def _run_single_experiment(env: BlockStackingSimulator,
                            init_block_positions,
                            init_block_belief: BlocksPositionsBelief,
                            help_config=None,
+                           position_estimator=None,
                            plot_belief=False, ):
     logging.info("EXPR running single experiment")
 
@@ -33,15 +41,35 @@ def _run_single_experiment(env: BlockStackingSimulator,
 
     env.reset(init_block_positions)
 
+    current_belief = deepcopy(init_block_belief)
     if help_config is not None:
-        # TODO copy from lab exprmgr (take to utils and import)
         results.is_with_helper = True
+        results.help_config = help_config
+        results.belief_before_help = deepcopy(init_block_belief)
 
-        current_belief = None
-        raise NotImplementedError()
+        position_estimator = position_estimator if position_estimator is not None else build_position_estimator(env)[0]
+        detection_mus, detections_sigmas, detections_im = help_and_update_belief(env, current_belief, help_config,
+                                                                                 position_estimator,
+                                                                                 init_block_positions)
+        help_observed_mus_and_sigmas = [(detection_mus[i], detections_sigmas[i]) for i in range(len(detection_mus))]
+
+        results.help_detections_mus = detection_mus
+        results.help_detections_sigmas = detections_sigmas
+
+        if plot_belief:
+            # the first belief that will be plotted is the one before the help
+            actual_state_ = np.asarray(actual_states[0])
+            actual_state_ = actual_state_[:, :2]  # take all blocks but just x and y
+            plot_belief_with_history(results.belief_before_help, actual_state=actual_state_,
+                                     observed_mus_and_sigmas=help_observed_mus_and_sigmas, ret_as_image=False)
+
+            plt.figure(dpi=512, tight_layout=True, figsize=(5, 10))
+            plt.imshow(detections_im)
+            plt.axis('off')
+            plt.show()
     else:
         results.is_with_helper = False
-        current_belief = deepcopy(init_block_belief)
+        help_observed_mus_and_sigmas, detections_im = None, None
 
     results.beliefs.append(current_belief)
 
@@ -50,9 +78,9 @@ def _run_single_experiment(env: BlockStackingSimulator,
     accumulated_reward = 0
     for i in range(env.max_steps):
         if plot_belief:
-            actual_state_ = np.array(results.get_metadata("actual_states")[-1])
-            actual_state = actual_state_[:, :2]  # take all blocks but just x and y
-            plot_belief_with_history(current_belief, actual_state=actual_state,
+            actual_state_ = np.asarray(actual_states[-1])
+            actual_state_ = actual_state_[:, :2]  # take all blocks but just x and y
+            plot_belief_with_history(current_belief, actual_state=actual_state_,
                                      history=history, ret_as_image=False)
 
         action = policy.sample_action(current_belief, history)
@@ -81,29 +109,47 @@ def _run_single_experiment(env: BlockStackingSimulator,
     logging.info(f"EXPR Experiment finished with total reward: {accumulated_reward}."
                  f" picked up {env.n_picked_blocks} blocks")
 
-    return results
+    return results, help_observed_mus_and_sigmas, detections_im
 
 
 @app.command(
     context_settings={"ignore_unknown_options": True})
 def run_single_experiment_with_planner(max_steps: int = 20,
                                        seed: int = typer.Option(42, help="for sampling initial belief and state"),
-                                       min_prior_std: float = typer.Option(0.03, help="min prior std for block positions"),
-                                       max_prior_std: float = typer.Option(0.15, help="max prior std for block positions"),
+                                       min_prior_std: float = typer.Option(0.03,
+                                                                           help="min prior std for block positions"),
+                                       max_prior_std: float = typer.Option(0.15,
+                                                                           help="max prior std for block positions"),
                                        n_sims: int = typer.Option(2000, help="number of simulations for POUCT planner"),
                                        max_planning_depth: int = typer.Option(5, help="max planning depth for POUCT"
                                                                                       " planner both for rollout and tree"),
+                                       help_config_idx: int = typer.Option(-1, help="index of the help config to use"
+                                                                                    "from the file. -1 for no help"),
                                        render_env: bool = typer.Option(True, help="whether to render the environment"),
-                                       real_time_rendering: bool = typer.Option(True, help="whether to wait when rendiring to maintain"
-                                                                                   "real time or go as fast as possible"),
-                                       visualize_mp: bool = typer.Option(False, help="whether to visualize the motion planner"),
-                                       show_planner_progress: bool = typer.Option(True, help="whether to show progress of task planner"),
-                                       plot_belief: bool = typer.Option(True, help="whether to plot belief at each step")
-                                       ):
+                                       real_time_rendering: bool = typer.Option(True,
+                                                                                help="whether to wait when rendiring to maintain"
+                                                                                     "real time or go as fast as possible"),
+                                       visualize_mp: bool = typer.Option(False,
+                                                                         help="whether to visualize the motion planner"),
+                                       show_planner_progress: bool = typer.Option(True,
+                                                                                  help="whether to show progress of task planner"),
+                                       plot_belief: bool = typer.Option(True,
+                                                                        help="whether to plot belief at each step"),
+                                       results_dir: str = typer.Option("", help="directory to save results"
+                                                                                "will be saved in an internal dir with datetime stamp"), ):
     np.random.seed(seed)
     n_blocks = 4  # maybe parameter in the future
 
-    # TODO help config..
+    if results_dir == "":
+        results_dir = os.path.join(os.path.dirname(__file__), "experiments")
+    datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    experiment_dir = os.path.join(results_dir, datetime_stamp)
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    logging.info(f"Experiment dir: {experiment_dir}")
+
+    help_configs = np.load(os.path.join(os.path.dirname(__file__), "sim_help_configs.npy"))
+    help_config = help_configs[help_config_idx] if help_config_idx >= 0 else None
 
     render_mode = "human" if render_env else None
     env = BlockStackingSimulator(max_steps=max_steps, render_mode=render_mode,
@@ -124,9 +170,27 @@ def run_single_experiment_with_planner(max_steps: int = 20,
                          stacking_cost_coeff=env.stacking_cost_coeff,
                          finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff)
 
-    results = _run_single_experiment(env, policy, init_block_positions, init_block_belief, plot_belief=plot_belief)
+    position_estimator, _ = build_position_estimator(env)
 
-    # TODO save results
+    results, help_obs_mus_and_sigmas, help_plot = _run_single_experiment(env, policy, init_block_positions,
+                                                                         init_block_belief, help_config=help_config,
+                                                                         position_estimator=position_estimator,
+                                                                         plot_belief=plot_belief)
+
+    results.save(os.path.join(experiment_dir, "results.pkl"))
+    if help_plot is not None:
+        cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), help_plot)
+        # belief before help:
+        b_before_help_im = plot_belief_with_history(results.belief_before_help,
+                                                    actual_state=results.actual_initial_block_positions,
+                                                    observed_mus_and_sigmas=help_obs_mus_and_sigmas, ret_as_image=True)
+        b_after_help_im = plot_belief_with_history(results.beliefs[0],
+                                                   actual_state=results.actual_initial_block_positions,
+                                                   observed_mus_and_sigmas=help_obs_mus_and_sigmas, ret_as_image=True)
+        cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
+        cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
+    # TODO rgb2bgr?
+
     pass
 
 
