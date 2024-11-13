@@ -5,8 +5,7 @@ import cv2
 import numpy as np
 import typer
 from matplotlib import pyplot as plt
-from mpmath import mp
-
+import multiprocessing as mp
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.utils import plot_belief_with_history, update_belief
 from experiments_sim.block_stacking_simulator import BlockStackingSimulator

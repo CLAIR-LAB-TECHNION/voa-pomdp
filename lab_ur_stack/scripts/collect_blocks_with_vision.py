@@ -36,8 +36,8 @@ def main(n_blocks: int = 4,
 
     r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
     r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
-    r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
-    r2_controller.speed, r2_controller.acceleration = 1.0, 1.0
+    r1_controller.speed, r1_controller.acceleration = 1.75, 1.75
+    r2_controller.speed, r2_controller.acceleration = 3.0, 4.0
 
     r1_sensing_config = lookat_verangle_distance_to_robot_config(lookat, verangle, distance, gt, ur5e_1["name"],
                                                                  y_offset=y_offset)
@@ -46,7 +46,7 @@ def main(n_blocks: int = 4,
         return
     motion_planner.vis_config(ur5e_1["name"], r1_sensing_config)
 
-    r1_controller.plan_and_move_home(speed=0.5, acceleration=0.5)
+    r1_controller.plan_and_move_home(speed=1.5, acceleration=1.5)
 
     # r2 distribute blocks and clear out
     actual_block_positions = ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks, r2_controller)

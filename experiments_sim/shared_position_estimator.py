@@ -1,6 +1,8 @@
 import multiprocessing as mp
 from queue import Empty
 
+import numpy as np
+
 from lab_ur_stack.camera.configurations_and_params import color_camera_intrinsic_matrix
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
@@ -9,15 +11,14 @@ from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositio
 class SharedImageBlockPositionEstimator(ImageBlockPositionEstimator):
     def __init__(self, workspace_limits_x, workspace_limits_y, gt: GeometryAndTransforms, robot_name='ur5e_1',
                  intrinsic_camera_matrix=color_camera_intrinsic_matrix):
-        # Store only picklable parameters
         self.workspace_limits_x = workspace_limits_x
         self.workspace_limits_y = workspace_limits_y
         self.robot_name = robot_name
-        self.intrinsic_camera_matrix = intrinsic_camera_matrix
+        self.intrinsic_camera_matrix = np.array(intrinsic_camera_matrix)
 
         # Store parameters needed to recreate GeometryAndTransforms
         self.motion_planner = gt.motion_planner
-        self.cam_in_ee = gt.cam_in_ee
+        self.cam_in_ee = gt.camera_in_ee
 
         # Setup multiprocessing components
         self.request_queue = mp.Queue()
