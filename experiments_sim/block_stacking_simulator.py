@@ -9,6 +9,9 @@ from multi_mujoco.motion_planning.motion_executor import MotionExecutor, FACING_
 from multi_mujoco.mujoco_env.common.ur5e_fk import forward
 
 
+helper_camera_translation_from_ee = np.array([0.0, 0.1, -0.01])
+
+
 class BlockStackingSimulator:
     def __init__(self,
                  max_steps=20,
@@ -51,7 +54,8 @@ class BlockStackingSimulator:
 
         self.tower_pos = [-0.45, -1.15]
 
-        self.helper_camera_translation_from_ee = np.array([0.0, 0.1, -0.01])
+        self.helper_camera_translation_from_ee = helper_camera_translation_from_ee
+
 
     def reset(self, block_positions):
         logging.info(f"resetting with block_positions: {block_positions}")

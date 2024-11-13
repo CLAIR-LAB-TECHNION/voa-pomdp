@@ -1,6 +1,7 @@
 import cv2
 import numpy as np
-from experiments_sim.block_stacking_simulator import BlockStackingSimulator
+from experiments_sim.block_stacking_simulator import BlockStackingSimulator, helper_camera_translation_from_ee
+from experiments_sim.shared_position_estimator import SharedImageBlockPositionEstimator
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
@@ -9,11 +10,18 @@ from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.sensor_distribution import detections_to_distributions
 
 
-def build_position_estimator(env: BlockStackingSimulator):
+def build_position_estimator(env: BlockStackingSimulator, shared=False) \
+        -> (ImageBlockPositionEstimator, GeometryAndTransforms):
     gt = GeometryAndTransforms(env.motion_executor.motion_planner,
                                cam_in_ee=-np.array(env.helper_camera_translation_from_ee))
-    position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt, "ur5e_1",
-                                                     intrinsic_camera_matrix=env.mujoco_env.get_robot_cam_intrinsic_matrix())
+    if shared:
+        position_estimator = SharedImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt,
+                                                               "ur5e_1",
+                                                               intrinsic_camera_matrix=env.mujoco_env.get_robot_cam_intrinsic_matrix())
+    else:
+        position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt,
+                                                         "ur5e_1",
+                                                         intrinsic_camera_matrix=env.mujoco_env.get_robot_cam_intrinsic_matrix())
     return position_estimator, gt
 
 
@@ -43,7 +51,8 @@ def help_and_update_belief(env: BlockStackingSimulator, belief: BlocksPositionsB
                                                          actual_positions=hidden_actual_positions)
 
     # filter positions that are outside the workspace
-    pred_positions = [pos for pos in pred_positions if workspace_x_lims_default[0] < pos[0] < workspace_x_lims_default[1]
+    pred_positions = [pos for pos in pred_positions if
+                      workspace_x_lims_default[0] < pos[0] < workspace_x_lims_default[1]
                       and workspace_y_lims_default[0] < pos[1] < workspace_y_lims_default[1]]
 
     camera_position = position_estimator.gt.point_camera_to_world(point_camera=np.array([0, 0, 0]),

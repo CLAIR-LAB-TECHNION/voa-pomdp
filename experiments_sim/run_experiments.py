@@ -1,11 +1,11 @@
 import os
 import time
 from copy import deepcopy
-
 import cv2
 import numpy as np
 import typer
 from matplotlib import pyplot as plt
+from mpmath import mp
 
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.utils import plot_belief_with_history, update_belief
@@ -18,6 +18,7 @@ import logging
 from modeling.pomdp_problem.domain.observation import ObservationReachedTerminal
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, goal_tower_position, \
     sample_block_positions_from_dists
+
 
 app = typer.Typer()
 
@@ -64,7 +65,7 @@ def _run_single_experiment(env: BlockStackingSimulator,
                                      observed_mus_and_sigmas=help_observed_mus_and_sigmas, ret_as_image=False)
 
             plt.figure(dpi=512, tight_layout=True, figsize=(5, 10))
-            plt.imshow(detections_im)
+            plt.imshow(cv2.cvtColor(detections_im, cv2.COLOR_RGB2BGR))
             plt.axis('off')
             plt.show()
     else:
@@ -115,7 +116,7 @@ def _run_single_experiment(env: BlockStackingSimulator,
 @app.command(
     context_settings={"ignore_unknown_options": True})
 def run_single_experiment_with_planner(max_steps: int = 20,
-                                       seed: int = typer.Option(42, help="for sampling initial belief and state"),
+                                       seed: int = typer.Option(41, help="for sampling initial belief and state"),
                                        min_prior_std: float = typer.Option(0.03,
                                                                            help="min prior std for block positions"),
                                        max_prior_std: float = typer.Option(0.15,
@@ -187,11 +188,137 @@ def run_single_experiment_with_planner(max_steps: int = 20,
         b_after_help_im = plot_belief_with_history(results.beliefs[0],
                                                    actual_state=results.actual_initial_block_positions,
                                                    observed_mus_and_sigmas=help_obs_mus_and_sigmas, ret_as_image=True)
+        b_after_help_im = cv2.cvtColor(b_after_help_im, cv2.COLOR_RGB2BGR)
+        b_before_help_im = cv2.cvtColor(b_before_help_im, cv2.COLOR_RGB2BGR)
         cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
         cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
-    # TODO rgb2bgr?
 
-    pass
+
+def run_parallel_experiment_wrapper(kwargs_dict, results_dir):
+    """Wrapper function to run a single experiment with proper directory structure"""
+    # Create unique directory for this experiment
+    datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
+    process_id = os.getpid()
+    experiment_dir = os.path.join(results_dir, f"{datetime_stamp}_pid{process_id}")
+    os.makedirs(experiment_dir, exist_ok=True)
+
+    results, help_obs_mus_and_sigmas, help_plot = _run_single_experiment(**kwargs_dict)
+
+    results.save(os.path.join(experiment_dir, "results.pkl"))
+    if help_plot is not None:
+        cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), help_plot)
+
+        b_before_help_im = plot_belief_with_history(
+            results.belief_before_help,
+            actual_state=results.actual_initial_block_positions,
+            observed_mus_and_sigmas=help_obs_mus_and_sigmas,
+            ret_as_image=True
+        )
+        b_after_help_im = plot_belief_with_history(
+            results.beliefs[0],
+            actual_state=results.actual_initial_block_positions,
+            observed_mus_and_sigmas=help_obs_mus_and_sigmas,
+            ret_as_image=True
+        )
+        b_after_help_im = cv2.cvtColor(b_after_help_im, cv2.COLOR_RGB2BGR)
+        b_before_help_im = cv2.cvtColor(b_before_help_im, cv2.COLOR_RGB2BGR)
+        cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
+        cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
+
+    return results
+
+
+@app.command()
+def run_experiments_from_list_parallel(
+        n_processes: int = 2,
+        max_steps: int = 20,
+        seed: int = typer.Option(41, help="for sampling initial belief and state"),
+        min_prior_std: float = typer.Option(0.03, help="min prior std for block positions"),
+        max_prior_std: float = typer.Option(0.15, help="max prior std for block positions"),
+        n_sims: int = typer.Option(2000, help="number of simulations for POUCT planner"),
+        max_planning_depth: int = typer.Option(5,
+                                               help="max planning depth for POUCT planner both for rollout and tree"),
+        help_config_idx: int = typer.Option(-1, help="index of the help config to use from the file. -1 for no help"),
+        render_env: bool = typer.Option(False, help="whether to render the environment"),
+        real_time_rendering: bool = typer.Option(False,
+                                                 help="whether to wait when rendering to maintain real time or go as fast as possible"),
+        visualize_mp: bool = typer.Option(False, help="whether to visualize the motion planner"),
+        show_planner_progress: bool = typer.Option(False, help="whether to show progress of task planner"),
+        plot_belief: bool = typer.Option(False, help="whether to plot belief at each step"),
+        results_dir: str = typer.Option("",
+                                        help="directory to save results will be saved in an internal dir with datetime stamp"),
+):
+    np.random.seed(seed)
+    n_blocks = 4
+
+    if results_dir == "":
+        results_dir = os.path.join(os.path.dirname(__file__), "experiments")
+
+    # Create shared position estimator
+    dummy_env = BlockStackingSimulator(max_steps=max_steps, render_mode=None, visualize_mp=False)
+    shared_position_estimator, _ = build_position_estimator(dummy_env, shared=True)
+
+    # Load help configs
+    help_configs = np.load(os.path.join(os.path.dirname(__file__), "sim_help_configs.npy"))
+    help_config = help_configs[help_config_idx] if help_config_idx >= 0 else None
+
+    experiment_kwargs_list = []
+    for _ in range(n_processes):
+        block_pos_mu = np.random.uniform(
+            low=[workspace_x_lims_default[0], workspace_y_lims_default[0]],
+            high=[workspace_x_lims_default[1], workspace_y_lims_default[1]],
+            size=(n_blocks, 2)
+        )
+        block_pos_sigma = np.random.uniform(low=min_prior_std, high=max_prior_std, size=(n_blocks, 2))
+        init_block_belief = BlocksPositionsBelief(
+            n_blocks, workspace_x_lims_default, workspace_y_lims_default,
+            init_mus=block_pos_mu, init_sigmas=block_pos_sigma
+        )
+        init_block_positions = sample_block_positions_from_dists(init_block_belief.block_beliefs, min_dist=0.08)
+
+        # Create environment and policy for this experiment
+        render_mode = "human" if render_env else None
+        env = BlockStackingSimulator(
+            max_steps=max_steps,
+            render_mode=render_mode,
+            render_sleep_to_maintain_fps=real_time_rendering,
+            visualize_mp=visualize_mp
+        )
+
+        policy = POUCTPolicy(
+            initial_belief=init_block_belief,
+            max_steps=max_steps,
+            tower_position=goal_tower_position,
+            max_planning_depth=max_planning_depth,
+            num_sims=n_sims,
+            show_progress=show_planner_progress,
+            stacking_reward=env.stacking_reward,
+            sensing_cost_coeff=env.sensing_cost_coeff,
+            stacking_cost_coeff=env.stacking_cost_coeff,
+            finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff
+        )
+
+        experiment_kwargs = {
+            'env': env,
+            'policy': policy,
+            'init_block_positions': init_block_positions,
+            'init_block_belief': init_block_belief,
+            'help_config': help_config,
+            'plot_belief': plot_belief,
+            'position_estimator': shared_position_estimator
+        }
+        experiment_kwargs_list.append(experiment_kwargs)
+
+    from functools import partial
+    wrapped_experiment = partial(run_parallel_experiment_wrapper, results_dir=results_dir)
+
+    try:
+        with mp.Pool(n_processes) as pool:
+            results = pool.map(wrapped_experiment, experiment_kwargs_list)
+    finally:
+        shared_position_estimator.close()
+
+    return results
 
 
 if __name__ == '__main__':
