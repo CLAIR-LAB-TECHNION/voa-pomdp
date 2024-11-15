@@ -419,7 +419,11 @@ class MotionExecutor:
         self.wait(5)
         self.moveJ(agent, above_block_config, speed=4., acceleration=4., tolerance=0.1)
 
-        return self.env.is_object_grasped()
+        object_grasped = self.env.is_object_grasped()
+        if not object_grasped:
+            self.deactivate_grasp()
+
+        return object_grasped
 
     def put_down(self, agent, x, y, start_height=0.15):
         release_height = self.env.get_tower_height_at_point((x, y)) + 0.04 + 0.025

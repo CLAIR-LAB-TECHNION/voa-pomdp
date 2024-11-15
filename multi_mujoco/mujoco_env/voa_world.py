@@ -1,5 +1,5 @@
 """ a wrapper around spear env to simplify and fix some issues with the environment """
-from copy import deepcopy
+from copy import deepcopy, copy
 from collections import namedtuple
 import mujoco as mj
 import scipy
@@ -145,8 +145,9 @@ class WorldVoA:
         blocks_near_point = not_grasped_block_positions[
             np.linalg.norm(not_grasped_block_positions[:, :2] - point, axis=1) < 0.03]
         highest_block_height = np.max(blocks_near_point[:, 2]) if blocks_near_point.size > 0 \
-            else not_grasped_block_positions[:, 2].min()
-        return highest_block_height
+            else not_grasped_block_positions[:, 2].min() - 0.02
+        # if no blocks near point, return zero height which is estimated as lowest block minus block size
+        return copy(highest_block_height)
 
     def get_block_positions(self):
         return list(self._object_manager.get_all_block_positions_dict().values())

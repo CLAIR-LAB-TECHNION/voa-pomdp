@@ -102,10 +102,10 @@ class BlockStackingSimulator:
                 self.n_picked_blocks += 1
 
                 init_tower_height = self.mujoco_env.get_tower_height_at_point(self.tower_pos)
-                self.motion_executor.put_down('ur5e_2', *self.tower_pos,)
+                self.motion_executor.put_down('ur5e_2', *self.tower_pos, start_height=init_tower_height + 0.15)
                 final_tower_height = self.mujoco_env.get_tower_height_at_point(self.tower_pos)
 
-                if final_tower_height > init_tower_height:
+                if final_tower_height > init_tower_height + 0.01:
                     reward += self.stacking_reward
 
             reward -= self.stacking_cost_coeff * \
