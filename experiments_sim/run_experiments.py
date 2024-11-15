@@ -1,6 +1,7 @@
 import os
 import time
 from copy import deepcopy
+from functools import partial
 import cv2
 import numpy as np
 import typer
@@ -9,7 +10,10 @@ import multiprocessing as mp
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.utils import plot_belief_with_history, update_belief
 from experiments_sim.block_stacking_simulator import BlockStackingSimulator
+from experiments_sim.shared_position_estimator import SharedImageBlockPositionEstimator
 from experiments_sim.utils import build_position_estimator, help_and_update_belief
+from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
+from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.policies.abstract_policy import AbastractPolicy
 from modeling.policies.pouct_planner_policy import POUCTPolicy
@@ -22,12 +26,29 @@ from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspa
 app = typer.Typer()
 
 
+class PositionEstimatorWrapper:
+    def __init__(self,):
+        dummy_env = BlockStackingSimulator(render_mode=None, visualize_mp=False,)
+        gt = GeometryAndTransforms(dummy_env.motion_executor.motion_planner,
+                                   cam_in_ee=-np.array(dummy_env.helper_camera_translation_from_ee))
+        self.position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default,
+                                                              gt, "ur5e_1",
+                                                              dummy_env.mujoco_env.get_robot_cam_intrinsic_matrix())
+
+    def __call__(self, image, robot_config, plane_z=-0.02, return_annotations=True, detect_on_cropped=True,
+                 max_detections=5):
+        return self.position_estimator.get_block_position_plane_projection(
+            image, robot_config, plane_z=plane_z, return_annotations=return_annotations,
+            detect_on_cropped=detect_on_cropped, max_detections=max_detections
+        )
+
+
 def _run_single_experiment(env: BlockStackingSimulator,
                            policy: AbastractPolicy,
                            init_block_positions,
                            init_block_belief: BlocksPositionsBelief,
                            help_config=None,
-                           position_estimator=None,
+                           position_estimator_func: callable = None,
                            plot_belief=False, ):
     logging.info("EXPR running single experiment")
 
@@ -47,9 +68,13 @@ def _run_single_experiment(env: BlockStackingSimulator,
         results.help_config = help_config
         results.belief_before_help = deepcopy(init_block_belief)
 
-        position_estimator = position_estimator if position_estimator is not None else build_position_estimator(env)[0]
+        position_estimator_func = position_estimator_func if position_estimator_func is not None\
+            else PositionEstimatorWrapper()
+        gt = GeometryAndTransforms(env.motion_executor.motion_planner,
+                                   cam_in_ee=-np.array(env.helper_camera_translation_from_ee))
         detection_mus, detections_sigmas, detections_im = help_and_update_belief(env, current_belief, help_config,
-                                                                                 position_estimator,
+                                                                                 position_estimator_func,
+                                                                                 gt,
                                                                                  init_block_positions)
         help_observed_mus_and_sigmas = [(detection_mus[i], detections_sigmas[i]) for i in range(len(detection_mus))]
 
@@ -170,11 +195,11 @@ def run_single_experiment_with_planner(max_steps: int = 20,
                          stacking_cost_coeff=env.stacking_cost_coeff,
                          finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff)
 
-    position_estimator, _ = build_position_estimator(env)
+    position_estimator_func = PositionEstimatorWrapper()
 
     results, help_obs_mus_and_sigmas, help_plot = _run_single_experiment(env, policy, init_block_positions,
                                                                          init_block_belief, help_config=help_config,
-                                                                         position_estimator=position_estimator,
+                                                                         position_estimator_func=position_estimator_func,
                                                                          plot_belief=plot_belief)
 
     results.save(os.path.join(experiment_dir, "results.pkl"))
@@ -193,39 +218,131 @@ def run_single_experiment_with_planner(max_steps: int = 20,
         cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
 
 
-def run_parallel_experiment_wrapper(kwargs_dict, results_dir):
-    """Wrapper function to run a single experiment with proper directory structure"""
-    # Create unique directory for this experiment
+class PositionEstimatorService:
+    """
+     A service that runs the position estimator in a separate process. to be shared among multiple experiments
+    and not to be duplicated in each process.
+    """
+
+    def __init__(self):
+        self.parent_conn, self.child_conn = mp.Pipe()
+        self.process = mp.Process(target=self._run_service)
+        self.process.start()
+
+    def _run_service(self):
+        # Initialize estimator here so it only exists in this process
+        dummy_env = BlockStackingSimulator(render_mode=None, visualize_mp=False)
+        gt = GeometryAndTransforms(dummy_env.motion_executor.motion_planner,
+                                   cam_in_ee=-np.array(dummy_env.helper_camera_translation_from_ee))
+        position_estimator = ImageBlockPositionEstimator(
+            workspace_x_lims_default, workspace_y_lims_default,
+            gt, "ur5e_1", dummy_env.mujoco_env.get_robot_cam_intrinsic_matrix())
+
+        while True:
+            try:
+                request = self.child_conn.recv()
+                if request is None:  # shutdown signal
+                    break
+
+                image, robot_config = request
+                result = position_estimator.get_block_position_plane_projection(
+                    image, robot_config, plane_z=-0.02, return_annotations=True,
+                    detect_on_cropped=True, max_detections=5
+                )
+                self.child_conn.send(result)
+            except EOFError:
+                break
+
+    def estimate_position(self, image, robot_config):
+        self.parent_conn.send((image, robot_config))
+        return self.parent_conn.recv()
+
+    def shutdown(self):
+        self.parent_conn.send(None)
+        self.process.join()
+
+
+def run_experiment_wrapper(kwargs_dict, results_dir, parent_conn):
+    # Set matplotlib backend to non-interactive at the start of the process
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+
     datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
     process_id = os.getpid()
     experiment_dir = os.path.join(results_dir, f"{datetime_stamp}_pid{process_id}")
     os.makedirs(experiment_dir, exist_ok=True)
 
-    results, help_obs_mus_and_sigmas, help_plot = _run_single_experiment(**kwargs_dict)
+    # Create environment and policy in the worker process
+    env = BlockStackingSimulator(
+        max_steps=kwargs_dict['max_steps'],
+        render_mode=kwargs_dict['render_mode'],
+        render_sleep_to_maintain_fps=kwargs_dict['real_time_rendering'],
+        visualize_mp=kwargs_dict['visualize_mp']
+    )
 
-    results.save(os.path.join(experiment_dir, "results.pkl"))
-    if help_plot is not None:
-        cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), help_plot)
+    policy = POUCTPolicy(
+        initial_belief=kwargs_dict['init_block_belief'],
+        max_steps=kwargs_dict['max_steps'],
+        tower_position=goal_tower_position,
+        max_planning_depth=kwargs_dict['max_planning_depth'],
+        num_sims=kwargs_dict['n_sims'],
+        show_progress=kwargs_dict['show_planner_progress'],
+        stacking_reward=env.stacking_reward,
+        sensing_cost_coeff=env.sensing_cost_coeff,
+        stacking_cost_coeff=env.stacking_cost_coeff,
+        finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff
+    )
 
-        b_before_help_im = plot_belief_with_history(
-            results.belief_before_help,
-            actual_state=results.actual_initial_block_positions,
-            observed_mus_and_sigmas=help_obs_mus_and_sigmas,
-            ret_as_image=True
-        )
-        b_after_help_im = plot_belief_with_history(
-            results.beliefs[0],
-            actual_state=results.actual_initial_block_positions,
-            observed_mus_and_sigmas=help_obs_mus_and_sigmas,
-            ret_as_image=True
-        )
-        b_after_help_im = cv2.cvtColor(b_after_help_im, cv2.COLOR_RGB2BGR)
-        b_before_help_im = cv2.cvtColor(b_before_help_im, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
-        cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
+    class SharedPositionEstimatorClient:
+        def __init__(self, conn):
+            self.conn = conn
 
-    return results
+        def __call__(self, image, robot_config, **kwargs):
+            self.conn.send((image, robot_config))
+            return self.conn.recv()
 
+    position_estimator_func = SharedPositionEstimatorClient(parent_conn)
+
+    run_kwargs = {
+        'env': env,
+        'policy': policy,
+        'init_block_positions': kwargs_dict['init_block_positions'],
+        'init_block_belief': kwargs_dict['init_block_belief'],
+        'help_config': kwargs_dict['help_config'],
+        'plot_belief': kwargs_dict['plot_belief'],
+        'position_estimator_func': position_estimator_func
+    }
+
+    try:
+        results, help_obs_mus_and_sigmas, help_plot = _run_single_experiment(**run_kwargs)
+
+        # Save results
+        results.save(os.path.join(experiment_dir, "results.pkl"))
+        if help_plot is not None:
+            cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), help_plot)
+            b_before_help_im = plot_belief_with_history(
+                results.belief_before_help,
+                actual_state=results.actual_initial_block_positions,
+                observed_mus_and_sigmas=help_obs_mus_and_sigmas,
+                ret_as_image=True
+            )
+            b_after_help_im = plot_belief_with_history(
+                results.beliefs[0],
+                actual_state=results.actual_initial_block_positions,
+                observed_mus_and_sigmas=help_obs_mus_and_sigmas,
+                ret_as_image=True
+            )
+            b_after_help_im = cv2.cvtColor(b_after_help_im, cv2.COLOR_RGB2BGR)
+            b_before_help_im = cv2.cvtColor(b_before_help_im, cv2.COLOR_RGB2BGR)
+            cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
+            cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
+
+        plt.close('all')  # Clean up plots
+        return results
+    except Exception as e:
+        print(f"Process {process_id} failed with error: {str(e)}")
+        raise e
 
 @app.command()
 def run_experiments_from_list_parallel(
@@ -253,13 +370,12 @@ def run_experiments_from_list_parallel(
     if results_dir == "":
         results_dir = os.path.join(os.path.dirname(__file__), "experiments")
 
-    # Create shared position estimator
-    dummy_env = BlockStackingSimulator(max_steps=max_steps, render_mode=None, visualize_mp=False)
-    shared_position_estimator, _ = build_position_estimator(dummy_env, shared=True)
-
-    # Load help configs
     help_configs = np.load(os.path.join(os.path.dirname(__file__), "sim_help_configs.npy"))
     help_config = help_configs[help_config_idx] if help_config_idx >= 0 else None
+
+    # Create the shared service before forking
+    position_service = PositionEstimatorService()
+    parent_conn = position_service.parent_conn  # Get the connection to pass to workers
 
     experiment_kwargs_list = []
     for _ in range(n_processes):
@@ -275,47 +391,30 @@ def run_experiments_from_list_parallel(
         )
         init_block_positions = sample_block_positions_from_dists(init_block_belief.block_beliefs, min_dist=0.08)
 
-        # Create environment and policy for this experiment
         render_mode = "human" if render_env else None
-        env = BlockStackingSimulator(
-            max_steps=max_steps,
-            render_mode=render_mode,
-            render_sleep_to_maintain_fps=real_time_rendering,
-            visualize_mp=visualize_mp
-        )
-
-        policy = POUCTPolicy(
-            initial_belief=init_block_belief,
-            max_steps=max_steps,
-            tower_position=goal_tower_position,
-            max_planning_depth=max_planning_depth,
-            num_sims=n_sims,
-            show_progress=show_planner_progress,
-            stacking_reward=env.stacking_reward,
-            sensing_cost_coeff=env.sensing_cost_coeff,
-            stacking_cost_coeff=env.stacking_cost_coeff,
-            finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff
-        )
 
         experiment_kwargs = {
-            'env': env,
-            'policy': policy,
+            'max_steps': max_steps,
+            'render_mode': render_mode,
+            'real_time_rendering': real_time_rendering,
+            'visualize_mp': visualize_mp,
             'init_block_positions': init_block_positions,
             'init_block_belief': init_block_belief,
             'help_config': help_config,
             'plot_belief': plot_belief,
-            'position_estimator': shared_position_estimator
+            'n_sims': n_sims,
+            'max_planning_depth': max_planning_depth,
+            'show_planner_progress': show_planner_progress
         }
         experiment_kwargs_list.append(experiment_kwargs)
 
-    from functools import partial
-    wrapped_experiment = partial(run_parallel_experiment_wrapper, results_dir=results_dir)
-
     try:
         with mp.Pool(n_processes) as pool:
-            results = pool.map(wrapped_experiment, experiment_kwargs_list)
+            results = pool.starmap(run_experiment_wrapper,
+                                 [(kwargs, results_dir, parent_conn)
+                                  for kwargs in experiment_kwargs_list])
     finally:
-        shared_position_estimator.close()
+        position_service.shutdown()
 
     return results
 

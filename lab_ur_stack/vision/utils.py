@@ -93,6 +93,9 @@ def crop_workspace(image,
 
 def detections_plots_no_depth_as_image(cropped_image, orig_image, pred_positions,
                                        ws_lim_x, ws_lim_y, actual_positions=None):
+    cropped_image = np.asarray(cropped_image).astype(np.uint8)
+    orig_image = np.asarray(orig_image).astype(np.uint8)
+
     fig, axs = plt.subplots(3, 1, figsize=(5, 10))
     axs[0].imshow(cropped_image)
     axs[1].imshow(orig_image)
