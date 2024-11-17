@@ -1,7 +1,6 @@
 import cv2
 import numpy as np
 from experiments_sim.block_stacking_simulator import BlockStackingSimulator, helper_camera_translation_from_ee
-from experiments_sim.shared_position_estimator import SharedImageBlockPositionEstimator
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator

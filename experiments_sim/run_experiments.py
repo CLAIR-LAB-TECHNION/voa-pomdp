@@ -1,4 +1,5 @@
 import os
+import platform
 import time
 from copy import deepcopy
 from functools import partial
@@ -10,10 +11,11 @@ import multiprocessing as mp
 from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.utils import plot_belief_with_history, update_belief
 from experiments_sim.block_stacking_simulator import BlockStackingSimulator
-from experiments_sim.shared_position_estimator import SharedImageBlockPositionEstimator
+from experiments_sim.position_estimation_service import create_position_estimation_service
 from experiments_sim.utils import build_position_estimator, help_and_update_belief
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
+from lab_ur_stack.vision.utils import detections_plots_no_depth_as_image
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.policies.abstract_policy import AbastractPolicy
 from modeling.policies.pouct_planner_policy import POUCTPolicy
@@ -217,53 +219,31 @@ def run_single_experiment_with_planner(max_steps: int = 20,
         cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
         cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
 
+class SharedPositionEstimatorClient:
+    """Client for the position estimation service"""
+    def __init__(self, service):
+        self.service = service
 
-class PositionEstimatorService:
-    """
-     A service that runs the position estimator in a separate process. to be shared among multiple experiments
-    and not to be duplicated in each process.
-    """
+    def __call__(self, image, robot_config, **kwargs):
+        try:
+            image = np.ascontiguousarray(image, dtype=np.uint8)
+            robot_config = np.asarray(robot_config, dtype=np.float64)
 
-    def __init__(self):
-        self.parent_conn, self.child_conn = mp.Pipe()
-        self.process = mp.Process(target=self._run_service)
-        self.process.start()
+            response = self.service.estimate_position(image, robot_config)
 
-    def _run_service(self):
-        # Initialize estimator here so it only exists in this process
-        dummy_env = BlockStackingSimulator(render_mode=None, visualize_mp=False)
-        gt = GeometryAndTransforms(dummy_env.motion_executor.motion_planner,
-                                   cam_in_ee=-np.array(dummy_env.helper_camera_translation_from_ee))
-        position_estimator = ImageBlockPositionEstimator(
-            workspace_x_lims_default, workspace_y_lims_default,
-            gt, "ur5e_1", dummy_env.mujoco_env.get_robot_cam_intrinsic_matrix())
+            if response is None:
+                raise RuntimeError("Position estimation failed")
 
-        while True:
-            try:
-                request = self.child_conn.recv()
-                if request is None:  # shutdown signal
-                    break
-
-                image, robot_config = request
-                result = position_estimator.get_block_position_plane_projection(
-                    image, robot_config, plane_z=-0.02, return_annotations=True,
-                    detect_on_cropped=True, max_detections=5
-                )
-                self.child_conn.send(result)
-            except EOFError:
-                break
-
-    def estimate_position(self, image, robot_config):
-        self.parent_conn.send((image, robot_config))
-        return self.parent_conn.recv()
-
-    def shutdown(self):
-        self.parent_conn.send(None)
-        self.process.join()
+            pred_positions, pred_annotations = response
+            return pred_positions, pred_annotations
+        except Exception as e:
+            print(f"Error in client: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            raise RuntimeError("Position estimation failed")
 
 
-def run_experiment_wrapper(kwargs_dict, results_dir, parent_conn):
-    # Set matplotlib backend to non-interactive at the start of the process
+def run_experiment_wrapper(kwargs_dict, results_dir, position_service):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
@@ -294,15 +274,7 @@ def run_experiment_wrapper(kwargs_dict, results_dir, parent_conn):
         finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff
     )
 
-    class SharedPositionEstimatorClient:
-        def __init__(self, conn):
-            self.conn = conn
-
-        def __call__(self, image, robot_config, **kwargs):
-            self.conn.send((image, robot_config))
-            return self.conn.recv()
-
-    position_estimator_func = SharedPositionEstimatorClient(parent_conn)
+    position_estimator_func = SharedPositionEstimatorClient(position_service)
 
     run_kwargs = {
         'env': env,
@@ -344,6 +316,7 @@ def run_experiment_wrapper(kwargs_dict, results_dir, parent_conn):
         print(f"Process {process_id} failed with error: {str(e)}")
         raise e
 
+
 @app.command()
 def run_experiments_from_list_parallel(
         n_processes: int = 2,
@@ -353,17 +326,24 @@ def run_experiments_from_list_parallel(
         max_prior_std: float = typer.Option(0.15, help="max prior std for block positions"),
         n_sims: int = typer.Option(2000, help="number of simulations for POUCT planner"),
         max_planning_depth: int = typer.Option(5,
-                                               help="max planning depth for POUCT planner both for rollout and tree"),
+                                             help="max planning depth for POUCT planner both for rollout and tree"),
         help_config_idx: int = typer.Option(-1, help="index of the help config to use from the file. -1 for no help"),
         render_env: bool = typer.Option(False, help="whether to render the environment"),
         real_time_rendering: bool = typer.Option(False,
-                                                 help="whether to wait when rendering to maintain real time or go as fast as possible"),
+                                               help="whether to wait when rendering to maintain real time or go as fast as possible"),
         visualize_mp: bool = typer.Option(False, help="whether to visualize the motion planner"),
         show_planner_progress: bool = typer.Option(False, help="whether to show progress of task planner"),
         plot_belief: bool = typer.Option(False, help="whether to plot belief at each step"),
         results_dir: str = typer.Option("",
-                                        help="directory to save results will be saved in an internal dir with datetime stamp"),
+                                      help="directory to save results will be saved in an internal dir with datetime stamp"),
 ):
+    if platform.system() == 'Linux':
+        try:
+            mp.set_start_method('spawn')
+        except RuntimeError:
+            # In case it was already set
+            pass
+
     np.random.seed(seed)
     n_blocks = 4
 
@@ -374,8 +354,7 @@ def run_experiments_from_list_parallel(
     help_config = help_configs[help_config_idx] if help_config_idx >= 0 else None
 
     # Create the shared service before forking
-    position_service = PositionEstimatorService()
-    parent_conn = position_service.parent_conn  # Get the connection to pass to workers
+    position_service = create_position_estimation_service()
 
     experiment_kwargs_list = []
     for _ in range(n_processes):
@@ -411,7 +390,7 @@ def run_experiments_from_list_parallel(
     try:
         with mp.Pool(n_processes) as pool:
             results = pool.starmap(run_experiment_wrapper,
-                                 [(kwargs, results_dir, parent_conn)
+                                 [(kwargs, results_dir, position_service)
                                   for kwargs in experiment_kwargs_list])
     finally:
         position_service.shutdown()
