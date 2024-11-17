@@ -40,6 +40,7 @@ def generate_experiments(
         n_states_per_belief: int = typer.Option(5, help="Number of states to sample per belief"),
         n_helper_configs: int = typer.Option(8, help="Number of helper configurations to sample"),
         output_file: str = typer.Option("experiments", help="Output file name (without extension)"),
+        help_configs_file: str = typer.Option("help_configs.npy", help="Helper configurations file path")
 ):
     # Use the default workspace limits from your utility module
     ws_x_lims = workspace_x_lims_default
@@ -49,7 +50,7 @@ def generate_experiments(
     # all_help_configs = load_help_configs()
     # # Sample helper configurations once
     # help_configs = all_help_configs[np.random.choice(len(all_help_configs), n_helper_configs, replace=False)]
-    help_configs = np.load("experiments_4_blocks_help_configs.npy")
+    help_configs = np.load(help_configs_file)
 
     # Create empty list to store experiment data
     experiments = []
