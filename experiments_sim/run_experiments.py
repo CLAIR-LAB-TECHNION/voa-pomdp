@@ -332,7 +332,7 @@ def run_experiment_wrapper(args):
 @app.command()
 def run_experiments_from_list_parallel(
         n_processes: int = 2,
-        experiments_file: str = typer.Option("./configurations/experiments_planner_2000.csv",
+        experiments_file: str = typer.Option("experiments_sim/configurations/experiments_planner_2000.csv",
                                              help="file with list of experiment to draw from and write to"),
         max_steps: int = 20,
         n_sims: int = typer.Option(2000, help="number of simulations for POUCT planner"),
@@ -365,8 +365,9 @@ def run_experiments_from_list_parallel(
 
         # Filter undone experiments
         undone_experiments = df[pd.isna(df['conducted_datetime_stamp']) | (df['conducted_datetime_stamp'] == '')]
+        n_init_undone = len(undone_experiments)
 
-        if len(undone_experiments) == 0:
+        if n_init_undone == 0:
             logging.info("No experiments left to run")
             return
 
@@ -392,12 +393,15 @@ def run_experiments_from_list_parallel(
             }
             experiment_args.append((kwargs, results_dir, position_service))
 
+        n_done = 0
         with mp.Pool(n_processes) as pool:
             for result in pool.imap_unordered(run_experiment_wrapper, experiment_args):
                 experiment_id, experiment_dir, success = result
                 if success:
                     update_csv(experiment_id, experiment_dir)
                     logging.info(f"Completed and updated experiment {experiment_id}")
+                    n_done += 1
+                    print(f"---Completed {n_done}/{n_init_undone} experiments in this run---")
                 else:
                     logging.error(f"Failed experiment {experiment_id}")
 
