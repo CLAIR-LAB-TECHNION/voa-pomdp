@@ -5,6 +5,7 @@ from copy import deepcopy
 from functools import partial
 import cv2
 import numpy as np
+import pandas as pd
 import typer
 from matplotlib import pyplot as plt
 import multiprocessing as mp
@@ -243,31 +244,53 @@ class SharedPositionEstimatorClient:
             raise RuntimeError("Position estimation failed")
 
 
-def run_experiment_wrapper(kwargs_dict, results_dir, position_service):
+def run_experiment_wrapper(args):
+    kwargs_dict, results_dir, position_service = args
+
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
     datetime_stamp = time.strftime("%Y-%m-%d_%H-%M-%S")
     process_id = os.getpid()
-    experiment_dir = os.path.join(results_dir, f"{datetime_stamp}_pid{process_id}")
+    date_time_pid_stamp = f"{datetime_stamp}_pid{process_id}"
+    experiment_dir = os.path.join(results_dir, date_time_pid_stamp)
     os.makedirs(experiment_dir, exist_ok=True)
 
-    # Create environment and policy in the worker process
+    row = kwargs_dict['row']
+
+    # Create environment
     env = BlockStackingSimulator(
         max_steps=kwargs_dict['max_steps'],
-        render_mode=kwargs_dict['render_mode'],
-        render_sleep_to_maintain_fps=kwargs_dict['real_time_rendering'],
-        visualize_mp=kwargs_dict['visualize_mp']
+        render_mode=kwargs_dict.get('render_mode', None),
+        render_sleep_to_maintain_fps=kwargs_dict.get('real_time_rendering', False),
+        visualize_mp=kwargs_dict.get('visualize_mp', False)
     )
 
+    # Initialize belief from CSV data
+    init_block_belief = BlocksPositionsBelief(
+        4,  # n_blocks is fixed to 4 as per your example
+        workspace_x_lims_default,
+        workspace_y_lims_default,
+        init_mus=np.array(eval(row['belief_mus'])),
+        init_sigmas=np.array(eval(row['belief_sigmas']))
+    )
+    init_block_positions = np.array(eval(row['state']))
+
+    # Parse help config from row
+    if pd.isna(row['help_config']) or row['help_config'] == '' or row['help_config'] == 'None':
+        help_config = None
+    else:
+        help_config = np.array(eval(row['help_config']))
+
+    # Create policy
     policy = POUCTPolicy(
-        initial_belief=kwargs_dict['init_block_belief'],
+        initial_belief=init_block_belief,
         max_steps=kwargs_dict['max_steps'],
         tower_position=goal_tower_position,
         max_planning_depth=kwargs_dict['max_planning_depth'],
         num_sims=kwargs_dict['n_sims'],
-        show_progress=kwargs_dict['show_planner_progress'],
+        show_progress=kwargs_dict.get('show_planner_progress', False),
         stacking_reward=env.stacking_reward,
         sensing_cost_coeff=env.sensing_cost_coeff,
         stacking_cost_coeff=env.stacking_cost_coeff,
@@ -276,126 +299,112 @@ def run_experiment_wrapper(kwargs_dict, results_dir, position_service):
 
     position_estimator_func = SharedPositionEstimatorClient(position_service)
 
-    run_kwargs = {
-        'env': env,
-        'policy': policy,
-        'init_block_positions': kwargs_dict['init_block_positions'],
-        'init_block_belief': kwargs_dict['init_block_belief'],
-        'help_config': kwargs_dict['help_config'],
-        'plot_belief': kwargs_dict['plot_belief'],
-        'position_estimator_func': position_estimator_func
-    }
-
     try:
-        results, help_obs_mus_and_sigmas, help_plot = _run_single_experiment(**run_kwargs)
+        results, help_obs_mus_and_sigmas, help_plot = _run_single_experiment(
+            env=env,
+            policy=policy,
+            init_block_positions=init_block_positions,
+            init_block_belief=init_block_belief,
+            help_config=help_config,
+            plot_belief=kwargs_dict.get('plot_belief', False),
+            position_estimator_func=position_estimator_func
+        )
 
-        # Save results
+        # Save results and plots
+        results.set_metadata('experiment_id', row['experiment_id'])
+        results.set_metadata('belief_idx', row['belief_idx'])
+        results.set_metadata('state_idx', row['state_idx'])
+        results.set_metadata('help_config_idx_local', row['help_config_idx_local'])
         results.save(os.path.join(experiment_dir, "results.pkl"))
+
         if help_plot is not None:
             cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), help_plot)
-            b_before_help_im = plot_belief_with_history(
-                results.belief_before_help,
-                actual_state=results.actual_initial_block_positions,
-                observed_mus_and_sigmas=help_obs_mus_and_sigmas,
-                ret_as_image=True
-            )
-            b_after_help_im = plot_belief_with_history(
-                results.beliefs[0],
-                actual_state=results.actual_initial_block_positions,
-                observed_mus_and_sigmas=help_obs_mus_and_sigmas,
-                ret_as_image=True
-            )
-            b_after_help_im = cv2.cvtColor(b_after_help_im, cv2.COLOR_RGB2BGR)
-            b_before_help_im = cv2.cvtColor(b_before_help_im, cv2.COLOR_RGB2BGR)
-            cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
-            cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
 
-        plt.close('all')  # Clean up plots
-        return results
+        return row['experiment_id'],  date_time_pid_stamp, True
+
     except Exception as e:
         print(f"Process {process_id} failed with error: {str(e)}")
-        raise e
+        return row['experiment_id'], None, False
+    finally:
+        plt.close('all')  # Clean up plots
 
 
 @app.command()
 def run_experiments_from_list_parallel(
         n_processes: int = 2,
+        experiments_file: str = typer.Option("./configurations/experiments_planner_2000.csv",
+                                             help="file with list of experiment to draw from and write to"),
         max_steps: int = 20,
-        seed: int = typer.Option(41, help="for sampling initial belief and state"),
-        min_prior_std: float = typer.Option(0.03, help="min prior std for block positions"),
-        max_prior_std: float = typer.Option(0.15, help="max prior std for block positions"),
         n_sims: int = typer.Option(2000, help="number of simulations for POUCT planner"),
         max_planning_depth: int = typer.Option(5,
-                                             help="max planning depth for POUCT planner both for rollout and tree"),
-        help_config_idx: int = typer.Option(-1, help="index of the help config to use from the file. -1 for no help"),
+                                               help="max planning depth for POUCT planner both for rollout and tree"),
         render_env: bool = typer.Option(False, help="whether to render the environment"),
         real_time_rendering: bool = typer.Option(False,
-                                               help="whether to wait when rendering to maintain real time or go as fast as possible"),
+                                                 help="whether to wait when rendering to maintain real time or go as fast as possible"),
         visualize_mp: bool = typer.Option(False, help="whether to visualize the motion planner"),
         show_planner_progress: bool = typer.Option(False, help="whether to show progress of task planner"),
         plot_belief: bool = typer.Option(False, help="whether to plot belief at each step"),
         results_dir: str = typer.Option("",
-                                      help="directory to save results will be saved in an internal dir with datetime stamp"),
+                                        help="directory to save results will be saved in an internal dir with datetime stamp"),
 ):
     if platform.system() == 'Linux':
         try:
             mp.set_start_method('spawn')
         except RuntimeError:
-            # In case it was already set
             pass
-
-    np.random.seed(seed)
-    n_blocks = 4
 
     if results_dir == "":
         results_dir = os.path.join(os.path.dirname(__file__), "experiments")
 
-    help_configs = np.load(os.path.join(os.path.dirname(__file__), "sim_help_configs.npy"))
-    help_config = help_configs[help_config_idx] if help_config_idx >= 0 else None
-
-    # Create the shared service before forking
     position_service = create_position_estimation_service()
 
-    experiment_kwargs_list = []
-    for _ in range(n_processes):
-        block_pos_mu = np.random.uniform(
-            low=[workspace_x_lims_default[0], workspace_y_lims_default[0]],
-            high=[workspace_x_lims_default[1], workspace_y_lims_default[1]],
-            size=(n_blocks, 2)
-        )
-        block_pos_sigma = np.random.uniform(low=min_prior_std, high=max_prior_std, size=(n_blocks, 2))
-        init_block_belief = BlocksPositionsBelief(
-            n_blocks, workspace_x_lims_default, workspace_y_lims_default,
-            init_mus=block_pos_mu, init_sigmas=block_pos_sigma
-        )
-        init_block_positions = sample_block_positions_from_dists(init_block_belief.block_beliefs, min_dist=0.08)
-
-        render_mode = "human" if render_env else None
-
-        experiment_kwargs = {
-            'max_steps': max_steps,
-            'render_mode': render_mode,
-            'real_time_rendering': real_time_rendering,
-            'visualize_mp': visualize_mp,
-            'init_block_positions': init_block_positions,
-            'init_block_belief': init_block_belief,
-            'help_config': help_config,
-            'plot_belief': plot_belief,
-            'n_sims': n_sims,
-            'max_planning_depth': max_planning_depth,
-            'show_planner_progress': show_planner_progress
-        }
-        experiment_kwargs_list.append(experiment_kwargs)
-
     try:
+        # Read experiments file
+        df = pd.read_csv(experiments_file)
+        logging.info(f"Loaded {len(df)} experiments from {experiments_file}")
+
+        # Filter undone experiments
+        undone_experiments = df[pd.isna(df['conducted_datetime_stamp']) | (df['conducted_datetime_stamp'] == '')]
+
+        if len(undone_experiments) == 0:
+            logging.info("No experiments left to run")
+            return
+
+        def update_csv(experiment_id, experiment_dir):
+            """Safely update CSV with completion status and directory"""
+            df = pd.read_csv(experiments_file)
+            idx = df['experiment_id'] == experiment_id
+            df.loc[idx, 'conducted_datetime_stamp'] = experiment_dir
+            df.to_csv(experiments_file, index=False)
+
+        experiment_args = []
+        for _, row in undone_experiments.iterrows():
+            kwargs = {
+                'max_steps': max_steps,
+                'render_mode': "human" if render_env else None,
+                'real_time_rendering': real_time_rendering,
+                'visualize_mp': visualize_mp,
+                'n_sims': n_sims,
+                'max_planning_depth': max_planning_depth,
+                'show_planner_progress': show_planner_progress,
+                'plot_belief': plot_belief,
+                'row': row
+            }
+            experiment_args.append((kwargs, results_dir, position_service))
+
         with mp.Pool(n_processes) as pool:
-            results = pool.starmap(run_experiment_wrapper,
-                                 [(kwargs, results_dir, position_service)
-                                  for kwargs in experiment_kwargs_list])
+            for result in pool.imap_unordered(run_experiment_wrapper, experiment_args):
+                experiment_id, experiment_dir, success = result
+                if success:
+                    update_csv(experiment_id, experiment_dir)
+                    logging.info(f"Completed and updated experiment {experiment_id}")
+                else:
+                    logging.error(f"Failed experiment {experiment_id}")
+
     finally:
         position_service.shutdown()
 
-    return results
+    logging.info("All experiments completed")
 
 
 if __name__ == '__main__':
