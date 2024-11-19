@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from experiments_sim.block_stacking_simulator import BlockStackingSimulator, helper_camera_translation_from_ee
+from experiments_sim.block_stacking_simulator import BlockStackingSimulator
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
@@ -38,7 +38,7 @@ def help_and_update_belief(env: BlockStackingSimulator, belief: BlocksPositionsB
     # im = cv2.cvtColor(im_rgb, cv2.COLOR_RGB2BGR)
     im = im_rgb
 
-    pred_positions, annotations = position_estimator_func(im, actual_config, plane_z=0.024, max_detections=4)
+    pred_positions, annotations = position_estimator_func(im, actual_config, plane_z=0.025, max_detections=4)
 
     detections_plot = detections_plots_no_depth_as_image(annotations[0], annotations[1], pred_positions,
                                                          workspace_x_lims_default, workspace_y_lims_default,
@@ -46,8 +46,8 @@ def help_and_update_belief(env: BlockStackingSimulator, belief: BlocksPositionsB
 
     # filter positions that are outside the workspace
     pred_positions = [pos for pos in pred_positions if
-                      workspace_x_lims_default[0] < pos[0] < workspace_x_lims_default[1]
-                      and workspace_y_lims_default[0] < pos[1] < workspace_y_lims_default[1]]
+                      workspace_x_lims_default[0] - 0.01 < pos[0] < workspace_x_lims_default[1] + 0.01
+                      and workspace_y_lims_default[0] - 0.01 < pos[1] < workspace_y_lims_default[1] + 0.01]
 
     camera_position = gt.point_camera_to_world(point_camera=np.array([0, 0, 0]),
                                                robot_name="ur5e_1",

@@ -140,9 +140,9 @@ class BlockStackingSimulator:
         # the ee transform is to look into the robot tool flange. need to reverse that.
         orientation[:3] = -orientation[:3]
 
-        ee_forward_direction = orientation[:, 2]
-        ee_up_direction = orientation[:, 1]
-        ee_right_direction = orientation[:, 0]
+        ee_forward_direction = orientation.T[:, 2]
+        ee_up_direction = orientation.T[:, 1]
+        ee_right_direction = orientation.T[:, 0]
 
         position += + self.helper_camera_translation_from_ee[2] * ee_forward_direction\
                     + self.helper_camera_translation_from_ee[1] * ee_up_direction\

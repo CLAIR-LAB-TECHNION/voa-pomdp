@@ -35,10 +35,11 @@ class PositionEstimatorWrapper:
         gt = GeometryAndTransforms(dummy_env.motion_executor.motion_planner,
                                    cam_in_ee=-np.array(dummy_env.helper_camera_translation_from_ee))
         self.position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default,
-                                                              gt, "ur5e_1",
+                                                              gt,
+                                                              "ur5e_1",
                                                               dummy_env.mujoco_env.get_robot_cam_intrinsic_matrix())
 
-    def __call__(self, image, robot_config, plane_z=-0.02, return_annotations=True, detect_on_cropped=True,
+    def __call__(self, image, robot_config, plane_z, return_annotations=True, detect_on_cropped=True,
                  max_detections=5):
         return self.position_estimator.get_block_position_plane_projection(
             image, robot_config, plane_z=plane_z, return_annotations=return_annotations,

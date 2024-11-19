@@ -303,6 +303,7 @@ class ImageBlockPositionEstimator:
                       for bboxes, xyxy in zip(bboxes_in_cropped, cropped_images_xyxy)]
         else:
             bboxes, _, results = self.detector.detect_objects(images, max_detections=max_detections)
+            bboxes = [bbox.cpu().numpy() for bbox in bboxes]
 
         bboxes_centers = [(bbox[:, :2] + bbox[:, 2:]) / 2 for bbox in bboxes]
         bbox_sizes = [(bbox[:, 2:] - bbox[:, :2]) for bbox in bboxes]
