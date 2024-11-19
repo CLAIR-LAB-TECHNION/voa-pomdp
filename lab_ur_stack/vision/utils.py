@@ -108,6 +108,7 @@ def detections_plots_no_depth_as_image(cropped_image, orig_image, pred_positions
     if actual_positions is not None:
         actual_positions = np.array(actual_positions)
         axs[2].scatter(actual_positions[:, 0], actual_positions[:, 1], c="b", label="Actual")
+    axs[2].legend()
     extended_x_lim_for_plot = [ws_lim_x[0] - 0.1, ws_lim_x[1] + 0.1]
     extended_y_lim_for_plot = [ws_lim_y[0] - 0.1, ws_lim_y[1] + 0.1]
     axs[2].set_xlim(extended_x_lim_for_plot)

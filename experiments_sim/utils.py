@@ -35,7 +35,8 @@ def help_and_update_belief(env: BlockStackingSimulator, belief: BlocksPositionsB
     """
     env.clear_r2_no_motion()
     im_rgb, actual_config = env.sense_camera_r1(help_config)
-    im = cv2.cvtColor(im_rgb, cv2.COLOR_RGB2BGR)
+    # im = cv2.cvtColor(im_rgb, cv2.COLOR_RGB2BGR)
+    im = im_rgb
 
     pred_positions, annotations = position_estimator_func(im, actual_config, plane_z=0.024, max_detections=4)
 

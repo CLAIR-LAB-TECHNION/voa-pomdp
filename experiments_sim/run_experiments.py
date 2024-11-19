@@ -92,7 +92,7 @@ def _run_single_experiment(env: BlockStackingSimulator,
                                      observed_mus_and_sigmas=help_observed_mus_and_sigmas, ret_as_image=False)
 
             plt.figure(dpi=512, tight_layout=True, figsize=(5, 10))
-            plt.imshow(cv2.cvtColor(detections_im, cv2.COLOR_RGB2BGR))
+            plt.imshow(detections_im)
             plt.axis('off')
             plt.show()
     else:
@@ -143,7 +143,7 @@ def _run_single_experiment(env: BlockStackingSimulator,
 @app.command(
     context_settings={"ignore_unknown_options": True})
 def run_single_experiment_with_planner(max_steps: int = 20,
-                                       seed: int = typer.Option(41, help="for sampling initial belief and state"),
+                                       seed: int = typer.Option(42, help="for sampling initial belief and state"),
                                        min_prior_std: float = typer.Option(0.03,
                                                                            help="min prior std for block positions"),
                                        max_prior_std: float = typer.Option(0.15,
@@ -176,7 +176,7 @@ def run_single_experiment_with_planner(max_steps: int = 20,
 
     logging.info(f"Experiment dir: {experiment_dir}")
 
-    help_configs = np.load(os.path.join(os.path.dirname(__file__), "sim_help_configs.npy"))
+    help_configs = np.load(os.path.join(os.path.dirname(__file__), "configurations/sim_help_configs_50.npy"))
     help_config = help_configs[help_config_idx] if help_config_idx >= 0 else None
 
     render_mode = "human" if render_env else None
@@ -207,7 +207,7 @@ def run_single_experiment_with_planner(max_steps: int = 20,
 
     results.save(os.path.join(experiment_dir, "results.pkl"))
     if help_plot is not None:
-        cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), help_plot)
+        cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), cv2.cvtColor(help_plot, cv2.COLOR_RGB2BGR))
         # belief before help:
         b_before_help_im = plot_belief_with_history(results.belief_before_help,
                                                     actual_state=results.actual_initial_block_positions,
@@ -219,6 +219,7 @@ def run_single_experiment_with_planner(max_steps: int = 20,
         b_before_help_im = cv2.cvtColor(b_before_help_im, cv2.COLOR_RGB2BGR)
         cv2.imwrite(os.path.join(experiment_dir, "belief_before_help_im.png"), b_before_help_im)
         cv2.imwrite(os.path.join(experiment_dir, "belief_after_help_im.png"), b_after_help_im)
+
 
 class SharedPositionEstimatorClient:
     """Client for the position estimation service"""
@@ -318,7 +319,8 @@ def run_experiment_wrapper(args):
         results.save(os.path.join(experiment_dir, "results.pkl"))
 
         if help_plot is not None:
-            cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"), help_plot)
+            cv2.imwrite(os.path.join(experiment_dir, "help_detections_im.png"),
+                        cv2.cvtColor(help_plot, cv2.COLOR_RGB2BGR))
 
         return row['experiment_id'],  date_time_pid_stamp, True
 
