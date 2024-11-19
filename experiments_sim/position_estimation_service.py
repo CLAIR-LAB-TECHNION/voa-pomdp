@@ -32,8 +32,8 @@ class PositionEstimatorServer:
                 robot_config = np.ascontiguousarray(robot_config, dtype=np.float64)
 
                 positions, annotations = self.position_estimator.get_block_position_plane_projection(
-                    image, robot_config, plane_z=-0.02, return_annotations=True,
-                    detect_on_cropped=True, max_detections=5
+                    image, robot_config, plane_z=0.025, return_annotations=True,
+                    detect_on_cropped=True, max_detections=4
                 )
 
                 # Ensure all parts of result are contiguous arrays
