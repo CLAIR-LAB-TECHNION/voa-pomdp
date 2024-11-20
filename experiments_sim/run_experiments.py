@@ -177,7 +177,7 @@ def run_single_experiment_with_planner(max_steps: int = 20,
 
     logging.info(f"Experiment dir: {experiment_dir}")
 
-    help_configs = np.load(os.path.join(os.path.dirname(__file__), "configurations/sim_help_configs_50.npy"))
+    help_configs = np.load(os.path.join(os.path.dirname(__file__), "configurations/sim_help_configs_40.npy"))
     help_config = help_configs[help_config_idx] if help_config_idx >= 0 else None
 
     render_mode = "human" if render_env else None
