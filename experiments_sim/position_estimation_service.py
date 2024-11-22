@@ -1,8 +1,8 @@
 import threading
 import numpy as np
 import multiprocessing as mp
+import gc
 from multiprocessing.managers import BaseManager
-
 from experiments_sim.block_stacking_simulator import BlockStackingSimulator
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
@@ -22,24 +22,28 @@ class PositionEstimatorServer:
             gt, "ur5e_1", dummy_env.mujoco_env.get_robot_cam_intrinsic_matrix())
 
         self.lock = threading.Lock()
+        self.call_count = 0
 
     def estimate_position(self, image, robot_config):
-        """Thread-safe estimation"""
         with self.lock:
             try:
-                # Ensure contiguous arrays
-                image = np.ascontiguousarray(image, dtype=np.uint8)
-                robot_config = np.ascontiguousarray(robot_config, dtype=np.float64)
+                self.call_count += 1
+
+                image_cont = np.ascontiguousarray(image, dtype=np.uint8)
+                robot_config_cont = np.ascontiguousarray(robot_config, dtype=np.float64)
 
                 positions, annotations = self.position_estimator.get_block_position_plane_projection(
-                    image, robot_config, plane_z=0.025, return_annotations=True,
+                    image_cont, robot_config_cont, plane_z=0.025, return_annotations=True,
                     detect_on_cropped=True, max_detections=4
                 )
 
-                # Ensure all parts of result are contiguous arrays
                 positions_con = np.ascontiguousarray(positions, dtype=np.float64)
                 annotations_con = (np.ascontiguousarray(annotations[0], dtype=np.float64),
                                    np.ascontiguousarray(annotations[1], dtype=np.float64))
+
+                del image_cont, robot_config_cont, positions, annotations
+                if self.call_count % 100 == 0:
+                    gc.collect()
 
                 return positions_con, annotations_con
             except Exception as e:

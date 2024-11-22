@@ -1,6 +1,8 @@
+import gc
 import os
 import platform
 import time
+import csv
 from copy import deepcopy
 from functools import partial
 import cv2
@@ -228,22 +230,19 @@ class SharedPositionEstimatorClient:
         self.service = service
 
     def __call__(self, image, robot_config, **kwargs):
-        try:
-            image = np.ascontiguousarray(image, dtype=np.uint8)
-            robot_config = np.asarray(robot_config, dtype=np.float64)
-
-            response = self.service.estimate_position(image, robot_config)
-
-            if response is None:
-                raise RuntimeError("Position estimation failed")
-
-            pred_positions, pred_annotations = response
-            return pred_positions, pred_annotations
-        except Exception as e:
-            print(f"Error in client: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            raise RuntimeError("Position estimation failed")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                image = np.ascontiguousarray(image, dtype=np.uint8)
+                robot_config = np.asarray(robot_config, dtype=np.float64)
+                response = self.service.estimate_position(image, robot_config)
+                if response is None:
+                    raise RuntimeError("Position estimation failed")
+                return response
+            except ConnectionError:
+                if attempt == max_retries - 1:
+                    raise
+                time.sleep(1)
 
 
 def run_experiment_wrapper(args):
@@ -329,7 +328,8 @@ def run_experiment_wrapper(args):
         print(f"Process {process_id} failed with error: {str(e)}")
         return row['experiment_id'], None, False
     finally:
-        plt.close('all')  # Clean up plots
+        plt.close('all')
+        gc.collect()
 
 
 @app.command()
@@ -380,6 +380,7 @@ def run_experiments_from_list_parallel(
             idx = df['experiment_id'] == experiment_id
             df.loc[idx, 'conducted_datetime_stamp'] = experiment_dir
             df.to_csv(experiments_file, index=False)
+            del df
 
         experiment_args = []
         for _, row in undone_experiments.iterrows():
@@ -407,6 +408,9 @@ def run_experiments_from_list_parallel(
                     print(f"---Completed {n_done}/{n_init_undone} experiments in this run---")
                 else:
                     logging.error(f"Failed experiment {experiment_id}")
+
+                if n_done % 50 == 0:
+                    gc.collect()
 
     finally:
         position_service.shutdown()
