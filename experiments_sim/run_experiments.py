@@ -349,6 +349,7 @@ def run_experiments_from_list_parallel(
         plot_belief: bool = typer.Option(False, help="whether to plot belief at each step"),
         results_dir: str = typer.Option("",
                                         help="directory to save results will be saved in an internal dir with datetime stamp"),
+        batch_size: int = typer.Option(150, help="number of experiments to run before recreating worker pool"),
 ):
     if platform.system() == 'Linux':
         try:
@@ -362,11 +363,10 @@ def run_experiments_from_list_parallel(
     position_service = create_position_estimation_service()
 
     try:
-        # Read experiments file
+        # Read experiments file and setup as before
         df = pd.read_csv(experiments_file)
         logging.info(f"Loaded {len(df)} experiments from {experiments_file}")
 
-        # Filter undone experiments
         undone_experiments = df[pd.isna(df['conducted_datetime_stamp']) | (df['conducted_datetime_stamp'] == '')]
         n_init_undone = len(undone_experiments)
 
@@ -375,13 +375,13 @@ def run_experiments_from_list_parallel(
             return
 
         def update_csv(experiment_id, experiment_dir):
-            """Safely update CSV with completion status and directory"""
             df = pd.read_csv(experiments_file)
             idx = df['experiment_id'] == experiment_id
             df.loc[idx, 'conducted_datetime_stamp'] = experiment_dir
             df.to_csv(experiments_file, index=False)
             del df
 
+        # Create experiment args as before
         experiment_args = []
         for _, row in undone_experiments.iterrows():
             kwargs = {
@@ -397,20 +397,45 @@ def run_experiments_from_list_parallel(
             }
             experiment_args.append((kwargs, results_dir, position_service))
 
+        # Process in batches
         n_done = 0
-        with mp.Pool(n_processes) as pool:
-            for result in pool.imap_unordered(run_experiment_wrapper, experiment_args):
-                experiment_id, experiment_dir, success = result
-                if success:
-                    update_csv(experiment_id, experiment_dir)
-                    logging.info(f"Completed and updated experiment {experiment_id}")
-                    n_done += 1
-                    print(f"---Completed {n_done}/{n_init_undone} experiments in this run---")
-                else:
-                    logging.error(f"Failed experiment {experiment_id}")
+        for batch_start in range(0, len(experiment_args), batch_size):
+            batch_end = min(batch_start + batch_size, len(experiment_args))
+            batch_args = experiment_args[batch_start:batch_end]
 
-                if n_done % 50 == 0:
-                    gc.collect()
+            logging.info(f"Starting batch {batch_start // batch_size + 1}, "
+                         f"experiments {batch_start} to {batch_end - 1}")
+
+            with mp.Pool(n_processes) as pool:
+                iterator = pool.imap_unordered(run_experiment_wrapper, batch_args)
+                while True:
+                    try:
+                        result = next(iterator, None)
+                        if result is None:
+                            break
+
+                        experiment_id, experiment_dir, success = result
+                        if success:
+                            update_csv(experiment_id, experiment_dir)
+                            n_done += 1
+                            print(f"---Completed {n_done}/{n_init_undone} experiments in this run---")
+                        else:
+                            logging.error(f"Failed experiment {experiment_id}")
+
+                    except IndexError:
+                        logging.error("Pool iterator error, waiting before retry...")
+                        time.sleep(1)
+                        continue
+                    except Exception as e:
+                        logging.error(f"Error processing result: {str(e)}")
+                        continue
+
+            # Force cleanup after each batch
+            gc.collect()
+            logging.info(f"Completed batch {batch_start // batch_size + 1}")
+            # let pc rest a bit
+            print("Waiting 120 seconds before starting next batch")
+            time.sleep(120)
 
     finally:
         position_service.shutdown()
