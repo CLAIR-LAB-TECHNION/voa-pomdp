@@ -1,4 +1,6 @@
 import numpy as np
+from scipy.optimize import linear_sum_assignment
+
 from modeling.belief.masked_gaussian_distribution import Masked2DTruncNorm, UnnormalizedMasked2DTruncNorm
 
 
@@ -286,28 +288,33 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
 
     def _associate_detection_mus_with_blocks(self, detection_mus):
         # Calculate likelihoods for each detection across all blocks
-        per_detection_likelihoods = np.array([block_belief.pdf(detection_mus) for block_belief in self.block_beliefs])
+        per_detection_likelihoods = np.array([block_belief.pdf(detection_mus)
+                                              for block_belief in self.block_beliefs])
 
-        # Initially associate each detection with the block that has the highest likelihood
-        detections_to_blocks = np.argmax(per_detection_likelihoods, axis=0)
+        num_blocks = len(self.block_beliefs)
+        num_detections = detection_mus.shape[0] if len(detection_mus.shape) > 1 else 1
 
-        # Ensure unique association: resolve conflicts
-        unique, counts = np.unique(detections_to_blocks, return_counts=True)
-        while np.any(counts > 1):
-            for block in unique[counts > 1]:
-                # Indices of all detections currently assigned to this block
-                conflicting_detections = np.where(detections_to_blocks == block)[0]
-                best_conflicting_detection_id = np.argmax(
-                    per_detection_likelihoods[block, conflicting_detections], axis=0)
-                # Zero out likelihoods for all other blocks for this detection
-                conflicting_detections_without_best = np.setdiff1d(
-                    conflicting_detections, best_conflicting_detection_id)
-                per_detection_likelihoods[block, conflicting_detections_without_best] = 0
-                # now reassign the conflicting detections to the second-best block, which is now the best
-                # one in the table
-                detections_to_blocks[conflicting_detections_without_best] = np.argmax(
-                    per_detection_likelihoods[:, conflicting_detections_without_best], axis=0)
+        # Handle single detection case
+        if num_detections == 1:
+            per_detection_likelihoods = per_detection_likelihoods.reshape(-1, 1)
 
-            unique, counts = np.unique(detections_to_blocks, return_counts=True)
+        # Convert likelihoods to costs (negative log-likelihood)
+        # Add small epsilon to avoid log(0)
+        epsilon = 1e-10
+        cost_matrix = -np.log(per_detection_likelihoods + epsilon)
+
+        # Pad cost matrix if necessary
+        if num_detections < num_blocks:
+            padding = np.full((num_blocks, num_blocks - num_detections), np.max(cost_matrix) + 1)
+            cost_matrix = np.hstack((cost_matrix, padding))
+
+        # Apply Hungarian algorithm
+        block_indices, detection_indices = linear_sum_assignment(cost_matrix)
+
+        # Create output array mapping detections to blocks
+        detections_to_blocks = np.zeros(num_detections, dtype=int)
+        for block_idx, detection_idx in zip(block_indices, detection_indices):
+            if detection_idx < num_detections:  # Ignore padded assignments
+                detections_to_blocks[detection_idx] = block_idx
 
         return detections_to_blocks
