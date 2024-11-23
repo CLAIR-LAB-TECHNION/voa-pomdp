@@ -1,7 +1,7 @@
 import numpy as np
 import logging
 
-from modeling.pomdp_problem.domain.action import ActionBase, ActionSense, ActionAttemptStack
+from modeling.pomdp_problem.domain.action import ActionBase, ActionSense, ActionAttemptStack, DummyAction
 from modeling.pomdp_problem.domain.observation import ObservationBase, ObservationReachedTerminal, \
     ObservationSenseResult, ObservationStackAttemptResult
 from multi_mujoco.mujoco_env.voa_world import WorldVoA
@@ -56,6 +56,8 @@ class BlockStackingSimulator:
 
         self.helper_camera_translation_from_ee = helper_camera_translation_from_ee
 
+        self.last_action_was_dummy = False
+
 
     def reset(self, block_positions):
         logging.info(f"resetting with block_positions: {block_positions}")
@@ -68,6 +70,7 @@ class BlockStackingSimulator:
         self.n_picked_blocks = 0
         self.current_robot_position = self.get_r2_xy()
         self.motion_executor.wait(1)
+        self.last_action_was_dummy = False
 
     def step(self, action: ActionBase) -> tuple[ObservationBase, float]:
         if self.steps >= self.max_steps:
@@ -82,6 +85,15 @@ class BlockStackingSimulator:
         self.steps += 1
         steps_left = self.max_steps - self.steps
         reward = 0
+
+        if isinstance(action, DummyAction):
+            logging.warning("Dummy action is performed")
+            if self.last_action_was_dummy:
+                print("dummy action is performed twice in a row... ending the episode")
+                return ObservationReachedTerminal(), 0
+            self.last_action_was_dummy = True
+        else:
+            self.last_action_was_dummy = False
 
         if isinstance(action, ActionSense):
             occupied = self.motion_executor.sense_for_block(agent='ur5e_2',
