@@ -21,6 +21,7 @@ from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositio
 from lab_ur_stack.vision.utils import detections_plots_no_depth_as_image
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.policies.abstract_policy import AbastractPolicy
+from modeling.policies.hand_made_policy import HandMadePolicy
 from modeling.policies.pouct_planner_policy import POUCTPolicy
 import logging
 from modeling.pomdp_problem.domain.observation import ObservationReachedTerminal
@@ -285,18 +286,23 @@ def run_experiment_wrapper(args):
         help_config = np.array(eval(row['help_config']))
 
     # Create policy
-    policy = POUCTPolicy(
-        initial_belief=init_block_belief,
-        max_steps=kwargs_dict['max_steps'],
-        tower_position=goal_tower_position,
-        max_planning_depth=kwargs_dict['max_planning_depth'],
-        num_sims=kwargs_dict['n_sims'],
-        show_progress=kwargs_dict.get('show_planner_progress', False),
-        stacking_reward=env.stacking_reward,
-        sensing_cost_coeff=env.sensing_cost_coeff,
-        stacking_cost_coeff=env.stacking_cost_coeff,
-        finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff
-    )
+    if kwargs_dict['policy_type'] == "pouct":
+        policy = POUCTPolicy(
+            initial_belief=init_block_belief,
+            max_steps=kwargs_dict['max_steps'],
+            tower_position=goal_tower_position,
+            max_planning_depth=kwargs_dict['max_planning_depth'],
+            num_sims=kwargs_dict['n_sims'],
+            show_progress=kwargs_dict.get('show_planner_progress', False),
+            stacking_reward=env.stacking_reward,
+            sensing_cost_coeff=env.sensing_cost_coeff,
+            stacking_cost_coeff=env.stacking_cost_coeff,
+            finish_ahead_of_time_reward_coeff=env.finish_ahead_of_time_reward_coeff
+        )
+    elif kwargs_dict['policy_type'] == "hand_made":
+        policy = HandMadePolicy()
+    else:
+        raise ValueError(f"Unknown policy type: {kwargs_dict['policy_type']}")
 
     position_estimator_func = SharedPositionEstimatorClient(position_service)
 
@@ -338,6 +344,9 @@ def run_experiments_from_list_parallel(
         experiments_file: str = typer.Option("experiments_sim/configurations/experiments_planner_2000.csv",
                                              help="file with list of experiment to draw from and write to"),
         max_steps: int = 20,
+        policy_type: str = typer.Option("pouct", help="policy type to use for the experiments,"
+                                                      " pouct or hand_made. If hand_made is chosen the parameters"
+                                                      "n_sims, max_planning_depth have no meaning "),
         n_sims: int = typer.Option(2000, help="number of simulations for POUCT planner"),
         max_planning_depth: int = typer.Option(5,
                                                help="max planning depth for POUCT planner both for rollout and tree"),
@@ -386,6 +395,7 @@ def run_experiments_from_list_parallel(
         for _, row in undone_experiments.iterrows():
             kwargs = {
                 'max_steps': max_steps,
+                'policy_type': policy_type,
                 'render_mode': "human" if render_env else None,
                 'real_time_rendering': real_time_rendering,
                 'visualize_mp': visualize_mp,
