@@ -19,7 +19,8 @@ def sample_belief(n_blocks, min_std, max_std, ws_x_lims, ws_y_lims, min_distance
                 block_pos_mu.append(mu)
                 break
     block_pos_mu = np.array(block_pos_mu)
-    block_pos_sigma = np.random.uniform(low=min_std, high=max_std, size=(n_blocks, 2))
+    block_pos_sigma = np.random.beta(a=1.5, b=10, size=(n_blocks, 2))  # b>a skews to lower values
+    block_pos_sigma = min_std + block_pos_sigma * (max_std - min_std)
     return BlocksPositionsBelief(n_blocks, ws_x_lims, ws_y_lims, init_mus=block_pos_mu, init_sigmas=block_pos_sigma)
 
 
@@ -107,6 +108,68 @@ def generate_experiments(
     help_configs_file = f"{output_file}_{n_blocks}_blocks_help_configs.npy"
     np.save(help_configs_file, help_configs)
     print(f"Helper configurations saved to {help_configs_file}")
+
+
+@app.command(context_settings={"ignore_unknown_options": True})
+def generate_extension_list_beliefs(
+        n_new_beliefs: int = typer.Option(5, help="Number of new beliefs to sample"),
+        original_list_file: str = typer.Option(prompt=True),
+        output_file: str = typer.Option("experiments_extensions.csv", help="Output file name (without extension)"),
+        n_blocks: int = typer.Option(4, help="Number of blocks in the experiment"),
+        min_std: float = typer.Option(0.01, help="Minimum standard deviation for belief sampling"),
+        max_std: float = typer.Option(1., help="Maximum standard deviation for belief sampling")
+):
+    print(f"Loading original list from {original_list_file}")
+    # Load original list
+    original_list = pd.read_csv(original_list_file)
+    # Take all the rows with belief_idx 0
+    chunk_list = original_list[original_list['belief_idx'] == 0]
+    print(f"creating {len(chunk_list) * n_new_beliefs} experiments for {n_new_beliefs} new beliefs")
+
+    # Create an empty list to store all new rows
+    all_new_rows = []
+
+    base_experiment_id = original_list['experiment_id'].max() + 1
+    # Sample new beliefs and add them to the original list
+    for belief_idx in range(n_new_beliefs):
+        new_belief = sample_belief(n_blocks=n_blocks, min_std=min_std, max_std=max_std,
+                                   ws_x_lims=workspace_x_lims_default, ws_y_lims=workspace_y_lims_default)
+        new_belief_mus = [[b.mu_x, b.mu_y] for b in new_belief.block_beliefs]
+        new_belief_sigmas = [[b.sigma_x, b.sigma_y] for b in new_belief.block_beliefs]
+
+        # Create new rows for this belief
+        new_rows = chunk_list.copy()
+        new_rows['belief_idx'] = len(original_list['belief_idx'].unique()) + belief_idx
+        # Convert lists to strings to store in DataFrame
+        new_rows['belief_mus'] = str(new_belief_mus)
+        new_rows['belief_sigmas'] = str(new_belief_sigmas)
+        new_rows['conducted_datetime_stamp'] = ''
+
+        # Update experiment_ids for this chunk
+        new_rows['experiment_id'] = range(base_experiment_id, base_experiment_id + len(new_rows))
+        base_experiment_id += len(new_rows)  # Update base_experiment_id for next iteration
+
+        all_new_rows.append(new_rows)
+
+    # result is just the new rows:
+    result = pd.concat(all_new_rows)
+
+    # Save to CSV
+    result.to_csv(output_file, index=False)
+    print(f"Experiments list saved to {output_file}")
+
+
+@app.command(context_settings={"ignore_unknown_options": True})
+def merge_new_experiments_to_list(original_list_path: str = typer.Option(prompt=True),
+                                  new_list: str = typer.Option(prompt=True)):
+    original_list = pd.read_csv(original_list_path)
+    new_list = pd.read_csv(new_list)
+
+    # Concatenate the two lists
+    result = pd.concat([original_list, new_list])
+
+    result.to_csv(original_list_path, index=False)
+    print(f"Experiments list saved to {original_list_path}")
 
 
 if __name__ == "__main__":

@@ -191,7 +191,8 @@ def run_single_experiment_with_planner(max_steps: int = 20,
     block_pos_mu = np.random.uniform(low=[workspace_x_lims_default[0], workspace_y_lims_default[0]],
                                      high=[workspace_x_lims_default[1], workspace_y_lims_default[1]],
                                      size=(n_blocks, 2))
-    block_pos_sigma = np.random.uniform(low=min_prior_std, high=max_prior_std, size=(n_blocks, 2))
+    block_pos_sigma = np.random.beta(a=1.5, b=10, size=(n_blocks, 2))  # b>a skews to lower values
+    block_pos_sigma = min_prior_std + block_pos_sigma * (max_prior_std - min_prior_std)
     init_block_belief = BlocksPositionsBelief(n_blocks, workspace_x_lims_default, workspace_y_lims_default,
                                               init_mus=block_pos_mu, init_sigmas=block_pos_sigma)
     init_block_positions = sample_block_positions_from_dists(init_block_belief.block_beliefs, min_dist=0.08)
