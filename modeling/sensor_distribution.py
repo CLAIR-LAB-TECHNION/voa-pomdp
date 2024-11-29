@@ -1,44 +1,71 @@
 import numpy as np
 
 
-def detections_to_distributions(detected_positions,
-                                camera_position,
-                                minimal_std=0.005,  # 0.5 cm
-                                distance_coeff=0.02,  # 2 cm added for distance of 1m
-                                n_blocks_coeff=0.002,  # each block adds 0.2 cm
-                                inverse_nearest_block_coeff=0.0005  # block at 10 cm adds 0.5 cm
-                                ):
+def compute_position_stds(detected_positions, camera_position, minimal_std=0.005,
+                          distance_coeff=0.02, n_blocks_coeff=0.002,
+                          inverse_nearest_block_coeff=0.0005):
     """
-    Converts detected block positions to block position distributions
-    the distribution is Gaussian with expectation at detected positions and
-    variance that is based on minimal_std and is increased based on the distance
-    of the camera from detections (distance_coeff), total num of blocks (n_blocks_coeff)
-    and distance of nearest block (inverse_nearest_block_coeff)
+    Computes standard deviations for block position distributions based on various factors:
+    - minimal_std: base standard deviation (0.5 cm)
+    - distance_coeff: increase based on camera distance (2 cm per 1m)
+    - n_blocks_coeff: increase based on total number of blocks (0.2 cm per block)
+    - inverse_nearest_block_coeff: increase based on nearest block distance (0.5 cm at 10 cm)
 
-    returns expectations [(mu_x, mu_y), ...] and stds [(std_x, std_y), ...]
+    Args:
+        detected_positions: numpy array of shape (n_blocks, 2) or (n_blocks, 3)
+        camera_position: position of the camera (x, y)
+        minimal_std: base standard deviation
+        distance_coeff: coefficient for camera distance impact
+        n_blocks_coeff: coefficient for number of blocks impact
+        inverse_nearest_block_coeff: coefficient for nearest block distance impact
+
+    Returns:
+        numpy array of shape (n_blocks, 2) containing std_x and std_y for each block
     """
-    if len(detected_positions) == 0:
-        return [], []
-
-    expectations = np.asarray(detected_positions)
-    detected_positions = np.asarray(detected_positions)
-
     n_blocks = len(detected_positions)
     stds = np.full((n_blocks, 2), minimal_std)
+
+    # Add std based on number of blocks
     stds += n_blocks_coeff * (n_blocks - 1)
 
+    # Add std based on nearest block distance
     if n_blocks > 1:
         blocks_distances_matrix = np.linalg.norm(detected_positions[:, None] - detected_positions[None, :], axis=-1)
         np.fill_diagonal(blocks_distances_matrix, np.inf)
         nearest_block_distances = np.min(blocks_distances_matrix, axis=1)
         stds += inverse_nearest_block_coeff * nearest_block_distances[:, None]
 
-    # detected_positions_3d = np.concatenate([detected_positions, np.zeros((n_blocks, 1))], axis=-1)
+    # Add std based on camera distance
     camera_distances = np.linalg.norm(detected_positions - camera_position, axis=-1)
     stds += distance_coeff * camera_distances[:, None]
 
+    return stds
+
+
+def detections_to_distributions(detected_positions,
+                                camera_position,
+                                minimal_std=0.005,
+                                distance_coeff=0.02,
+                                n_blocks_coeff=0.002,
+                                inverse_nearest_block_coeff=0.0005):
+    """
+    Converts detected block positions to block position distributions
+    the distribution is Gaussian with expectation at detected positions and
+    variance that is based on minimal_std and is increased based on the distance
+    of the camera from detections (distance_coeff), total num of blocks (n_blocks_coeff)
+    and distance of nearest block (inverse_nearest_block_coeff)
+    returns expectations [(mu_x, mu_y), ...] and stds [(std_x, std_y), ...]
+    """
+    if len(detected_positions) == 0:
+        return [], []
+
+    expectations = np.asarray(detected_positions)
     # expectations are only x,y:
     expectations = expectations[:, :2]
+
+    stds = compute_position_stds(detected_positions, camera_position,
+                                 minimal_std, distance_coeff,
+                                 n_blocks_coeff, inverse_nearest_block_coeff)
 
     return expectations, stds
 

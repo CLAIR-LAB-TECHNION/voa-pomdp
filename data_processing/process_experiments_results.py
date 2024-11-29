@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import typer
 from experiments_lab.experiment_results_data import ExperimentResults
+from lab_ur_stack.utils.workspace_utils import workspace_y_lims_default, workspace_x_lims_default
+from modeling.belief.block_position_belief import BlocksPositionsBelief
 from modeling.pomdp_problem.domain.observation import ObservationStackAttemptResult
 
 app = typer.Typer()
@@ -66,6 +68,103 @@ def process_experiment_results_to_table(
 
     # save the table:
     experiments_list.to_csv(output_file, index=False)
+
+
+def experiments_results_to_empirical_vd_table(experiment_results_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Given experiments results df, generate a df where for each experiment there added a value difference column
+    where it's the difference between the accumulated rewards in that experiment and the accumulated rewards
+    in the same state and belief but without help. All original columns are preserved.
+    """
+    value_diff_results = []
+    base_df = experiment_results_df[experiment_results_df['help_config_idx_local'] == -1]
+
+    for _, baseline_row in base_df.iterrows():
+        belief_idx = baseline_row['belief_idx']
+        state_idx = baseline_row['state_idx']
+        baseline_reward = baseline_row['accumulated_rewards']
+
+        filtered_rows = experiment_results_df[
+            (experiment_results_df['state_idx'] == state_idx) &
+            (experiment_results_df['belief_idx'] == belief_idx) &
+            (experiment_results_df['help_config_idx_local'] != -1)
+            ]
+
+        for _, row in filtered_rows.iterrows():
+            # Create a new dictionary with all columns from the original row
+            result_dict = row.to_dict()
+            # Add the value difference
+            result_dict['value_diff'] = row['accumulated_rewards'] - baseline_reward
+            value_diff_results.append(result_dict)
+
+    return pd.DataFrame(value_diff_results)
+
+
+def add_state_likelihood_column(vd_table: pd.DataFrame) -> pd.DataFrame:
+    """
+    Given any dataframe with a belief columns and state columns, add a column with the likelihood of each
+     state in the belief. perform the operation in place.
+    """
+    # Get unique belief-state combinations
+    unique_pairs = vd_table.groupby(['belief_idx', 'state_idx']).first()
+
+    # Calculate probabilities for unique pairs
+    probability_map = {}
+    for (belief_idx, state_idx), row in unique_pairs.iterrows():
+        belief_mu = eval(row['belief_mus'])
+        belief_sigma = eval(row['belief_sigmas'])
+        belief = BlocksPositionsBelief(
+            len(belief_mu),
+            workspace_x_lims_default,
+            workspace_y_lims_default,
+            init_mus=belief_mu,
+            init_sigmas=belief_sigma
+        )
+        state = eval(row['state'])
+        probability_map[(belief_idx, state_idx)] = belief.state_pdf(state)
+
+    # Map probabilities to all rows using the precomputed values
+    vd_table['state_likelihood'] = vd_table.apply(
+        lambda row: probability_map[(row['belief_idx'], row['state_idx'])],
+        axis=1
+    )
+
+    return vd_table
+
+
+def vd_table_to_empirical_voa_table(vd_table: pd.DataFrame) -> pd.DataFrame:
+    """
+    Given a value difference table, generate a table where each row corresponds to a belief-helpconfig pair
+    and there's a column for empirical VOA which is the expected value diff over all states
+    (weighted by the likelihood of each state)
+    """
+    # check that the state probabilities are already calculated
+    if 'state_likelihood' not in vd_table.columns:
+        vd_table = add_state_likelihood_column(vd_table)
+
+    voa_results = []
+    for (belief_idx, help_config_idx), group in vd_table.groupby(['belief_idx', 'help_config_idx_local']):
+        # compute the empirical voa
+        weights = group['state_likelihood']
+        weights /= weights.sum()
+        value_diffs = group['value_diff']
+        empirical_voa = np.sum(weights * value_diffs)[0]
+
+        # compute empirical population variance
+        empirical_population_variance = np.sum(weights * (value_diffs - empirical_voa) ** 2)[0]
+
+
+        voa_results.append({
+            'belief_idx': belief_idx,
+            'help_config_idx_local': help_config_idx,
+            'belief_mus': group['belief_mus'].iloc[0],
+            'belief_sigmas': group['belief_sigmas'].iloc[0],
+            'help_config': group['help_config'].iloc[0],
+            'empirical_voa': empirical_voa,
+            'empirical_voa_population_variance': empirical_population_variance
+        })
+
+    return pd.DataFrame(voa_results)
 
 
 @app.command()

@@ -235,7 +235,7 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
 
         # first associate each detection with a block
         # right now for simplicity each detection is associated with the block that has the highest likelihood
-        detections_to_blocks = self._associate_detection_mus_with_blocks(detection_mus)
+        detections_to_blocks = self._associate_positions_with_block_distributions(detection_mus)
 
         for i in range(len(detections_to_blocks)):
             self.update_belief_block_from_detection(detections_to_blocks[i],
@@ -286,13 +286,17 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
 
         block_belief.update_parameters(updated_mu_x, updated_sigma_x, updated_mu_y, updated_sigma_y)
 
-    def _associate_detection_mus_with_blocks(self, detection_mus):
+    def _associate_positions_with_block_distributions(self, positions):
+        """
+        given positions of blocks, associate each position with a block distribution such that the likelihood of the
+        position is the highest. (using hungarian algorithm)
+        """
         # Calculate likelihoods for each detection across all blocks
-        per_detection_likelihoods = np.array([block_belief.pdf(detection_mus)
+        per_detection_likelihoods = np.array([block_belief.pdf(positions)
                                               for block_belief in self.block_beliefs])
 
         num_blocks = len(self.block_beliefs)
-        num_detections = detection_mus.shape[0] if len(detection_mus.shape) > 1 else 1
+        num_detections = positions.shape[0] if len(positions.shape) > 1 else 1
 
         # Handle single detection case
         if num_detections == 1:
@@ -318,3 +322,22 @@ class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
                 detections_to_blocks[detection_idx] = block_idx
 
         return detections_to_blocks
+
+    def state_pdf(self, state):
+        """
+        compute state likelihood assuming block positions are independent (as we always assume).
+        state is list of block positions.
+        each block position is associated with a block distribution in the belief such that the likelihood of the state
+        is the highest. (using hungarian algorithm)
+        """
+        state = np.asarray(state)
+
+        # associate each block position with a block distribution
+        block_indices = self._associate_positions_with_block_distributions(state)
+
+        # calculate the likelihood of the state
+        likelihood = 1
+        for i, block_idx in enumerate(block_indices):
+            likelihood *= self.block_beliefs[block_idx].pdf(state[i])
+
+        return likelihood
