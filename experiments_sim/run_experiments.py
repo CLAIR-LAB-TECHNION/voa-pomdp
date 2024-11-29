@@ -20,7 +20,7 @@ from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTran
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
 from lab_ur_stack.vision.utils import detections_plots_no_depth_as_image
 from modeling.belief.block_position_belief import BlocksPositionsBelief
-from modeling.policies.abstract_policy import AbastractPolicy
+from modeling.policies.abstract_policy import AbstractPolicy
 from modeling.policies.hand_made_policy import HandMadePolicy
 from modeling.policies.pouct_planner_policy import POUCTPolicy
 import logging
@@ -51,7 +51,7 @@ class PositionEstimatorWrapper:
 
 
 def _run_single_experiment(env: BlockStackingSimulator,
-                           policy: AbastractPolicy,
+                           policy: AbstractPolicy,
                            init_block_positions,
                            init_block_belief: BlocksPositionsBelief,
                            help_config=None,

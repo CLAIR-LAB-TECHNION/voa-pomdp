@@ -5,11 +5,11 @@ from modeling.pomdp_problem.agent.agent import Agent
 from modeling.pomdp_problem.domain.action import *
 from modeling.pomdp_problem.domain.observation import *
 from modeling.belief.block_position_belief import BlocksPositionsBelief
-from modeling.policies.abstract_policy import AbastractPolicy
+from modeling.policies.abstract_policy import AbstractPolicy
 from modeling.pomdp_problem.models.policy_model import BeliefModel
 
 
-class POUCTPolicy(AbastractPolicy):
+class POUCTPolicy(AbstractPolicy):
     def __init__(self,
                  initial_belief: BlocksPositionsBelief,
                  max_steps: int,

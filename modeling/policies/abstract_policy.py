@@ -5,7 +5,7 @@ from modeling.pomdp_problem.domain.observation import *
 from modeling.belief.block_position_belief import BlocksPositionsBelief
 
 
-class AbastractPolicy:
+class AbstractPolicy:
     def __init__(self, ):
         pass
 

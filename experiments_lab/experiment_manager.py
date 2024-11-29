@@ -20,7 +20,7 @@ from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot
     detections_plots_with_depth_as_image
 from modeling.belief.belief_plotting import plot_all_blocks_beliefs
 from modeling.belief.block_position_belief import BlockPosDist, BlocksPositionsBelief
-from modeling.policies.abstract_policy import AbastractPolicy
+from modeling.policies.abstract_policy import AbstractPolicy
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
 from modeling.pomdp_problem.domain.observation import ObservationReachedTerminal, ObservationSenseResult, \
     ObservationStackAttemptResult
@@ -35,7 +35,7 @@ default_rewards = frozendict(stacking_reward=1,
 class ExperimentManager:
     cleared_blocks_position = [-0.25, -1.15]
 
-    def __init__(self, env: LabBlockStackingEnv, policy: AbastractPolicy, visualize=True):
+    def __init__(self, env: LabBlockStackingEnv, policy: AbstractPolicy, visualize=True):
         self.env = env
         self.policy = policy
 

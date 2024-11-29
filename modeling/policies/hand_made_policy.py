@@ -4,11 +4,11 @@ import numpy as np
 from modeling.pomdp_problem.domain.action import *
 from modeling.pomdp_problem.domain.observation import *
 from modeling.belief.block_position_belief import BlocksPositionsBelief
-from modeling.policies.abstract_policy import AbastractPolicy
+from modeling.policies.abstract_policy import AbstractPolicy
 from modeling.belief.masked_gaussian_distribution import Masked2DTruncNorm
 
 
-class HandMadePolicy(AbastractPolicy):
+class HandMadePolicy(AbstractPolicy):
     def __init__(self,
                  square_half_size_for_cdf=0.015,
                  confidence_for_stack=0.6,
