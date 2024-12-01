@@ -445,8 +445,8 @@ def run_experiments_from_list_parallel(
             gc.collect()
             logging.info(f"Completed batch {batch_start // batch_size + 1}")
             # let pc rest a bit
-            print("Waiting 120 seconds before starting next batch")
-            time.sleep(120)
+            print("Waiting 60 seconds before starting next batch")
+            time.sleep(60)
 
     finally:
         position_service.shutdown()

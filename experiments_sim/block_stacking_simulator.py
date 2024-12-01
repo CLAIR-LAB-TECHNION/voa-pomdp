@@ -92,6 +92,9 @@ class BlockStackingSimulator:
                 print("dummy action is performed twice in a row... ending the episode")
                 return ObservationReachedTerminal(), 0
             self.last_action_was_dummy = True
+            return ObservationSenseResult(is_occupied=False,
+                                          robot_position=self.current_robot_position,
+                                          steps_left=steps_left), 0
         else:
             self.last_action_was_dummy = False
 
