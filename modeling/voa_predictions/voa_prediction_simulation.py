@@ -104,17 +104,21 @@ def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, 
     for i, s in enumerate(states):
         print(f'Simulating state {i + 1}/{len(states)}') if print_progress else None
 
+        reward_no_help = rollout_episode(deepcopy(belief), policy, s)
+
         belief_with_help = deepcopy(belief)
         observed_detection_mus, observed_detection_sigmas = sample_observation_fov_based(
-            s, help_config, gt, cam_intrinsic_matrix)
+            s, help_config, gt, cam_intrinsic_matrix, detection_probability=1.0)
         if len(observed_detection_mus) == 0:
             states_value_diffs.append(0)
+            states_values_no_help.append(reward_no_help)
+            states_values_with_help.append(reward_no_help)
             continue
+
         belief_with_help.update_from_image_detections_position_distribution(
             observed_detection_mus, observed_detection_sigmas)
 
         reward_with_help = rollout_episode(belief_with_help, policy, s)
-        reward_no_help = rollout_episode(deepcopy(belief), policy, s)
 
         states_values_no_help.append(reward_no_help)
         states_values_with_help.append(reward_with_help)

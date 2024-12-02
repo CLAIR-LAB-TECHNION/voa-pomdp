@@ -95,6 +95,7 @@ def experiments_results_to_empirical_vd_table(experiment_results_df: pd.DataFram
             result_dict = row.to_dict()
             # Add the value difference
             result_dict['value_diff'] = row['accumulated_rewards'] - baseline_reward
+            result_dict['baseline_value'] = baseline_reward
             value_diff_results.append(result_dict)
 
     return pd.DataFrame(value_diff_results)
@@ -148,7 +149,9 @@ def vd_table_to_empirical_voa_table(vd_table: pd.DataFrame) -> pd.DataFrame:
         weights = group['state_likelihood']
         weights /= weights.sum()
         value_diffs = group['value_diff']
+        base_values = group['baseline_value']
         empirical_voa = np.sum(weights * value_diffs)[0]
+        empirical_baseline = np.sum(weights * base_values)[0]
 
         # compute empirical population variance
         empirical_population_variance = np.sum(weights * (value_diffs - empirical_voa) ** 2)[0]
@@ -161,7 +164,8 @@ def vd_table_to_empirical_voa_table(vd_table: pd.DataFrame) -> pd.DataFrame:
             'belief_sigmas': group['belief_sigmas'].iloc[0],
             'help_config': group['help_config'].iloc[0],
             'empirical_voa': empirical_voa,
-            'empirical_voa_population_variance': empirical_population_variance
+            'empirical_voa_population_variance': empirical_population_variance,
+            'empirical_baseline_value': empirical_baseline
         })
 
     return pd.DataFrame(voa_results)
