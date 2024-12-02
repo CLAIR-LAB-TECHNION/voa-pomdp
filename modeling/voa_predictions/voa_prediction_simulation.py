@@ -137,54 +137,74 @@ def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, 
 def predict_voa_with_sampled_states_parallel(belief: BlocksPositionsBelief, help_config, policy: AbstractPolicy,
                                              states, states_likelihoods, gt: GeometryAndTransforms,
                                              cam_intrinsic_matrix,
-                                             print_progress=False, n_processes=None) -> float:
-    """
-    Predict the VOA based on the given belief, help_config, policy and use the already sampled states
-    Now with parallel processing support
-    """
-    if n_processes is None:
-        n_processes = mp.cpu_count()
+                                             detection_probability=0.95, margin_in_pixels=10,
+                                             print_progress=False, n_processes=2) -> (float, float, float):
+    from collections import namedtuple
+    ObservedState = namedtuple('ObservedState', ['state', 'belief_with_help'])
 
-    states_value_diffs = []
-    valid_states = []
-    valid_likelihoods = []
+    # Process observations sequentially and prepare states for parallel rollouts
+    states_for_rollout = []  # Will contain None for no-observation states, or ObservedState for states with observations
 
-    # Process the observations sequentially
-    for i, s in enumerate(states):
+    for i, state in enumerate(states):
         print(f'Processing observations for state {i + 1}/{len(states)}') if print_progress else None
 
         observed_detection_mus, observed_detection_sigmas = sample_observation_fov_based(
-            s, help_config, gt, cam_intrinsic_matrix)
+            state, help_config, gt, cam_intrinsic_matrix,
+            detection_probability=detection_probability,
+            margin_in_pixels=margin_in_pixels)
 
         if len(observed_detection_mus) == 0:
-            states_value_diffs.append(0)
+            states_for_rollout.append(None)
             continue
 
         belief_with_help = deepcopy(belief)
         belief_with_help.update_from_image_detections_position_distribution(
             observed_detection_mus, observed_detection_sigmas)
-
-        valid_states.append((s, belief_with_help))
-        valid_likelihoods.append(states_likelihoods[i])
+        states_for_rollout.append(ObservedState(state, belief_with_help))
 
     if print_progress:
         print(f'Running parallel rollouts with {n_processes} processes')
 
+    # Prepare parallel tasks
+    parallel_tasks = []
+
+    for i, state_info in enumerate(states_for_rollout):
+        if state_info is None:
+            # For no-observation states, just one rollout without help
+            parallel_tasks.append((deepcopy(belief), deepcopy(policy), states[i]))
+        else:
+            # For states with observations, add both with-help and without-help rollouts
+            parallel_tasks.append((state_info.belief_with_help, deepcopy(policy), state_info.state))
+            parallel_tasks.append((deepcopy(belief), deepcopy(policy), state_info.state))
+
+    # Run all rollouts in parallel
     with mp.Pool(processes=n_processes) as pool:
-        # Run both rollouts for each state in parallel
-        results = pool.starmap(rollout_episode,
-                               [(belief_copy, policy, state) for state, belief_copy in valid_states] +  # with help
-                               [(belief, policy, state) for state, _ in valid_states])  # without help
+        all_rewards = pool.starmap(rollout_episode, parallel_tasks)
 
-        # Split results into with_help and without_help
-        n = len(valid_states)
-        rewards_with_help = results[:n]
-        rewards_without_help = results[n:]
+    # Process results into final format
+    final_results = []
+    reward_idx = 0
 
-        # Calculate differences
-        states_value_diffs.extend([r1 - r2 for r1, r2 in zip(rewards_with_help, rewards_without_help)])
+    for state_info in states_for_rollout:
+        if state_info is None:
+            # For no-observation states, reward is the same for both cases
+            reward = all_rewards[reward_idx]
+            final_results.append((0, reward, reward))
+            reward_idx += 1
+        else:
+            # For states with observations, get both rewards
+            reward_with_help = all_rewards[reward_idx]
+            reward_no_help = all_rewards[reward_idx + 1]
+            final_results.append((reward_with_help - reward_no_help,
+                                  reward_no_help,
+                                  reward_with_help))
+            reward_idx += 2
 
+    # Calculate weighted averages
+    value_diffs, values_no_help, values_with_help = zip(*final_results)
     weights = np.asarray(states_likelihoods)
     weights /= np.sum(weights)
 
-    return np.dot(states_value_diffs, weights)[0]
+    return (np.dot(value_diffs, weights)[0],
+            np.dot(values_no_help, weights)[0],
+            np.dot(values_with_help, weights)[0])
