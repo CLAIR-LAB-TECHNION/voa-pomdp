@@ -108,7 +108,7 @@ def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, 
 
         belief_with_help = deepcopy(belief)
         observed_detection_mus, observed_detection_sigmas = sample_observation_fov_based(
-            s, help_config, gt, cam_intrinsic_matrix, detection_probability=1.0)
+            s, help_config, gt, cam_intrinsic_matrix, detection_probability=1.0, margin_in_pixels=0)
         if len(observed_detection_mus) == 0:
             states_value_diffs.append(0)
             states_values_no_help.append(reward_no_help)
