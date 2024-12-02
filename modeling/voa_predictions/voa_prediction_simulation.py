@@ -84,6 +84,7 @@ def rollout_episode(belief: BlocksPositionsBelief, policy: AbstractPolicy, state
 
 def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, policy: AbstractPolicy,
                                     states, states_likelihoods, gt: GeometryAndTransforms, cam_intrinsic_matrix,
+                                    detection_probability=0.95, margin_in_pixels=10,
                                     print_progress=False) -> (float, float, float):
     """
     Predict the VOA based on the given belief, help_config, policy and use the already sampled states
@@ -108,7 +109,8 @@ def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, 
 
         belief_with_help = deepcopy(belief)
         observed_detection_mus, observed_detection_sigmas = sample_observation_fov_based(
-            s, help_config, gt, cam_intrinsic_matrix, detection_probability=1.0, margin_in_pixels=0)
+            s, help_config, gt, cam_intrinsic_matrix, detection_probability=detection_probability,
+            margin_in_pixels=margin_in_pixels)
         if len(observed_detection_mus) == 0:
             states_value_diffs.append(0)
             states_values_no_help.append(reward_no_help)
