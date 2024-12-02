@@ -27,7 +27,7 @@ def sample_observation_fov_based(block_pos_state,
     """
     plane_z = 0.025
 
-    block_pos_3d = np.concatenate([block_pos_state, 0.025 * np.ones((len(block_pos_state), 1))], axis=1)
+    block_pos_3d = np.concatenate([block_pos_state, plane_z * np.ones((len(block_pos_state), 1))], axis=1)
     blocks_in_fov = in_r1_fov(block_pos_3d, help_config, gt, cam_intrinsic_matrix, margin_in_pixels=margin_in_pixels)
 
     # block that are in fov are detected with a probability of detection_probability
@@ -44,7 +44,7 @@ def sample_observation_fov_based(block_pos_state,
     # add std computation to external func? and add that noise to detection
     detected_blocks_positions_3d = np.concatenate([detected_blocks_positions,
                                                    plane_z * np.ones((len(detected_blocks_positions), 1))], axis=1)
-    noise_stds = compute_position_stds(detected_blocks_positions_3d, camera_position)
+    # noise_stds = compute_position_stds(detected_blocks_positions_3d, camera_position)
     # detected_blocks_positions += np.random.randn(*detected_blocks_positions.shape) * noise_stds
 
     return detections_to_distributions(detected_blocks_positions_3d, camera_position)
