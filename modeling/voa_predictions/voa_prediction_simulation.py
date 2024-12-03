@@ -16,6 +16,7 @@ from modeling.policies.pouct_planner_policy import POUCTPolicy
 from frozendict import frozendict
 import multiprocessing as mp
 from functools import partial
+from lab_ur_stack.utils.workspace_utils import sample_block_positions_from_dists
 
 
 default_env_params = {
@@ -235,3 +236,28 @@ def predict_voa_with_sampled_states_parallel(belief: BlocksPositionsBelief, help
     return (np.dot(value_diffs, weights)[0],
             np.dot(values_no_help, weights)[0],
             np.dot(values_with_help, weights)[0])
+
+
+
+def predict_voa(belief: BlocksPositionsBelief, help_config, policy: AbstractPolicy,
+                gt: GeometryAndTransforms, cam_intrinsic_matrix, n_states_to_sample, times_repeat=1,
+                detection_probability_at_max_distance=0.9, max_distance=1.5, margin_in_pixels=30,
+                detection_noise_scale=0.1, print_progress=False) -> (float, float, float):
+    states = [sample_block_positions_from_dists(belief.block_beliefs) for _ in range(n_states_to_sample)]
+    states_likelihoods = [belief.state_pdf(state) for state in states]
+    pred_voa = []
+    pred_no_help = []
+    pred_with_help = []
+    for _ in range(times_repeat):
+        voa, no_help, with_help = (
+            predict_voa_with_sampled_states_parallel(belief, help_config, policy, states, states_likelihoods,
+                                                    gt, cam_intrinsic_matrix, n_processes=19,
+                                                    detection_probability_at_max_distance=detection_probability_at_max_distance,
+                                                    max_distance=max_distance, margin_in_pixels=margin_in_pixels,
+                                                    detection_noise_scale=detection_noise_scale,
+                                                     print_progress=print_progress))
+        pred_voa.append(voa)
+        pred_no_help.append(no_help)
+        pred_with_help.append(with_help)
+
+    return np.mean(pred_voa), np.mean(pred_no_help), np.mean(pred_with_help)
