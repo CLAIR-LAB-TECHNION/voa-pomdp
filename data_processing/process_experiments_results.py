@@ -24,9 +24,9 @@ def process_experiment_results_to_table(
     experiments_list = pd.read_csv(experiment_list_file)
 
     print(f"Processing {len(experiments_list)} experiments...")
-    # extract additional data for each row from the resutls fil
-    #
-    # e and save in lists
+    # extract additional data for each row from the resutls file and save in lists
+    belief_mus_after_help = []
+    belief_sigmas_after_help = []
     accumulated_rewards = []
     episode_lengths = []
     n_successful_pickups = []
@@ -53,6 +53,10 @@ def process_experiment_results_to_table(
             # sigmas that are lower than zeros means no detections
             curr_num_detection_from_help = sum([sigma[0] >= 0 for sigma in res.help_detections_sigmas])
 
+        after_help_mus, after_help_sigmas = res.beliefs[0].get_mus_and_sigmas()
+
+        belief_mus_after_help.append(after_help_mus)
+        belief_sigmas_after_help.append(after_help_sigmas)
         accumulated_rewards.append(res.total_reward)
         episode_lengths.append(len(res.rewards))
         n_successful_pickups.append(curr_num_successful_pickups)
@@ -60,6 +64,8 @@ def process_experiment_results_to_table(
         n_detection_from_help.append(curr_num_detection_from_help)
 
     # add new data to the table:
+    experiments_list['belief_mus_after_help'] = belief_mus_after_help
+    experiments_list['belief_sigmas_after_help'] = belief_sigmas_after_help
     experiments_list['accumulated_rewards'] = accumulated_rewards
     experiments_list['episode_lengths'] = episode_lengths
     experiments_list['n_successful_pickups'] = n_successful_pickups

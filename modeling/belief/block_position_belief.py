@@ -184,6 +184,11 @@ class UnnormalizedBlocksPositionsBelief:
             if is_picked:
                 self.block_beliefs_original_position[i] = None
 
+    def get_mus_and_sigmas(self):
+        mus = [[b.mu_x, b.mu_y] for b in self.block_beliefs]
+        sigmas = [[b.sigma_x, b.sigma_y] for b in self.block_beliefs]
+        return mus, sigmas
+
 
 class BlocksPositionsBelief(UnnormalizedBlocksPositionsBelief):
     def _create_block_beliefs(self, init_mus, init_sigmas):
