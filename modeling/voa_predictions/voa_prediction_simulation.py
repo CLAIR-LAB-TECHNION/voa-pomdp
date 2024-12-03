@@ -84,18 +84,21 @@ def rollout_episode(belief: BlocksPositionsBelief, policy: AbstractPolicy, state
 
 def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, policy: AbstractPolicy,
                                     states, states_likelihoods, gt: GeometryAndTransforms, cam_intrinsic_matrix,
-                                    detection_probability=0.95, margin_in_pixels=10,
-                                    print_progress=False) -> (float, float, float):
+                                    detection_probability_at_max_distance=0.9, max_distance=1.5, margin_in_pixels=30,
+                                    detection_noise_scale=0.1, print_progress=False) -> (float, float, float):
     """
     Predict the VOA based on the given belief, help_config, policy and use the already sampled states
-    @param belief:
-    @param help_config:
-    @param policy:
-    @param states: list of block positions listsb
+    @param belief: BlocksPositionsBelief representing current belief state
+    @param help_config: Configuration of helper robot
+    @param policy: Policy to evaluate
+    @param states: list of block positions lists
     @param states_likelihoods: list of likelihoods for the states (what is the likelihood of each state in the belief)
     @param gt: GeometryAndTransforms object for the scene
     @param cam_intrinsic_matrix: camera intrinsic matrix
-    @param print_progress:
+    @param detection_probability_at_max_distance: Detection probability at and beyond max_distance
+    @param max_distance: Maximum distance threshold in meters
+    @param margin_in_pixels: Blocks within this margin from image edges are considered out of FOV
+    @param print_progress: Whether to print progress information
     @return: tuple of (voa_pred, pred_value_no_help, pred_value_with_help)
     """
 
@@ -109,8 +112,12 @@ def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, 
 
         belief_with_help = deepcopy(belief)
         observed_detection_mus, observed_detection_sigmas = sample_observation_fov_based(
-            s, help_config, gt, cam_intrinsic_matrix, detection_probability=detection_probability,
-            margin_in_pixels=margin_in_pixels)
+            s, help_config, gt, cam_intrinsic_matrix,
+            detection_probability_at_max_distance=detection_probability_at_max_distance,
+            max_distance=max_distance,
+            margin_in_pixels=margin_in_pixels,
+            detection_noise_scale=detection_noise_scale)
+
         if len(observed_detection_mus) == 0:
             states_value_diffs.append(0)
             states_values_no_help.append(reward_no_help)
@@ -129,16 +136,34 @@ def predict_voa_with_sampled_states(belief: BlocksPositionsBelief, help_config, 
     weights = np.asarray(states_likelihoods)
     weights /= np.sum(weights)
 
-    return np.dot(states_value_diffs, weights)[0],\
-        np.dot(states_values_no_help, weights)[0],\
+    return np.dot(states_value_diffs, weights)[0], \
+        np.dot(states_values_no_help, weights)[0], \
         np.dot(states_values_with_help, weights)[0]
 
 
 def predict_voa_with_sampled_states_parallel(belief: BlocksPositionsBelief, help_config, policy: AbstractPolicy,
                                              states, states_likelihoods, gt: GeometryAndTransforms,
                                              cam_intrinsic_matrix,
-                                             detection_probability=0.95, margin_in_pixels=10,
-                                             print_progress=False, n_processes=2) -> (float, float, float):
+                                             detection_probability_at_max_distance=0.9, max_distance=1.5,
+                                             margin_in_pixels=30, detection_noise_scale=0.1,
+                                             print_progress=False, n_processes=2,) -> (float, float, float):
+    """
+    Parallel version of predict_voa_with_sampled_states
+    @param belief: BlocksPositionsBelief representing current belief state
+    @param help_config: Configuration of helper robot
+    @param policy: Policy to evaluate
+    @param states: list of block positions lists
+    @param states_likelihoods: list of likelihoods for the states
+    @param gt: GeometryAndTransforms object for the scene
+    @param cam_intrinsic_matrix: camera intrinsic matrix
+    @param detection_probability_at_max_distance: Detection probability at and beyond max_distance
+    @param max_distance: Maximum distance threshold in meters
+    @param margin_in_pixels: Blocks within this margin from image edges are considered out of FOV
+    @param print_progress: Whether to print progress information
+    @param n_processes: Number of parallel processes to use
+    @param detection_noise_scale: Scale factor for detection position noise
+    @return: tuple of (voa_pred, pred_value_no_help, pred_value_with_help)
+    """
     from collections import namedtuple
     ObservedState = namedtuple('ObservedState', ['state', 'belief_with_help'])
 
@@ -150,8 +175,10 @@ def predict_voa_with_sampled_states_parallel(belief: BlocksPositionsBelief, help
 
         observed_detection_mus, observed_detection_sigmas = sample_observation_fov_based(
             state, help_config, gt, cam_intrinsic_matrix,
-            detection_probability=detection_probability,
-            margin_in_pixels=margin_in_pixels)
+            detection_probability_at_max_distance=detection_probability_at_max_distance,
+            max_distance=max_distance,
+            margin_in_pixels=margin_in_pixels,
+            detection_noise_scale=detection_noise_scale)
 
         if len(observed_detection_mus) == 0:
             states_for_rollout.append(None)
