@@ -165,6 +165,11 @@ def predict_voa_with_sampled_states_parallel(belief: BlocksPositionsBelief, help
     @param detection_noise_scale: Scale factor for detection position noise
     @return: tuple of (voa_pred, pred_value_no_help, pred_value_with_help)
     """
+    if n_processes == 1:
+        args = locals().copy()
+        del args['n_processes']
+        return predict_voa_with_sampled_states(**args)
+
     from collections import namedtuple
     ObservedState = namedtuple('ObservedState', ['state', 'belief_with_help'])
 
@@ -242,16 +247,17 @@ def predict_voa_with_sampled_states_parallel(belief: BlocksPositionsBelief, help
 def predict_voa(belief: BlocksPositionsBelief, help_config, policy: AbstractPolicy,
                 gt: GeometryAndTransforms, cam_intrinsic_matrix, n_states_to_sample, times_repeat=1,
                 detection_probability_at_max_distance=0.9, max_distance=1.5, margin_in_pixels=30,
-                detection_noise_scale=0.1, print_progress=False) -> (float, float, float):
+                detection_noise_scale=0.1, n_processes=1, print_progress=False) -> (float, float, float):
     states = [sample_block_positions_from_dists(belief.block_beliefs) for _ in range(n_states_to_sample)]
     states_likelihoods = [belief.state_pdf(state) for state in states]
     pred_voa = []
     pred_no_help = []
     pred_with_help = []
+
     for _ in range(times_repeat):
         voa, no_help, with_help = (
             predict_voa_with_sampled_states_parallel(belief, help_config, policy, states, states_likelihoods,
-                                                    gt, cam_intrinsic_matrix, n_processes=19,
+                                                    gt, cam_intrinsic_matrix, n_processes=n_processes,
                                                     detection_probability_at_max_distance=detection_probability_at_max_distance,
                                                     max_distance=max_distance, margin_in_pixels=margin_in_pixels,
                                                     detection_noise_scale=detection_noise_scale,
