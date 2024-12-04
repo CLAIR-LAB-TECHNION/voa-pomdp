@@ -22,7 +22,7 @@ class AbstractMotionPlanner:
         "type": "rrt*",
         "bidirectional": False,
         "connectionThreshold": 30.0,
-        "perturbationRadius": 0.2,
+        "perturbationRadius": 1.,
         # "suboptimalityFactor": 1.01,  # only for rrt* and prm*.
         # Don't use suboptimalityFactor as it's unclear how that parameter works...
         # seems like it's ignored even in rrt*

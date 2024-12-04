@@ -28,6 +28,8 @@ def compute_position_stds(detected_positions, camera_position, minimal_std=0.005
     # Add std based on number of blocks
     stds += n_blocks_coeff * (n_blocks - 1)
 
+    detected_positions = np.asarray(detected_positions)
+    camera_position = np.asarray(camera_position)
     # Add std based on nearest block distance
     if n_blocks > 1:
         blocks_distances_matrix = np.linalg.norm(detected_positions[:, None] - detected_positions[None, :], axis=-1)
