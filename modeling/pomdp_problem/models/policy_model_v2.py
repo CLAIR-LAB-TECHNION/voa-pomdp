@@ -18,7 +18,7 @@ class PolicyModelV2(pomdp_py.RolloutPolicy):
         self.action_points_std = action_points_std
 
     def get_all_actions(self, state: State, history):
-        if state.is_terminal():
+        if state.steps_left == 0 or len(state.block_positions) == 0:
             return [DummyAction()]
 
         actions = []
@@ -26,9 +26,9 @@ class PolicyModelV2(pomdp_py.RolloutPolicy):
             n_points = self.n_sensing_actions_to_sample_per_block + self.n_pickup_actions_to_sample_per_block
             points = np.random.normal(block, [self.action_points_std]*2, (n_points, 2))
             for point in points[:self.n_sensing_actions_to_sample_per_block]:
-                actions.append(ActionSense(block, point))
+                actions.append(ActionSense(*point))
             for point in points[self.n_sensing_actions_to_sample_per_block:]:
-                actions.append(ActionAttemptStack(block, point))
+                actions.append(ActionAttemptStack(*point))
 
         return actions
 

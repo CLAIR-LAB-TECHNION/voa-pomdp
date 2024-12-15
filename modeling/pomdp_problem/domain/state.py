@@ -18,7 +18,8 @@ class State(pomdp_py.State):
             and self.robot_position == other.robot_position
 
     def __hash__(self):
-        return hash((self.block_positions, self.robot_position, self.steps_left, self.last_stack_attempt_succeded))
+        return hash((tuple(map(tuple, self.block_positions)), tuple(self.robot_position), self.steps_left,
+                     self.last_stack_attempt_succeded))
 
     def __str__(self):
         return f"State(block_positions={self.block_positions},\n robot position={self.robot_position}, steps_left={self.steps_left})"
