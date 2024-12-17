@@ -1,20 +1,29 @@
+import random
+
+import numpy as np
 import pomdp_py
 
-from rocksample_experiments.RSRolloutPolicy import CustomRSPolicyModel
+from rocksample_experiments.preferred_actions import CustomRSPolicyModel, RSActionPrior
 from rocksample_experiments.rocksample_problem import RockSampleProblem, init_particles_belief
 
 
 
 def run_rocksample_experiment():
+    np.random.seed(0)
+    random.seed(0)
+
     # Problem parameters
-    n = 7  # Grid size (nxn)
-    k = 8  # Number of rocks
+    n = 11  # Grid size (nxn)
+    k = 11  # Number of rocks
     num_steps = 100
     n_sims = 5000
     max_depth = 20
     discount = 0.95
     exploration_const = 5
     half_efficiency_dist = 20
+    preferred_actions = True
+    preferred_actions_v_init = 10
+    preferred_actions_n_visits_init = 10
 
     # Add statistics tracking
     stats = {
@@ -53,7 +62,10 @@ def run_rocksample_experiment():
         half_efficiency_dist=half_efficiency_dist
     )
 
-    preffered_actions_rollout_policy = CustomRSPolicyModel(n, k, rock_locs)
+    action_prior = RSActionPrior(n, k, rock_locs,
+                                 v_init=preferred_actions_v_init,
+                                 n_visits_init=preferred_actions_n_visits_init) if preferred_actions else None
+    rollout_policy = CustomRSPolicyModel(n, k, action_prior) if preferred_actions else rocksample.agent.policy_model
 
     # Initialize POMCP planner
     pomcp = pomdp_py.POMCP(
@@ -61,7 +73,8 @@ def run_rocksample_experiment():
         max_depth=max_depth,
         discount_factor=discount,
         exploration_const=exploration_const,
-        rollout_policy=preffered_actions_rollout_policy,
+        action_prior=action_prior,
+        rollout_policy=rollout_policy,
         num_visits_init=1,
         show_progress=True
     )
