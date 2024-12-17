@@ -319,18 +319,27 @@ class RSPolicyModel(pomdp_py.RolloutPolicy):
 
     def get_all_actions(self, **kwargs):
         state = kwargs.get("state", None)
+        history = kwargs.get("history", None)
         if state is None:
             raise NotImplementedError("Need state to determine actions")
-        else:
-            motions = set(self._move_actions)
-            rover_x, rover_y = state.position
-            if rover_x == 0:
-                motions.remove(MoveWest)
-            if rover_y == 0:
-                motions.remove(MoveNorth)
-            if rover_y == self._n - 1:
-                motions.remove(MoveSouth)
-            return list(motions | self._check_actions | {SampleAction(state.position)})
+
+        motions = set(self._move_actions)
+        rover_x, rover_y = state.position
+        if rover_x == 0:
+            motions.remove(MoveWest)
+        if rover_y == 0:
+            motions.remove(MoveNorth)
+        if rover_y == self._n - 1:
+            motions.remove(MoveSouth)
+
+        # can't check same rock twice in a row
+        checks = set(self._check_actions)
+        if history is not None and len(history) > 0:
+            last_action = history[-1][0]
+            if isinstance(last_action, CheckAction):
+                checks.remove(last_action)
+
+        return list(motions | checks | {SampleAction(state.position)})
 
     def rollout(self, state, history=None):
         return random.sample(self.get_all_actions(state=state), 1)[0]

@@ -16,11 +16,12 @@ def run_rocksample_experiment():
     n = 11  # Grid size (nxn)
     k = 11  # Number of rocks
     num_steps = 100
-    n_sims = 5000
+    n_sims = 2000
     max_depth = 20
     discount = 0.95
     exploration_const = 5
     half_efficiency_dist = 20
+    num_particles = 2000
     preferred_actions = True
     preferred_actions_v_init = 10
     preferred_actions_n_visits_init = 10
@@ -47,7 +48,7 @@ def run_rocksample_experiment():
     # Initialize belief with particles
     init_belief = init_particles_belief(
         k=k,
-        num_particles=200,
+        num_particles=num_particles,
         init_state=init_state,
         belief="uniform"
     )
