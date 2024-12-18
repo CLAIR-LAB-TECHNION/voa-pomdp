@@ -87,7 +87,7 @@ def push_rocks(problem: RockSampleProblem, rocks_to_push: dict) -> (RockSamplePr
             terminal=problem.env.state.terminal
         ),
         rock_locs=new_rock_locs,
-        init_belief=deepcopy(problem.agent._init_belief),
+        init_belief=deepcopy(problem.agent.cur_belief),
         half_efficiency_dist=problem.agent.observation_model._half_efficiency_dist
     )
 

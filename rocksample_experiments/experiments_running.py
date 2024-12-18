@@ -1,6 +1,8 @@
 import random
 import numpy as np
 import pomdp_py
+
+from rocksample_experiments.help_actions import push_rocks
 from rocksample_experiments.preferred_actions import CustomRSPolicyModel, RSActionPrior
 from rocksample_experiments.rocksample_problem import RockSampleProblem, init_particles_belief
 import typer
@@ -160,6 +162,10 @@ def run_rocksample_experiment(
         init_belief=init_belief,
         half_efficiency_dist=half_efficiency_dist
     )
+
+    # rocks_to_push = {0: (0, 1), 7: (1, 1)}
+    # problem_help, budget_used = push_rocks(problem, rocks_to_push)
+    # problem = problem_help
 
     # Set up POMCP parameters
     pomcp_params = {
