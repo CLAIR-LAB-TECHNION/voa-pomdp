@@ -131,4 +131,4 @@ def calculate_num_push_help_actions(k: int, m: int) -> int:
 
     return combinations * sign_combinations
 
-print(calculate_num_push_help_actions(7, 5))
+# print(calculate_num_push_help_actions(7, 5))
