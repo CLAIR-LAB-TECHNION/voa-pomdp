@@ -39,7 +39,6 @@ def run_pomcp_rocksample_instance(
         exploration_const=pomcp_params.get('exploration_const', 5),
         action_prior=pomcp_params.get('action_prior', None),
         rollout_policy=pomcp_params.get('rollout_policy', problem.agent.policy_model),
-        num_visits_init=pomcp_params.get('num_visits_init', 1),
         show_progress=verbose > 1
     )
 
@@ -170,7 +169,6 @@ def run_rocksample_experiment(
         'exploration_const': exploration_const,
         'action_prior': action_prior,
         'rollout_policy': rollout_policy if rollout_policy is not None else problem.agent.policy_model,
-        'num_visits_init': 1
     }
 
     # Run experiment

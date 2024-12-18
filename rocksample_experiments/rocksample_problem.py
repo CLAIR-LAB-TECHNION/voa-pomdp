@@ -355,7 +355,7 @@ class RockSampleProblem(pomdp_py.POMDP):
                 return loc
 
     def in_exit_area(self, pos):
-        return pos[0] == self._n
+        return pos[0] == self.n
 
     @staticmethod
     def generate_instance(n, k):
@@ -382,26 +382,26 @@ class RockSampleProblem(pomdp_py.POMDP):
         rover_position = self.env.state.position
         rocktypes = self.env.state.rocktypes
         # Rock id map
-        for y in range(self._n):
-            for x in range(self._n + 1):
+        for y in range(self.n):
+            for x in range(self.n + 1):
                 char = "."
-                if x == self._n:
+                if x == self.n:
                     char = ">"
-                if (x, y) in self._rock_locs:
-                    char = str(self._rock_locs[(x, y)])
+                if (x, y) in self.rock_locs:
+                    char = str(self.rock_locs[(x, y)])
                 if (x, y) == rover_position:
                     char = "R"
                 string += char
             string += "\n"
         string += "_____G/B_____\n"
         # Good/bad map
-        for y in range(self._n):
-            for x in range(self._n + 1):
+        for y in range(self.n):
+            for x in range(self.n + 1):
                 char = "."
-                if x == self._n:
+                if x == self.n:
                     char = ">"
-                if (x, y) in self._rock_locs:
-                    if rocktypes[self._rock_locs[(x, y)]] == RockType.GOOD:
+                if (x, y) in self.rock_locs:
+                    if rocktypes[self.rock_locs[(x, y)]] == RockType.GOOD:
                         char = "$"
                     else:
                         char = "x"
@@ -414,7 +414,7 @@ class RockSampleProblem(pomdp_py.POMDP):
     def __init__(
         self, n, k, init_state, rock_locs, init_belief, half_efficiency_dist=20
     ):
-        self._n, self._k = n, k
+        self.n, self.k = n, k
         agent = pomdp_py.Agent(
             init_belief,
             RSPolicyModel(n, k),
@@ -428,7 +428,7 @@ class RockSampleProblem(pomdp_py.POMDP):
             RSTransitionModel(n, rock_locs, self.in_exit_area),
             RSRewardModel(rock_locs, self.in_exit_area),
         )
-        self._rock_locs = rock_locs
+        self.rock_locs = rock_locs
         super().__init__(agent, env, name="RockSampleProblem")
 
 
