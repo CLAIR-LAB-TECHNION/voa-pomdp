@@ -20,6 +20,7 @@ def run_rocksample_experiment():
     max_depth = 20
     discount = 0.95
     exploration_const = 5
+
     half_efficiency_dist = 20
     num_particles = 2000
     preferred_actions = True
