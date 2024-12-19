@@ -469,8 +469,9 @@ def run_experiments_from_file_parallel(
                 print(f"Progress: {n_done}/{n_total} experiments")
 
         print(f"---Batch {batch_start // batch_size + 1} completed in {time.time() - t_start:.2f} seconds")
-
         gc.collect()
+        # rest for 10 seconds
+        time.sleep(10)
 
     print("All experiments completed")
 
