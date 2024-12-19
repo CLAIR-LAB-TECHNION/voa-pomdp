@@ -1,5 +1,6 @@
 import typer
 import json
+import os
 from typing import Dict, List, Tuple
 import random
 from rocksample_experiments.rocksample_problem import RockSampleProblem, RockType, State
@@ -139,7 +140,6 @@ def test_generate_help_config_set():
     # Test with different parameters
     test_help_config_set(problem, n_configs=100, budget=10, max_rocks_to_push=5)
 
-
 @app.command()
 def generate_experiment_configs(
         n: int = typer.Option(..., help="Grid size"),
@@ -164,6 +164,7 @@ def generate_experiment_configs(
     }
 
     experiments = []
+    experiment_id = 0
 
     for env_idx in range(n_problem_instances):
         init_state, rock_locs = RockSampleProblem.generate_instance(n, k)
@@ -187,6 +188,7 @@ def generate_experiment_configs(
 
             # Add experiment with no help
             experiments.append({
+                "experiment_id": experiment_id,
                 "env_instance_id": env_idx,
                 "state_id": state_idx,
                 "help_config_id": -1,
@@ -197,10 +199,12 @@ def generate_experiment_configs(
                 "total_reward": None,
                 "total_discounted_reward": None
             })
+            experiment_id += 1
 
             # Add experiments with help configurations
             for help_idx, help_config in enumerate(help_configs):
                 experiments.append({
+                    "experiment_id": experiment_id,
                     "env_instance_id": env_idx,
                     "state_id": state_idx,
                     "help_config_id": help_idx,
@@ -211,7 +215,10 @@ def generate_experiment_configs(
                     "total_reward": None,
                     "total_discounted_reward": None
                 })
+                experiment_id += 1
 
+    # create outputfile dir if not exists
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     # Save to JSON file
     with open(output_file, 'w') as f:
         json.dump({"metadata": metadata, "experiments": experiments}, f, indent=2)
