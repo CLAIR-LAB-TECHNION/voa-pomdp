@@ -381,7 +381,7 @@ def run_experiments_from_file_parallel(
         n_processes: int = typer.Option(2, help="Number of parallel processes"),
         max_steps: int = typer.Option(100, help="Maximum steps per experiment"),
         n_sims: int = typer.Option(2000, help="Number of simulations for POMCP planner"),
-        num_particles: int = typer.Option(2000, help="Number of particles for belief representation"),
+        num_particles: int = typer.Option(5000, help="Number of particles for belief representation"),
         max_depth: int = typer.Option(20, help="Maximum depth for POMCP planner"),
         verbose: int = typer.Option(0, help="Verbosity level"),
         batch_size: int = typer.Option(50, help="Number of experiments to run before recreating worker pool")
