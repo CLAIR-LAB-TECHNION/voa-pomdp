@@ -1,7 +1,7 @@
 import typer
 import json
 import os
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Optional
 import random
 from rocksample_experiments.rocksample_problem import RockSampleProblem, RockType, State
 from rocksample_experiments.help_actions import is_legal_rock_push
@@ -140,28 +140,84 @@ def test_generate_help_config_set():
     # Test with different parameters
     test_help_config_set(problem, n_configs=100, budget=10, max_rocks_to_push=5)
 
+
+def generate_single_push_configs(problem: RockSampleProblem, single_push_distance: int) -> List[Dict]:
+    """
+    Generate help configs where each config pushes one rock by up to single_push_distance steps
+    in one of four directions. If maximum distance is illegal, try shorter distances.
+    """
+    configs = []
+    directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]  # N,S,E,W
+
+    for rock_id in problem.rock_locs.values():
+        for dx_unit, dy_unit in directions:
+            # Try distances from max to 1
+            for distance in range(single_push_distance, 0, -1):
+                dx = dx_unit * distance
+                dy = dy_unit * distance
+                config = {rock_id: (dx, dy)}
+
+                # If legal, add this config and move to next direction
+                if is_legal_rock_push(problem, config):
+                    configs.append(config)
+                    break
+
+    return configs
+
+
 @app.command()
 def generate_experiment_configs(
         n: int = typer.Option(..., help="Grid size"),
         k: int = typer.Option(..., help="Number of rocks"),
         n_problem_instances: int = typer.Option(..., help="Number of problem instances"),
         n_actual_states: int = typer.Option(..., help="Number of states per instance"),
-        n_help_configs: int = typer.Option(..., help="Number of help configurations per state"),
-        push_help_budget: int = typer.Option(..., help="Budget for push help actions"),
-        max_rocks_to_push: int = typer.Option(..., help="Maximum number of rocks to push in help actions"),
+        help_mode: str = typer.Option("budget", help="Help mode: 'budget' or 'single_push'"),
+        # Parameters for budget mode
+        n_help_configs: Optional[int] = typer.Option(None,
+                                                     help="Number of help configurations per state (budget mode only)"),
+        push_help_budget: Optional[int] = typer.Option(None, help="Budget for push help actions (budget mode only)"),
+        max_rocks_to_push: Optional[int] = typer.Option(None,
+                                                        help="Maximum number of rocks to push (budget mode only)"),
+        # Parameters for single push mode
+        single_push_distance: Optional[int] = typer.Option(None,
+                                                           help="Maximum distance for single rock push (single_push mode only)"),
         output_file: str = typer.Option(..., help="Output JSON file path")
 ):
     """Generate experiment configurations and save to JSON file"""
+
+    # Validate parameters based on mode
+    if help_mode not in ["budget", "single_push"]:
+        raise ValueError("help_mode must be either 'budget' or 'single_push'")
+
+    if help_mode == "budget":
+        if any(param is None for param in [n_help_configs, push_help_budget, max_rocks_to_push]):
+            raise ValueError("In budget mode, n_help_configs, push_help_budget, and max_rocks_to_push must be provided")
+        if single_push_distance is not None:
+            print("Warning: single_push_distance is ignored in budget mode")
+    else:  # single_push mode
+        if single_push_distance is None:
+            raise ValueError("In single_push mode, single_push_distance must be provided")
+        if any(param is not None for param in [n_help_configs, push_help_budget, max_rocks_to_push]):
+            print("Warning: budget mode parameters are ignored in single_push mode")
 
     metadata = {
         "grid_size": n,
         "num_rocks": k,
         "num_problem_instances": n_problem_instances,
         "num_states_per_instance": n_actual_states,
-        "num_help_configs": n_help_configs,
-        "push_help_budget": push_help_budget,
-        "max_rocks_to_push": max_rocks_to_push
+        "help_mode": help_mode
     }
+
+    if help_mode == "budget":
+        metadata.update({
+            "num_help_configs": n_help_configs,
+            "push_help_budget": push_help_budget,
+            "max_rocks_to_push": max_rocks_to_push
+        })
+    else:
+        metadata.update({
+            "single_push_distance": single_push_distance
+        })
 
     experiments = []
     experiment_id = 0
@@ -176,14 +232,17 @@ def generate_experiment_configs(
             k=k,
             init_state=init_state,
             rock_locs=rock_locs,
-            init_belief=None  # Not needed for help config generation
+            init_belief=None
         )
 
-        help_configs = generate_help_config_set(problem, n_help_configs, push_help_budget, max_rocks_to_push)
+        # Generate help configs based on mode
+        if help_mode == "budget":
+            help_configs = generate_help_config_set(problem, n_help_configs, push_help_budget, max_rocks_to_push)
+        else:
+            help_configs = generate_single_push_configs(problem, single_push_distance)
 
         # For each instance, generate different states (rock types)
         for state_idx in range(n_actual_states):
-            # Generate new rock types
             rocktypes = tuple(RockType.random() for _ in range(k))
 
             # Add experiment with no help
@@ -217,7 +276,7 @@ def generate_experiment_configs(
                 })
                 experiment_id += 1
 
-    # create outputfile dir if not exists
+    # Create outputfile dir if not exists
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     # Save to JSON file
     with open(output_file, 'w') as f:
