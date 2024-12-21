@@ -9,12 +9,11 @@ import pomdp_py
 import json
 from rocksample_experiments.help_actions import push_rocks
 from rocksample_experiments.preferred_actions import CustomRSPolicyModel, RSActionPrior
-from rocksample_experiments.rocksample_problem import RockSampleProblem, init_particles_belief, State
+from rocksample_experiments.rocksample_problem import RockSampleProblem, State
 import typer
 from typing import Optional
 import os
 import time
-
 
 app = typer.Typer()
 
@@ -112,7 +111,7 @@ def run_rocksample_experiment(
         discount: float = typer.Option(0.95, help="Discount factor"),
         exploration_const: float = typer.Option(5.0, help="Exploration constant for POMCP"),
         half_efficiency_dist: float = typer.Option(20.0, help="Half efficiency distance for sensing"),
-        num_particles: int = typer.Option(2000, help="Number of particles for belief representation"),
+        num_particles: int = typer.Option(1000, help="Number of particles for belief representation"),
         use_preferred_actions: bool = typer.Option(True, help="Whether to use preferred actions in planning"),
         preferred_actions_v_init: float = typer.Option(10.0, help="Initial value for preferred actions"),
         preferred_actions_n_visits_init: int = typer.Option(10, help="Initial visit count for preferred actions"),
@@ -138,12 +137,13 @@ def run_rocksample_experiment(
     # Generate initial state and belief
     init_state, rock_locs = RockSampleProblem.generate_instance(grid_size, num_rocks)
 
-    init_belief = init_particles_belief(
-        k=num_rocks,
-        num_particles=num_particles,
-        init_state=init_state,
-        belief="uniform"
-    )
+    with open(f'rocksample_experiments/configurations/particles_k{num_rocks}.json', 'r') as f:
+        rocktypes = json.load(f)
+        if len(rocktypes) < num_particles:
+            ValueError("Not enough particles in file")
+    particles = [State(position=init_state.position, rocktypes=rocktypes[i], terminal=False)
+                 for i in range(num_particles)]
+    init_belief = pomdp_py.Particles(particles)
 
     # Set up action prior if using preferred actions
     action_prior = None
@@ -254,12 +254,13 @@ def run_experiment_from_config(experiment_config: dict, problem_params: dict) ->
         )
 
         # Create initial belief
-        init_belief = init_particles_belief(
-            k=len(rock_locs),
-            num_particles=problem_params['num_particles'],
-            init_state=init_state,
-            belief="uniform"
-        )
+        with open(f'rocksample_experiments/configurations/particles_k{len(rock_locs)}.json', 'r') as f:
+            rocktypes = json.load(f)
+            if len(rocktypes) < problem_params['num_particles']:
+                ValueError("Not enough particles in file")
+        particles = [State(position=init_state.position, rocktypes=rocktypes[i], terminal=False)
+                     for i in range(problem_params['num_particles'])]
+        init_belief = pomdp_py.Particles(particles)
 
         # Create base problem instance
         problem = RockSampleProblem(
@@ -319,12 +320,12 @@ def run_experiment_from_config(experiment_config: dict, problem_params: dict) ->
 
 @app.command()
 def run_experiments_from_file(
-    config_file: str = typer.Option(..., help="Path to configuration file"),
-    max_steps: int = typer.Option(100, help="Maximum steps per experiment"),
-    n_sims: int = typer.Option(2000, help="Number of simulations for POMCP planner"),
-    num_particles: int = typer.Option(2000, help="Number of particles for belief representation"),
-    max_depth: int = typer.Option(20, help="Maximum depth for POMCP planner"),
-    verbose: int = typer.Option(0, help="Verbosity level")
+        config_file: str = typer.Option(..., help="Path to configuration file"),
+        max_steps: int = typer.Option(100, help="Maximum steps per experiment"),
+        n_sims: int = typer.Option(2000, help="Number of simulations for POMCP planner"),
+        num_particles: int = typer.Option(1000, help="Number of particles for belief representation"),
+        max_depth: int = typer.Option(20, help="Maximum depth for POMCP planner"),
+        verbose: int = typer.Option(0, help="Verbosity level")
 ):
     """
     Run experiments from configuration file and save results back to the same file.
@@ -387,7 +388,7 @@ def run_experiments_from_file_parallel(
         n_processes: int = typer.Option(2, help="Number of parallel processes"),
         max_steps: int = typer.Option(100, help="Maximum steps per experiment"),
         n_sims: int = typer.Option(2000, help="Number of simulations for POMCP planner"),
-        num_particles: int = typer.Option(5000, help="Number of particles for belief representation"),
+        num_particles: int = typer.Option(1000, help="Number of particles for belief representation"),
         max_depth: int = typer.Option(20, help="Maximum depth for POMCP planner"),
         verbose: int = typer.Option(0, help="Verbosity level"),
         batch_size: int = typer.Option(50, help="Number of experiments to run before recreating worker pool"),

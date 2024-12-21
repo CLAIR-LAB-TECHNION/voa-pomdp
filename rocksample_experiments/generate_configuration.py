@@ -166,6 +166,29 @@ def generate_single_push_configs(problem: RockSampleProblem, single_push_distanc
 
 
 @app.command()
+def generate_initial_belief(
+        k: int = typer.Option(..., help="Number of rocks"),
+        num_particles: int = typer.Option(..., help="Number of particles to generate"),
+        output_file: str = typer.Option(..., help="Output JSON file path")
+):
+    """
+    Generate initial belief particles and save to file.
+    Saved as list which each entry is a particle.
+    Each particle is k-length list of rock types.
+    """
+    particles = []
+    for _ in range(num_particles):
+        particles.append([RockType.random() for _ in range(k)])
+
+    # Create outputfile dir if not exists
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    # Save to JSON file
+    with open(output_file, 'w') as f:
+        json.dump(particles, f, indent=2)
+
+
+
+@app.command()
 def generate_experiment_configs(
         n: int = typer.Option(..., help="Grid size"),
         k: int = typer.Option(..., help="Number of rocks"),

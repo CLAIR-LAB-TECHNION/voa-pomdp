@@ -474,7 +474,6 @@ def test_planner(rocksample, planner, nsteps=3, discount=0.95):
 
 
 def init_particles_belief(k, num_particles, init_state, belief="uniform"):
-    num_particles = 200
     particles = []
     for _ in range(num_particles):
         if belief == "uniform":
