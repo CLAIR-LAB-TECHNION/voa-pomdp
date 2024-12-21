@@ -375,6 +375,12 @@ def run_experiments_from_file(
               f"reward={total_reward}, discounted_reward={total_discounted_reward}")
 
 
+def run_experiment_wrapper(args):
+    exp, params = args
+    result = run_experiment_from_config(exp, params)
+    return exp['experiment_id'], result
+
+
 @app.command()
 def run_experiments_from_file_parallel(
         config_file: str = typer.Option(..., help="Path to configuration file"),
@@ -384,7 +390,8 @@ def run_experiments_from_file_parallel(
         num_particles: int = typer.Option(5000, help="Number of particles for belief representation"),
         max_depth: int = typer.Option(20, help="Maximum depth for POMCP planner"),
         verbose: int = typer.Option(0, help="Verbosity level"),
-        batch_size: int = typer.Option(50, help="Number of experiments to run before recreating worker pool")
+        batch_size: int = typer.Option(50, help="Number of experiments to run before recreating worker pool"),
+        n_experiment_repeats: int = typer.Option(3, help="Number of times to repeat each experiment")
 ):
     """
     Run experiments from configuration file in parallel and save results back to the same file.
@@ -416,61 +423,73 @@ def run_experiments_from_file_parallel(
         'preferred_actions_n_visits_init': 10
     }
 
-    # Get undone experiments
-    experiments_to_run = [exp for exp in config['experiments']
-                          if exp['total_reward'] is None]
-    n_total = len(experiments_to_run)
-    print(f"Total experiments to run: {n_total}")
+    # Convert single numbers to lists if needed
+    for exp in config['experiments']:
+        if exp['total_reward'] is not None:
+            if not isinstance(exp['total_reward'], list):
+                exp['total_reward'] = [exp['total_reward']]
+            if not isinstance(exp['total_discounted_reward'], list):
+                exp['total_discounted_reward'] = [exp['total_discounted_reward']]
 
-    if n_total == 0:
-        print("No experiments left to run")
+    # Get experiments that need more runs
+    experiments_to_run = [exp for exp in config['experiments']
+                          if exp['total_reward'] is None
+                          or len(exp['total_reward']) < n_experiment_repeats]
+
+    # Count total runs needed
+    total_runs = sum(n_experiment_repeats - (len(exp['total_reward']) if exp['total_reward'] is not None else 0)
+                     for exp in experiments_to_run)
+
+    print(f"Total runs needed: {total_runs}")
+    if total_runs == 0:
+        print("No more runs needed")
         return
 
-    # Process in batches
     n_done = 0
     for batch_start in range(0, len(experiments_to_run), batch_size):
         t_start = time.time()
+        batch = experiments_to_run[batch_start:min(batch_start + batch_size, len(experiments_to_run))]
 
-        batch_end = min(batch_start + batch_size, len(experiments_to_run))
-        batch = experiments_to_run[batch_start:batch_end]
+        # Create all needed runs for this batch
+        experiment_args = []
+        for exp in batch:
+            runs_needed = n_experiment_repeats
+            if exp['total_reward'] is not None:
+                runs_needed -= len(exp['total_reward'])
+            experiment_args.extend([(exp, problem_params) for _ in range(runs_needed)])
 
-        print(f"Starting batch {batch_start // batch_size + 1}, "
-              f"experiments {batch_start} to {batch_end - 1}")
+        print(f"Starting batch with {len(experiment_args)} runs")
 
-        # Create experiment arguments
-        experiment_args = [(exp, problem_params) for exp in batch]
+        # Dictionary to collect results by experiment ID
+        results_by_exp = {}
 
-        # Run batch with process pool
         with mp.Pool(n_processes) as pool:
-            iterator = pool.starmap(run_experiment_from_config, experiment_args)
+            for exp_id, result in pool.imap_unordered(run_experiment_wrapper, experiment_args):
+                if result[0] is not None:
+                    print(f"Completed run for experiment {exp_id}: "
+                          f"reward={result[0]}, discounted_reward={result[1]}")
 
-            for i, result in enumerate(iterator):
-                exp = experiment_args[i][0]  # Get corresponding experiment config
-
-                if result[0] is not None:  # If experiment completed successfully
-                    total_reward, total_discounted_reward = result
-
-                    # Update results in config
-                    for e in config['experiments']:
-                        if e['experiment_id'] == exp['experiment_id']:
-                            e['total_reward'] = total_reward
-                            e['total_discounted_reward'] = total_discounted_reward
+                    # Find and update experiment in config
+                    for exp in config['experiments']:
+                        if exp['experiment_id'] == exp_id:
+                            if exp['total_reward'] is None:
+                                exp['total_reward'] = []
+                                exp['total_discounted_reward'] = []
+                            exp['total_reward'].append(result[0])
+                            exp['total_discounted_reward'].append(result[1])
                             break
 
+                    # Save after each successful run
                     with open(config_file, 'w') as f:
                         json.dump(config, f, indent=2)
-
-                    print(f"Completed experiment {exp['experiment_id']} successfully: "
-                          f"reward={total_reward}, discounted_reward={total_discounted_reward}")
                 else:
-                    print(f"Experiment {exp['experiment_id']} failed (likely particle deprivation)")
+                    print(f"Run failed for experiment {exp_id}")
 
                 n_done += 1
-                print(f"Progress: {n_done}/{n_total} experiments")
+                print(f"Progress: {n_done}/{total_runs} runs")
 
-        print(f"---Batch {batch_start // batch_size + 1} completed in {time.time() - t_start:.2f} seconds")
+        print(f"---Batch completed in {time.time() - t_start:.2f} seconds")
         gc.collect()
-        # rest for 10 seconds
         time.sleep(10)
 
     print("All experiments completed")
