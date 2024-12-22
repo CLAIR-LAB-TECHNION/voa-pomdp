@@ -5,6 +5,10 @@ from typing import Dict, List, Tuple, Optional
 import random
 from rocksample_experiments.rocksample_problem import RockSampleProblem, RockType, State
 from rocksample_experiments.help_actions import is_legal_rock_push
+from clustering_help_util import (
+    generate_cluster_help_configs,
+    convert_to_movement_config
+)
 
 app = typer.Typer()
 
@@ -165,6 +169,15 @@ def generate_single_push_configs(problem: RockSampleProblem, single_push_distanc
     return configs
 
 
+def generate_cluster_configs(problem: RockSampleProblem, max_rocks_per_cluster: int, window_size: int) -> List[Dict]:
+    """
+    Generate help configs for clustering mode and convert them to movement format.
+    Returns list of movement configs {rock_id: (dx, dy)}
+    """
+    cluster_configs = generate_cluster_help_configs(problem, window_size, max_rocks_per_cluster)
+    return [convert_to_movement_config(problem, config) for config in cluster_configs]
+
+
 @app.command()
 def generate_initial_belief(
         k: int = typer.Option(..., help="Number of rocks"),
@@ -194,34 +207,33 @@ def generate_experiment_configs(
         k: int = typer.Option(..., help="Number of rocks"),
         n_problem_instances: int = typer.Option(..., help="Number of problem instances"),
         n_actual_states: int = typer.Option(..., help="Number of states per instance"),
-        help_mode: str = typer.Option("budget", help="Help mode: 'budget' or 'single_push'"),
+        help_mode: str = typer.Option("budget", help="Help mode: 'budget', 'single_push', or 'cluster'"),
         # Parameters for budget mode
-        n_help_configs: Optional[int] = typer.Option(None,
-                                                     help="Number of help configurations per state (budget mode only)"),
+        n_help_configs: Optional[int] = typer.Option(None, help="Number of help configurations per state (budget mode only)"),
         push_help_budget: Optional[int] = typer.Option(None, help="Budget for push help actions (budget mode only)"),
-        max_rocks_to_push: Optional[int] = typer.Option(None,
-                                                        help="Maximum number of rocks to push (budget mode only)"),
+        max_rocks_to_push: Optional[int] = typer.Option(None, help="Maximum number of rocks to push (budget mode only)"),
         # Parameters for single push mode
-        single_push_distance: Optional[int] = typer.Option(None,
-                                                           help="Maximum distance for single rock push (single_push mode only)"),
+        single_push_distance: Optional[int] = typer.Option(None, help="Maximum distance for single rock push (single_push mode only)"),
+        # Parameters for cluster mode
+        window_size: Optional[int] = typer.Option(None, help="Window size for clustering mode"),
+        max_rocks_per_cluster: Optional[int] = typer.Option(None, help="Maximum number of rocks per cluster (cluster mode only)"),
         output_file: str = typer.Option(..., help="Output JSON file path")
 ):
     """Generate experiment configurations and save to JSON file"""
 
     # Validate parameters based on mode
-    if help_mode not in ["budget", "single_push"]:
-        raise ValueError("help_mode must be either 'budget' or 'single_push'")
+    if help_mode not in ["budget", "single_push", "cluster"]:
+        raise ValueError("help_mode must be either 'budget', 'single_push', or 'cluster'")
 
     if help_mode == "budget":
         if any(param is None for param in [n_help_configs, push_help_budget, max_rocks_to_push]):
             raise ValueError("In budget mode, n_help_configs, push_help_budget, and max_rocks_to_push must be provided")
-        if single_push_distance is not None:
-            print("Warning: single_push_distance is ignored in budget mode")
-    else:  # single_push mode
+    elif help_mode == "single_push":
         if single_push_distance is None:
             raise ValueError("In single_push mode, single_push_distance must be provided")
-        if any(param is not None for param in [n_help_configs, push_help_budget, max_rocks_to_push]):
-            print("Warning: budget mode parameters are ignored in single_push mode")
+    else:  # cluster mode
+        if any(param is None for param in [window_size, max_rocks_per_cluster]):
+            raise ValueError("In cluster mode, window_size and max_rocks_per_cluster must be provided")
 
     metadata = {
         "grid_size": n,
@@ -237,9 +249,14 @@ def generate_experiment_configs(
             "push_help_budget": push_help_budget,
             "max_rocks_to_push": max_rocks_to_push
         })
-    else:
+    elif help_mode == "single_push":
         metadata.update({
             "single_push_distance": single_push_distance
+        })
+    else:  # cluster mode
+        metadata.update({
+            "window_size": window_size,
+            "max_rocks_per_cluster": max_rocks_per_cluster
         })
 
     experiments = []
@@ -261,8 +278,10 @@ def generate_experiment_configs(
         # Generate help configs based on mode
         if help_mode == "budget":
             help_configs = generate_help_config_set(problem, n_help_configs, push_help_budget, max_rocks_to_push)
-        else:
+        elif help_mode == "single_push":
             help_configs = generate_single_push_configs(problem, single_push_distance)
+        else:  # cluster mode
+            help_configs = generate_cluster_configs(problem, max_rocks_per_cluster, window_size)
 
         # For each instance, generate different states (rock types)
         for state_idx in range(n_actual_states):
