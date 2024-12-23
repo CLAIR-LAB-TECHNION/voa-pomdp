@@ -107622,10 +107622,12 @@
         ]
       },
       "total_reward": [
-        40.0
+        40.0,
+        20.0
       ],
       "total_discounted_reward": [
-        13.734238006202135
+        13.734238006202135,
+        10.808521769539496
       ]
     },
     {
@@ -107681,8 +107683,14 @@
           4
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        10.0,
+        40.0
+      ],
+      "total_discounted_reward": [
+        5.526907007935467,
+        22.21780008009079
+      ]
     },
     {
       "experiment_id": 1768,
