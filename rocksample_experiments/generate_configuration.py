@@ -5,7 +5,7 @@ from typing import Dict, List, Tuple, Optional
 import random
 from rocksample_experiments.rocksample_problem import RockSampleProblem, RockType, State
 from rocksample_experiments.help_actions import is_legal_rock_push
-from clustering_help_util import (
+from rocksample_experiments.clustering_help_util import (
     generate_cluster_help_configs,
     convert_to_movement_config
 )
@@ -324,6 +324,108 @@ def generate_experiment_configs(
     with open(output_file, 'w') as f:
         json.dump({"metadata": metadata, "experiments": experiments}, f, indent=2)
 
+
+@app.command()
+def merge_experiment_results(
+        file1: str = typer.Option(..., help="First results file path"),
+        file2: str = typer.Option(..., help="Second results file path"),
+        output_file: str = typer.Option(..., help="Output merged file path")
+):
+    """Merge two experiment results files"""
+
+    # Load both files
+    with open(file1, 'r') as f:
+        data1 = json.load(f)
+    with open(file2, 'r') as f:
+        data2 = json.load(f)
+
+    # Validate metadata matches
+    metadata_keys_to_check = [
+        "grid_size", "num_rocks", "help_mode", "window_size",
+        "max_rocks_per_cluster", "num_states_per_instance"
+    ]
+    for key in metadata_keys_to_check:
+        if data1["metadata"][key] != data2["metadata"][key]:
+            raise ValueError(f"Metadata mismatch for {key}")
+
+    # Create new metadata with combined problem instances
+    new_metadata = data1["metadata"].copy()
+    new_metadata["num_problem_instances"] = (
+            data1["metadata"]["num_problem_instances"] +
+            data2["metadata"]["num_problem_instances"]
+    )
+
+    # Create map of old env_instance_ids to new ones
+    max_env_id = max(exp["env_instance_id"] for exp in data1["experiments"])
+    env_id_map_2 = {
+        old_id: old_id + max_env_id + 1
+        for old_id in set(exp["env_instance_id"] for exp in data2["experiments"])
+    }
+
+    # Combine experiments, updating IDs for second file
+    new_experiments = data1["experiments"].copy()
+    next_exp_id = max(exp["experiment_id"] for exp in new_experiments) + 1
+
+    for exp in data2["experiments"]:
+        new_exp = exp.copy()
+        new_exp["experiment_id"] = next_exp_id
+        new_exp["env_instance_id"] = env_id_map_2[exp["env_instance_id"]]
+        next_exp_id += 1
+        new_experiments.append(new_exp)
+
+    # Validate merged results
+    validate_merged_results(new_experiments, new_metadata["num_states_per_instance"])
+
+    # Save merged results
+    merged_data = {
+        "metadata": new_metadata,
+        "experiments": new_experiments
+    }
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    with open(output_file, 'w') as f:
+        json.dump(merged_data, f, indent=2)
+
+
+def validate_merged_results(experiments, num_states_per_instance):
+    """Validate the merged experiments for consistency"""
+    by_env = {}
+    for exp in experiments:
+        env_id = exp["env_instance_id"]
+        if env_id not in by_env:
+            by_env[env_id] = []
+        by_env[env_id].append(exp)
+
+    for env_id, env_exps in by_env.items():
+        # Check rock locations
+        rock_locs = env_exps[0]["rock_locations"]
+        if not all(exp["rock_locations"] == rock_locs for exp in env_exps):
+            raise ValueError(f"Inconsistent rock locations in env_instance {env_id}")
+
+        # Get the actual max help_config_id
+        max_help_id = max(exp["help_config_id"] for exp in env_exps)
+
+        # Check help configs are consistent
+        help_configs = {}
+        for exp in env_exps:
+            if exp["help_config_id"] != -1:
+                help_id = exp["help_config_id"]
+                if help_id in help_configs:
+                    if exp["help_actions"] != help_configs[help_id]:
+                        raise ValueError(f"Inconsistent help config {help_id} in env_instance {env_id}")
+                else:
+                    help_configs[help_id] = exp["help_actions"]
+
+        # Check all states for this env exist
+        states = set((exp["state_id"], exp["help_config_id"]) for exp in env_exps)
+        expected_states = set(
+            (state_id, help_id)
+            for state_id in range(num_states_per_instance)
+            for help_id in range(-1, max_help_id + 1)  # From -1 (no help) to max_help_id
+        )
+        if not expected_states.issubset(states):
+            missing = expected_states - states
+            raise ValueError(f"Missing experiments in env_instance {env_id}: {missing}")
 
 if __name__ == "__main__":
     app()
