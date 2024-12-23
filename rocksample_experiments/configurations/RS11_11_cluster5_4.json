@@ -28849,10 +28849,14 @@
         ]
       },
       "total_reward": [
+        40.0,
+        50.0,
         40.0
       ],
       "total_discounted_reward": [
-        19.185009862245646
+        19.185009862245646,
+        21.40111449933317,
+        18.566581217586496
       ]
     },
     {
@@ -28909,10 +28913,14 @@
         ]
       },
       "total_reward": [
-        30.0
+        30.0,
+        40.0,
+        40.0
       ],
       "total_discounted_reward": [
-        17.553162544108957
+        17.553162544108957,
+        19.196603922901843,
+        19.196603922901843
       ]
     },
     {
@@ -28968,8 +28976,16 @@
           6
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        30.0,
+        40.0,
+        60.0
+      ],
+      "total_discounted_reward": [
+        17.434249101481292,
+        19.81251795403461,
+        21.56833077893251
+      ]
     },
     {
       "experiment_id": 459,
@@ -29024,8 +29040,16 @@
           -1
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        40.0,
+        60.0,
+        50.0
+      ],
+      "total_discounted_reward": [
+        18.975737067401283,
+        23.081297251814078,
+        19.396242871500682
+      ]
     },
     {
       "experiment_id": 460,
@@ -29080,8 +29104,16 @@
           -1
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        30.0,
+        40.0,
+        50.0
+      ],
+      "total_discounted_reward": [
+        15.95899108178431,
+        18.975737067401283,
+        19.903126323688344
+      ]
     },
     {
       "experiment_id": 461,
@@ -29136,8 +29168,16 @@
           6
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        40.0,
+        20.0,
+        60.0
+      ],
+      "total_discounted_reward": [
+        18.765913554675752,
+        14.340899080297806,
+        22.785109172495574
+      ]
     },
     {
       "experiment_id": 462,
@@ -29192,8 +29232,16 @@
           2
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        30.0,
+        40.0,
+        50.0
+      ],
+      "total_discounted_reward": [
+        18.014602262627708,
+        19.09465051002895,
+        20.172803140046117
+      ]
     },
     {
       "experiment_id": 463,
@@ -29248,8 +29296,16 @@
           -4
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        40.0,
+        40.0,
+        40.0
+      ],
+      "total_discounted_reward": [
+        22.13766206232911,
+        19.66097656286849,
+        18.755449914933532
+      ]
     },
     {
       "experiment_id": 464,
@@ -29304,8 +29360,16 @@
           3
         ]
       },
-      "total_reward": null,
-      "total_discounted_reward": null
+      "total_reward": [
+        30.0,
+        40.0,
+        50.0
+      ],
+      "total_discounted_reward": [
+        17.852835490140855,
+        18.61956035021787,
+        19.77519636126919
+      ]
     },
     {
       "experiment_id": 465,
