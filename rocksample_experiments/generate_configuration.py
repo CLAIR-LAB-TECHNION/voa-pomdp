@@ -427,5 +427,169 @@ def validate_merged_results(experiments, num_states_per_instance):
             missing = expected_states - states
             raise ValueError(f"Missing experiments in env_instance {env_id}: {missing}")
 
+
+@app.command()
+def add_states_to_experiments(
+        input_file: str = typer.Option(..., help="Input experiment results file"),
+        additional_states: int = typer.Option(..., help="Number of additional states to add"),
+        output_file: str = typer.Option(..., help="Output file path")
+):
+    """Add more states to existing experiment configurations"""
+
+    print(f"\nLoading experiments from: {input_file}")
+    with open(input_file, 'r') as f:
+        data = json.load(f)
+
+    # Store original data for validation
+    original_experiments = data["experiments"]
+    original_count = len(original_experiments)
+    experiments_with_results = sum(1 for exp in original_experiments
+                                   if exp["total_reward"] is not None)
+
+    print(f"\nOriginal experiment stats:")
+    print(f"Total experiments: {original_count}")
+    print(f"Experiments with results: {experiments_with_results}")
+
+    # Update metadata
+    new_metadata = data["metadata"].copy()
+    original_states = data["metadata"]["num_states_per_instance"]
+    new_metadata["num_states_per_instance"] = original_states + additional_states
+
+    print(f"\nAdding {additional_states} states to each environment instance")
+    print(f"States per instance: {original_states} -> {original_states + additional_states}")
+
+    # Group experiments by env_instance_id
+    by_env = {}
+    for exp in data["experiments"]:
+        env_id = exp["env_instance_id"]
+        if env_id not in by_env:
+            by_env[env_id] = []
+        by_env[env_id].append(exp)
+
+    print(f"\nFound {len(by_env)} environment instances")
+
+    # Create new experiments list
+    new_experiments = []
+    experiment_id = 0
+    preserved_results = 0
+    new_experiments_added = 0
+
+    # Process each environment instance
+    for env_id in sorted(by_env.keys()):
+        env_exps = by_env[env_id]
+
+        # Get environment details from first experiment
+        rover_position = env_exps[0]["rover_position"]
+        rock_locations = env_exps[0]["rock_locations"]
+
+        # Get help configurations
+        help_configs = {}
+        for exp in env_exps:
+            if exp["help_config_id"] != -1:
+                help_configs[exp["help_config_id"]] = exp["help_actions"]
+
+        # Add existing states first
+        for state_idx in range(original_states):
+            state_exps = [e for e in env_exps if e["state_id"] == state_idx]
+            for exp in state_exps:
+                new_exp = exp.copy()
+                new_exp["experiment_id"] = experiment_id
+                new_experiments.append(new_exp)
+                experiment_id += 1
+                if exp["total_reward"] is not None:
+                    preserved_results += 1
+
+        # Add new states
+        for state_idx in range(original_states, original_states + additional_states):
+            # Generate new rock types
+            rocktypes = tuple(RockType.random() for _ in range(data["metadata"]["num_rocks"]))
+
+            # Add experiment with no help
+            new_experiments.append({
+                "experiment_id": experiment_id,
+                "env_instance_id": env_id,
+                "state_id": state_idx,
+                "help_config_id": -1,
+                "rover_position": rover_position,
+                "rock_locations": rock_locations,
+                "rock_types": list(rocktypes),
+                "help_actions": {},
+                "total_reward": None,
+                "total_discounted_reward": None
+            })
+            experiment_id += 1
+            new_experiments_added += 1
+
+            # Add experiments with help configurations
+            for help_idx, help_actions in help_configs.items():
+                new_experiments.append({
+                    "experiment_id": experiment_id,
+                    "env_instance_id": env_id,
+                    "state_id": state_idx,
+                    "help_config_id": help_idx,
+                    "rover_position": rover_position,
+                    "rock_locations": rock_locations,
+                    "rock_types": list(rocktypes),
+                    "help_actions": help_actions,
+                    "total_reward": None,
+                    "total_discounted_reward": None
+                })
+                experiment_id += 1
+                new_experiments_added += 1
+
+    # Validate results
+    print("\nValidating results:")
+
+    # Check all original results were preserved
+    assert preserved_results == experiments_with_results, \
+        f"Lost some results! Preserved: {preserved_results}, Original: {experiments_with_results}"
+    print("✓ All original results preserved")
+
+    # Validate experiment count
+    expected_new_count = original_count + \
+                         (additional_states * len(by_env) * (len(help_configs) + 1))
+    assert len(new_experiments) == expected_new_count, \
+        f"Expected {expected_new_count} experiments, got {len(new_experiments)}"
+    print("✓ Total experiment count matches expected")
+
+    # Validate experiment IDs are sequential
+    exp_ids = [exp["experiment_id"] for exp in new_experiments]
+    assert exp_ids == list(range(len(new_experiments))), "Experiment IDs not sequential"
+    print("✓ Experiment IDs are sequential")
+
+    # Validate help configs are consistent within each env instance
+    for env_id in by_env:
+        env_exps = [exp for exp in new_experiments if exp["env_instance_id"] == env_id]
+        help_actions = {}
+        for exp in env_exps:
+            if exp["help_config_id"] != -1:
+                help_id = exp["help_config_id"]
+                if help_id in help_actions:
+                    assert exp["help_actions"] == help_actions[help_id], \
+                        f"Inconsistent help config {help_id} in env {env_id}"
+                else:
+                    help_actions[help_id] = exp["help_actions"]
+    print("✓ Help configurations are consistent within environments")
+
+    print("\nSummary:")
+    print(f"Original experiments: {original_count}")
+    print(f"New experiments added: {new_experiments_added}")
+    print(f"Total experiments: {len(new_experiments)}")
+    print(f"Results preserved: {preserved_results}")
+
+    # Save to output file
+    print(f"\nSaving to: {output_file}")
+    output_data = {
+        "metadata": new_metadata,
+        "experiments": new_experiments
+    }
+
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    with open(output_file, 'w') as f:
+        json.dump(output_data, f, indent=2)
+
+    print("Done!")
+
+
 if __name__ == "__main__":
     app()
