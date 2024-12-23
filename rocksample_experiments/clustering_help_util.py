@@ -11,25 +11,27 @@ app = typer.Typer()
 
 
 def get_cluster_positions(n: int) -> List[Tuple[int, int]]:
-    """Return the three fixed cluster positions near exit"""
+    """Return the three fixed cluster positions at column 2"""
     return [
-        (n - 1, n // 2),  # middle
-        (n - 1, n // 4),  # upper quarter
-        (n - 1, 3 * n // 4)  # lower quarter
+        (2, n // 2),    # middle
+        (2, n // 4),    # upper quarter
+        (2, 3 * n // 4)  # lower quarter
     ]
 
 
-def get_available_positions_around(center: Tuple[int, int], n: int, occupied_positions: Set[Tuple[int, int]]) -> List[
-    Tuple[int, int]]:
+def get_available_positions_around(center: Tuple[int, int], n: int, occupied_positions: Set[Tuple[int, int]]) -> List[Tuple[int, int]]:
     """Get available positions around center point, considering grid bounds and occupied positions"""
     x, y = center
     relative = [
-        (0, 0),  # center
-        (0, 1),  # up
-        (0, -1),  # down
-        (-1, 0),  # left
-        (-1, 1),  # diagonal up-left
-        (-1, -1)  # diagonal down-left
+        (0, 0),     # center
+        (-1, 0),    # left
+        (0, 1),     # up
+        (0, -1),    # down
+        (1, 0),     # right
+        (-1, 1),    # diagonal up-left
+        (-1, -1),   # diagonal down-left
+        (1, 1),     # diagonal up-right
+        (1, -1)     # diagonal down-right
     ]
 
     positions = []
@@ -39,7 +41,6 @@ def get_available_positions_around(center: Tuple[int, int], n: int, occupied_pos
             positions.append((new_x, new_y))
 
     return positions
-
 
 def get_cluster_center(positions: List[Tuple[int, int]], n: int) -> Tuple[int, int]:
     """
