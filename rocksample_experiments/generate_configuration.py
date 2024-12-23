@@ -473,10 +473,13 @@ def add_states_to_experiments(
     experiment_id = 0
     preserved_results = 0
     new_experiments_added = 0
+    total_new_experiments_expected = 0
 
     # Process each environment instance
     for env_id in sorted(by_env.keys()):
         env_exps = by_env[env_id]
+        print(f"\nProcessing environment instance {env_id}:")
+        print(f"Original experiments in this instance: {len(env_exps)}")
 
         # Get environment details from first experiment
         rover_position = env_exps[0]["rover_position"]
@@ -487,6 +490,13 @@ def add_states_to_experiments(
         for exp in env_exps:
             if exp["help_config_id"] != -1:
                 help_configs[exp["help_config_id"]] = exp["help_actions"]
+
+        exps_per_state = len(help_configs) + 1  # +1 for no-help case
+        print(f"Found {len(help_configs)} help configurations ({exps_per_state} experiments per state)")
+
+        # Calculate expected new experiments for this env
+        env_new_exps = additional_states * exps_per_state
+        total_new_experiments_expected += env_new_exps
 
         # Add existing states first
         for state_idx in range(original_states):
@@ -521,7 +531,7 @@ def add_states_to_experiments(
             new_experiments_added += 1
 
             # Add experiments with help configurations
-            for help_idx, help_actions in help_configs.items():
+            for help_idx in sorted(help_configs.keys()):
                 new_experiments.append({
                     "experiment_id": experiment_id,
                     "env_instance_id": env_id,
@@ -530,7 +540,7 @@ def add_states_to_experiments(
                     "rover_position": rover_position,
                     "rock_locations": rock_locations,
                     "rock_types": list(rocktypes),
-                    "help_actions": help_actions,
+                    "help_actions": help_configs[help_idx],
                     "total_reward": None,
                     "total_discounted_reward": None
                 })
@@ -546,8 +556,7 @@ def add_states_to_experiments(
     print("✓ All original results preserved")
 
     # Validate experiment count
-    expected_new_count = original_count + \
-                         (additional_states * len(by_env) * (len(help_configs) + 1))
+    expected_new_count = original_count + total_new_experiments_expected
     assert len(new_experiments) == expected_new_count, \
         f"Expected {expected_new_count} experiments, got {len(new_experiments)}"
     print("✓ Total experiment count matches expected")
@@ -589,7 +598,6 @@ def add_states_to_experiments(
         json.dump(output_data, f, indent=2)
 
     print("Done!")
-
 
 if __name__ == "__main__":
     app()
