@@ -23,15 +23,15 @@ def get_available_positions_around(center: Tuple[int, int], n: int, occupied_pos
     """Get available positions around center point, considering grid bounds and occupied positions"""
     x, y = center
     relative = [
-        (0, 0),     # center
-        (-1, 0),    # left
-        (0, 1),     # up
-        (0, -1),    # down
-        (1, 0),     # right
-        (-1, 1),    # diagonal up-left
-        (-1, -1),   # diagonal down-left
-        (1, 1),     # diagonal up-right
-        (1, -1)     # diagonal down-right
+        (0, 0),  # center
+        (-1, 0),  # left
+        (0, -1),  # up (negative y)
+        (0, 1),  # down (positive y)
+        (1, 0),  # right
+        (-1, -1),  # diagonal up-left
+        (-1, 1),  # diagonal down-left
+        (1, -1),  # diagonal up-right
+        (1, 1)  # diagonal down-right
     ]
 
     positions = []
