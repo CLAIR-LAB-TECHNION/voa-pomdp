@@ -1,3 +1,4 @@
+import math
 import sys
 import time
 from abc import abstractmethod
@@ -14,11 +15,13 @@ from klampt.model import ik
 from klampt.math import se3, so3
 from klampt.model import collide
 import os
+from trimesh.path.packing import visualize
+
 
 
 class AbstractMotionPlanner:
     default_attachments = frozendict(ur5e_1=["camera", "gripper"], ur5e_2=["gripper"])
-    default_settings = frozendict({  # "type": "lazyrrg*",
+    default_settings = frozendict({
         "type": "rrt*",
         "bidirectional": False,
         "connectionThreshold": 30.0,
@@ -38,7 +41,7 @@ class AbstractMotionPlanner:
             collision, too low value may lead to slow planning. Default value is 1e-2.
         """
         self.eps = eps
-
+        self.objects = {}
         self.world = WorldModel()
         world_path = self._get_klampt_world_path()
         self.world.readFile(world_path)
@@ -55,6 +58,7 @@ class AbstractMotionPlanner:
         self.world_collider = collide.WorldCollider(self.world)
 
         self.settings = frozendict(self.default_settings)
+        self.held_objects = {robot_name: None for robot_name in self.robot_name_mapping}  # Track held objects
 
     def is_pyqt5_available(self):
         try:
@@ -81,8 +85,8 @@ class AbstractMotionPlanner:
             vis.createWindow(window_name)
 
         vis.add("world", self.world)
-        # vis.setColor(('world', 'ur5e_1'), 0, 1, 1)
-        # vis.setColor(('world', 'ur5e_2'), 0, 0, 0.5)
+        vis.setColor(('world', 'ur5e_1'), 0.8, 0.8, 0.8)
+        vis.setColor(('world', 'ur5e_2'), 0.8, 0.8, 0.8)
 
         # set camera position:
         viewport = vis.getViewport()
@@ -150,11 +154,12 @@ class AbstractMotionPlanner:
         """
         plan from a start and a goal that are given in 6d configuration space
         """
-        start_config_klampt = self.config6d_to_klampt(start_config)
-        goal_config_klampt = self.config6d_to_klampt(goal_config)
+        if len(start_config) == 6 and len(goal_config) == 6:
+            start_config = self.config6d_to_klampt(start_config)
+            goal_config = self.config6d_to_klampt(goal_config)
 
         robot = self.robot_name_mapping[robot_name]
-        path = self._plan_from_start_to_goal_config_klampt(robot, start_config_klampt, goal_config_klampt,
+        path = self._plan_from_start_to_goal_config_klampt(robot, start_config, goal_config,
                                                            max_time, max_length_to_distance_ratio)
 
         return self.path_klampt_to_config6d(path)
@@ -350,6 +355,84 @@ class AbstractMotionPlanner:
         robot.setConfig(curr_config)
 
         return res_config
+
+
+    def add_object_to_world(self, name, item):
+        """
+        Add a new object to the world.
+        :param name: Name of the object.
+        :param item: Dictionary containing the following keys:
+            - geometry_file: Path to the object's geometry file.
+            - coordinates: [x, y, z] coordinates.
+            - angle: Rotation matrix (so3).
+            - color: Dictionary with 'name' and 'rgb' keys for the object's color (default is white).
+            - scale: Scaling factor of the object (default is 1,1,1).
+        """
+
+        obj = self.world.makeRigidObject(name)
+        geom = obj.geometry()
+        if not geom.loadFile(item["geometry_file"]):
+            raise ValueError(f"Failed to load geometry file: {item['geometry_file']}")
+
+        # Set the transformation (rotation + position)
+        if len(item["angle"]) != 9:
+            item["angle"] = so3.rotation(item["angle"], math.pi / 2)
+        transform = (item["angle"], item["coordinates"])
+        geom.setCurrentTransform(*transform)
+        if type(item["scale"]) is float or int:
+            geom.scale(item["scale"])
+        else:
+            geom.scale(*item["scale"])
+
+        # Set the transformation for the rigid object
+        obj.setTransform(*transform)
+
+        # Set the object's color
+        obj.appearance().setColor(*item["color"]["rgb"])
+
+        # Save the object in the dictionary
+        self.objects[name] = obj
+
+        return obj
+
+
+    def get_object(self, name):
+        """
+        Retrieve an object by name from the dictionary.
+        :param name: Name of the object.
+        :return: The object if found, otherwise None.
+        """
+        obj = self.objects.get(name)
+        if obj is None:
+            print(f"Object '{name}' not found.")
+        return obj
+
+    def remove_object(self, name, vis_state=False):
+        """
+        Remove an object from the world and the dictionary.
+        :param name: Name of the object to be removed.
+        :param vis_state: Boolean to visualize the workspace after removing the object.
+        """
+        if vis.shown():
+            vis_state = True
+            vis.show(False)
+            time.sleep(0.3)
+        self._remove_object(name)
+        if vis_state:
+            self.visualize(window_name="workspace")
+
+    def _remove_object(self, name):
+        """
+        Remove an object from the world and the dictionary.
+        :param name: Name of the object to be removed.
+        """
+        obj = self.objects.pop(name, None)  # Remove from the dictionary
+        if obj is None:
+            print(f"Object '{name}' not found. Cannot remove.")
+        else:
+            self.world.remove(obj)
+            print(f"Object '{name}' removed from the dictionary and world.")
+
 
     @abstractmethod
     def _get_klampt_world_path(self):

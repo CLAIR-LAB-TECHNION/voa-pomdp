@@ -1,0 +1,96 @@
+{
+    "items": {
+        "green-mug": {
+            "name": "green-mug",
+            "color": {"name": "green", "rgb": [0.0, 1.0, 0.0]},
+            "geometry_file": "C:/Users/adiab/OneDrive - Technion/Master proj/S3E ROBOT/S3E_Robot/S3E_ROBOT/geometries/red_can/Drinks Can.STL",
+            "board_location": "white_zone_1",
+            "coordinates": [-1, -0.4, 0],
+            "angle": [0, 0, 1],
+            "scale": 0.001,
+            "height": 0.15
+        },
+        "red-can": {
+            "name": "red-can",
+            "color": {"name": "red", "rgb": [1.0, 0.0, 0.0]},
+            "geometry_file": "C:/Users/adiab/OneDrive - Technion/Master proj/S3E ROBOT/S3E_Robot/S3E_ROBOT/geometries/red_can/Drinks Can.STL",
+            "board_location": null,
+            "coordinates": [-0.8, -0.4, 0],
+            "angle": [1, 0, 0],
+            "scale": 0.001,
+            "height": 0.12
+        },
+        "water-bottle": {
+            "name": "water-bottle",
+            "color": {"name": "transparent", "rgb": [1.0, 1.0, 1.0]},
+            "geometry_file": "C:/Users/adiab/OneDrive - Technion/Master proj/S3E ROBOT/S3E_Robot/S3E_ROBOT/geometries/red_can/Drinks Can.STL",
+            "board_location": "white_zone_2",
+            "coordinates": [1, 0, 0.0, 0, 1, 0, 0, 0, 1],
+            "angle": [1, 0, 1],
+            "scale": 0.001,
+            "height": 0.25
+        },
+        "spray-bottle": {
+            "name": "spray-bottle",
+            "color": {"name": "blue", "rgb": [0.0, 0.0, 1.0]},
+            "geometry_file": "C:/Users/adiab/OneDrive - Technion/Master proj/S3E ROBOT/S3E_Robot/S3E_ROBOT/geometries/spray/spray_test1.STL",
+            "board_location": "blue_zone_2",
+            "coordinates": [-0.97, -0.5, 0],
+            "angle": [1, 0, 0.0, 0, 1, 0, 0, 0, 1],
+            "scale": 1,
+            "height": 0.30
+        },
+        "spray-bottle1": {
+            "name": "spray-bottle1",
+            "color": {"name": "blue", "rgb": [0.0, 0.0, 1.0]},
+            "geometry_file": "C:/Users/adiab/OneDrive - Technion/Master proj/S3E ROBOT/S3E_Robot/S3E_ROBOT/geometries/spray/spray_test1.STL",
+            "board_location": "blue_zone_2",
+            "coordinates": [-0.4, -0.5, 0],
+            "angle": [1, 0, 0.0, 0, 1, 0, 0, 0, 1],
+            "scale": 1,
+            "height": 0.20
+        }
+    },
+    "locations": {
+        "white_zone_1": {
+            "name": "white_zone_1",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        },
+        "white_zone_2": {
+            "name": "white_zone_2",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        },
+        "white_zone_3": {
+            "name": "white_zone_3",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        },
+        "white_zone_4": {
+            "name": "white_zone_4",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        },
+        "blue_zone_1": {
+            "name": "blue_zone_1",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        },
+        "blue_zone_2": {
+            "name": "blue_zone_2",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        },
+        "blue_zone_3": {
+            "name": "blue_zone_3",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        },
+        "blue_zone_4": {
+            "name": "blue_zone_4",
+            "coordinates": [0, 0, 0],
+            "occupied": "True"
+        }
+    }
+}
