@@ -5,6 +5,7 @@ from numpy import pi
 import time
 import logging
 
+from lab_ur_stack.robot_inteface.vgc10_gripper import VG10C
 
 home_config = [0, -pi/2, 0, -pi/2, 0, 0]
 
@@ -40,12 +41,12 @@ class RobotInterface(rtdectrl, rtdercv):
 
 class RobotInterfaceWithGripper(RobotInterface):
     def __init__(self, robot_ip, freq=50, gripper_id=0):
+        raise DeprecationWarning("This class is deprecated, use RobotInterfaceWith2FG7 instead")
         super().__init__(robot_ip, freq)
         self.gripper = TwoFG7(robot_ip, gripper_id)
 
         self.min_width = self.gripper.twofg_get_min_external_width()
         self.max_width = self.gripper.twofg_get_max_external_width()
-
 
     def set_gripper(self, width, force, speed, wait_time=0.5):
         logging.debug(f"Setting gripper ({self._ip}), width: {width}, force: {force}, speed: {speed}")
@@ -70,3 +71,10 @@ class RobotInterfaceWithGripper(RobotInterface):
 
     def is_object_gripped(self):
         return self.gripper.twofg_get_grip_detected()
+
+
+class RobotInterfaceWithSuctionGripper(RobotInterface):
+    def __init__(self, robot_ip, freq=50, suction_id=0):
+        super().__init__(robot_ip, freq)
+        self.suction = VG10C(robot_ip, suction_id)
+

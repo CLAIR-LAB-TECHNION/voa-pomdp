@@ -1,7 +1,7 @@
 from lab_ur_stack.utils.workspace_utils import (sample_block_positions_uniform, stack_position_r2frame,
                                                 workspace_x_lims_default, workspace_y_lims_default,
                                                 sample_block_positions_from_dists)
-from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 import numpy as np
 
 
@@ -19,7 +19,7 @@ def to_canonical_config(config):
 
 
 def distribute_blocks_in_positions(block_positions,
-                                   robot_controller: ManipulationController,
+                                   robot_controller: ManipulationController2FG,
                                    stack_position=stack_position_r2frame,
                                    is_stack_position_in_ur5e_2_frame=True,
                                    start_height=None):
@@ -39,7 +39,7 @@ def distribute_blocks_in_positions(block_positions,
 
 
 def ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks,
-                                                  robot_controller: ManipulationController,
+                                                  robot_controller: ManipulationController2FG,
                                                   ws_lim_x=workspace_x_lims_default,
                                                   ws_lim_y=workspace_y_lims_default,
                                                   stack_position_ur5e_2_frame=stack_position_r2frame,
@@ -53,7 +53,7 @@ def ur5e_2_distribute_blocks_in_workspace_uniform(n_blocks,
 
 
 def ur5e_2_distribute_blocks_from_block_positions_dists(blocks_distributions,
-                                                        robot_controller: ManipulationController,
+                                                        robot_controller: ManipulationController2FG,
                                                         stack_position_ur5e_2_frame=stack_position_r2frame,
                                                         min_distance=0.07):
     block_positions = sample_block_positions_from_dists(blocks_distributions, min_distance)
@@ -61,7 +61,7 @@ def ur5e_2_distribute_blocks_from_block_positions_dists(blocks_distributions,
     return block_positions
 
 
-def ur5e_2_collect_blocks_from_positions(block_positions, robot_controller: ManipulationController,
+def ur5e_2_collect_blocks_from_positions(block_positions, robot_controller: ManipulationController2FG,
                                          stack_position_ur5e_2_frame=stack_position_r2frame):
     """
     collect blocks from block_positions and stack them at stack_position

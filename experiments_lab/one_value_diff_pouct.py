@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from experiments_lab.block_stacking_env import LabBlockStackingEnv
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
-from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera, RealsenseCameraWithRecording
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
@@ -43,8 +43,8 @@ def main(n_blocks: int = 4,
     gt = GeometryAndTransforms.from_motion_planner(motion_planner)
     position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt)
 
-    r1_controller = ManipulationController(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
-    r2_controller = ManipulationController(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
+    r1_controller = ManipulationController2FG(ur5e_1["ip"], ur5e_1["name"], motion_planner, gt)
+    r2_controller = ManipulationController2FG(ur5e_2["ip"], ur5e_2["name"], motion_planner, gt)
     r1_controller.speed, r1_controller.acceleration = 0.75, 0.75
     r2_controller.speed, r2_controller.acceleration = 2.0, 4.0
 

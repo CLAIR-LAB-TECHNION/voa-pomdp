@@ -1,7 +1,7 @@
 import random
 
 import typer
-from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_2
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default
 
@@ -18,7 +18,7 @@ points = [[workspace_x_lims_default[0], workspace_y_lims_default[0]],
 @app.command(
     context_settings={"ignore_unknown_options": True})
 def main(repeat: int = 1):
-    controller = ManipulationController.build_from_robot_name_and_ip(ur5e_2["ip"], ur5e_2["name"])
+    controller = ManipulationController2FG.build_from_robot_name_and_ip(ur5e_2["ip"], ur5e_2["name"])
     # controller.moveL_relative([0, 0, 0.1], speed=0.5, acceleration=0.5)
     controller.plan_and_move_home()
     for point in points:

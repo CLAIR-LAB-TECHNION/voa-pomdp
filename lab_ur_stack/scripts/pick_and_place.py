@@ -1,5 +1,5 @@
 import typer
-from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_2
 
 
@@ -19,7 +19,7 @@ def main(pickup_x: float,
     typer.echo(f"Pickup location: {pickup_x, pickup_y}")
     typer.echo(f"Drop location: {drop_x, drop_y}")
 
-    controller = ManipulationController.build_from_robot_name_and_ip(ur5e_2["ip"], ur5e_2["name"])
+    controller = ManipulationController2FG.build_from_robot_name_and_ip(ur5e_2["ip"], ur5e_2["name"])
     controller.speed *= speed_scale
     controller.acceleration *= speed_scale
 

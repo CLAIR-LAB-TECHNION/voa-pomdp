@@ -1,7 +1,7 @@
 from matplotlib import pyplot as plt
 
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera
-from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_from_block_positions_dists, \
     distribute_blocks_in_positions, to_canonical_config
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
@@ -20,8 +20,8 @@ class LabBlockStackingEnv:
     def __init__(self,
                  n_blocks,
                  max_steps,
-                 ur5e_1_controller: ManipulationController,
-                 ur5e_2_controller: ManipulationController,
+                 ur5e_1_controller: ManipulationController2FG,
+                 ur5e_2_controller: ManipulationController2FG,
                  gt: GeometryAndTransforms,
                  camera=None,
                  position_estimator=None,

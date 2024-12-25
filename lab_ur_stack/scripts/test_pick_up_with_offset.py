@@ -2,7 +2,7 @@ import typer
 
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
-from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default, stack_position_r2frame)
@@ -17,7 +17,7 @@ app = typer.Typer()
     context_settings={"ignore_unknown_options": True})
 def main(offset_x: float = -0.015,
          offset_y: float = -0.02):
-    r2_controller = ManipulationController.build_from_robot_name_and_ip(ur5e_2["ip"], ur5e_2["name"])
+    r2_controller = ManipulationController2FG.build_from_robot_name_and_ip(ur5e_2["ip"], ur5e_2["name"])
     gt = GeometryAndTransforms.from_motion_planner(MotionPlanner())
 
     stack_position = gt.point_robot_to_world("ur5e_2", (*stack_position_r2frame, 0))

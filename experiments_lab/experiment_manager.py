@@ -11,7 +11,7 @@ from experiments_lab.experiment_results_data import ExperimentResults
 from experiments_lab.experiment_visualizer import ExperimentVisualizer
 from experiments_lab.utils import plot_belief_with_history, update_belief
 from lab_ur_stack.camera.realsense_camera import RealsenseCameraWithRecording
-from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.manipulation.utils import to_canonical_config,  ur5e_2_collect_blocks_from_positions
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import workspace_x_lims_default, workspace_y_lims_default, goal_tower_position, \
@@ -52,8 +52,8 @@ class ExperimentManager:
     def from_params(cls,
                     n_blocks: int,
                     max_steps: int,
-                    r1_controller: ManipulationController,
-                    r2_controller: ManipulationController,
+                    r1_controller: ManipulationController2FG,
+                    r2_controller: ManipulationController2FG,
                     gt: GeometryAndTransforms,
                     camera=None,
                     position_estimator=None,

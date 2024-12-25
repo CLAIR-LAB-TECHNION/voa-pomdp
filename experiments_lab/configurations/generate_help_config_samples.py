@@ -135,7 +135,7 @@ def visualize_configs(file_name="help_configs.npy",
     context_settings={"ignore_unknown_options": True})
 def detect_from_configs(file_name="help_configs.npy",):
     from lab_ur_stack.camera.realsense_camera import RealsenseCamera
-    from lab_ur_stack.manipulation.manipulation_controller import ManipulationController
+    from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
     from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1
     from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
     from matplotlib import pyplot as plt
@@ -157,7 +157,7 @@ def detect_from_configs(file_name="help_configs.npy",):
     gt.motion_planner.visualize()
 
     camera = RealsenseCamera()
-    r1_controller = ManipulationController.build_from_robot_name_and_ip(ur5e_1["ip"], ur5e_1["name"])
+    r1_controller = ManipulationController2FG.build_from_robot_name_and_ip(ur5e_1["ip"], ur5e_1["name"])
     position_estimator = ImageBlockPositionEstimator(workspace_x_lims_default, workspace_y_lims_default, gt)
 
     for config in help_configs:
