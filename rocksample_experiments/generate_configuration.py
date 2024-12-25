@@ -217,6 +217,9 @@ def generate_experiment_configs(
         # Parameters for cluster mode
         window_size: Optional[int] = typer.Option(None, help="Window size for clustering mode"),
         max_rocks_per_cluster: Optional[int] = typer.Option(None, help="Maximum number of rocks per cluster (cluster mode only)"),
+        ###
+        max_help_configs: Optional[int] = typer.Option(0, help="Maximum number of help configurations, for all help modes."
+                                                               "used for value function learning where we want sparse instances"),
         output_file: str = typer.Option(..., help="Output JSON file path")
 ):
     """Generate experiment configurations and save to JSON file"""
@@ -282,6 +285,9 @@ def generate_experiment_configs(
             help_configs = generate_single_push_configs(problem, single_push_distance)
         else:  # cluster mode
             help_configs = generate_cluster_configs(problem, max_rocks_per_cluster, window_size)
+
+        if max_help_configs > 0:
+            help_configs = random.sample(help_configs, min(max_help_configs, len(help_configs)))
 
         # For each instance, generate different states (rock types)
         for state_idx in range(n_actual_states):
