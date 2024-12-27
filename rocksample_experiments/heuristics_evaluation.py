@@ -1,12 +1,15 @@
+from joblib import Parallel, delayed
+import pandas as pd
 from rocksample_experiments.utils import sample_problem_from_voa_row
 import numpy as np
 from scipy import stats
+import time
 
 
 def test_heuristic_on_problem_instance(voa_df, env_instance_id, heuristic_function, heuristic_kwargs=None):
     """
     Test a heuristic function on a specific environment instance all helping actions,
-    using efficient pandas operations
+    using efficient pandas operations. Measures computation time for each heuristic call.
     """
     if heuristic_kwargs is None:
         heuristic_kwargs = {}
@@ -14,14 +17,19 @@ def test_heuristic_on_problem_instance(voa_df, env_instance_id, heuristic_functi
     # Filter for the specific environment instance
     env_voa_df = voa_df[voa_df['env_instance_id'] == env_instance_id].copy()
 
-    # Apply heuristic function to each row using pandas apply
     def apply_heuristic(row):
+        start_time = time.time()
+
         problem = sample_problem_from_voa_row(row, n=11)
         help_config = eval(row['help_actions'])
-        return heuristic_function(problem, help_config, **heuristic_kwargs)
+        heuristic_value = heuristic_function(problem, help_config, **heuristic_kwargs)
 
-    # Calculate heuristic values
-    env_voa_df['heuristic_value'] = env_voa_df.apply(apply_heuristic, axis=1)
+        computation_time = time.time() - start_time
+        return pd.Series([heuristic_value, computation_time],
+                         index=['heuristic_value', 'computation_time'])
+
+    # Calculate heuristic values and computation times in one go
+    env_voa_df[['heuristic_value', 'computation_time']] = env_voa_df.apply(apply_heuristic, axis=1)
 
     # Select relevant columns for the results
     results_df = env_voa_df[[
@@ -33,13 +41,46 @@ def test_heuristic_on_problem_instance(voa_df, env_instance_id, heuristic_functi
         'ci_low_90',
         'ci_high_90',
         'ci_low_80',
-        'ci_high_80'
+        'ci_high_80',
+        'computation_time'
     ]].copy()
 
     # Add environment instance ID
     results_df['env_instance_id'] = env_instance_id
-
     return results_df
+
+
+def test_heuristic_on_all_instances_parallel(voa_df, heuristic_function, heuristic_kwargs=None, n_jobs=2):
+    """
+    Test a heuristic function on all environment instances in parallel
+
+    Args:
+        voa_df: DataFrame containing VOA data for all instances
+        heuristic_function: Function to evaluate the heuristic
+        heuristic_kwargs: Optional kwargs for the heuristic function
+        n_jobs: Number of parallel processes to use
+
+    Returns:
+        dict: {env_instance_id: DataFrame} containing heuristic computation results for each instance
+    """
+    if heuristic_kwargs is None:
+        heuristic_kwargs = {}
+
+    # Get unique environment instances
+    env_instances = voa_df['env_instance_id'].unique()
+
+    # Run parallel processing
+    results = Parallel(n_jobs=n_jobs)(
+        delayed(test_heuristic_on_problem_instance)(
+            voa_df,
+            env_id,
+            heuristic_function,
+            heuristic_kwargs
+        ) for env_id in env_instances
+    )
+
+    # Convert to dictionary with env_id as key
+    return {env_id: df for env_id, df in zip(env_instances, results)}
 
 
 def evaluate_top_k_accuracy(results_df, k=3):
@@ -104,8 +145,11 @@ def evaluate_sign_agreement(results_df, ci_type='95'):
         - precision: proportion of heuristic positive predictions that are actually positive
         - recall: proportion of true positives that are correctly identified
         - accuracy: proportion of correct predictions among all significant samples
+        - balanced_accuracy: average of true positive and true negative rates
         - n_significant: number of samples with significant VOA
         - n_total: total number of samples
+        - n_significant_positive: number of samples with significant positive VOA
+        - n_significant_negative: number of samples with significant negative VOA
     """
     if ci_type not in ['95', '90', '80']:
         raise ValueError("ci_type must be '95', '90', or '80'")
@@ -123,8 +167,11 @@ def evaluate_sign_agreement(results_df, ci_type='95'):
             'precision': None,
             'recall': None,
             'accuracy': None,
+            'balanced_accuracy': None,
             'n_significant': 0,
-            'n_total': len(results_df)
+            'n_total': len(results_df),
+            'n_significant_positive': 0,
+            'n_significant_negative': 0
         }
 
     # Actual and predicted labels for significant samples
@@ -141,12 +188,21 @@ def evaluate_sign_agreement(results_df, ci_type='95'):
     recall = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
     accuracy = (true_positives + true_negatives) / len(significant_df)
 
+    # Calculate balanced accuracy
+    tpr = recall  # true positive rate
+    tnr = true_negatives / (true_negatives + false_positives) if (
+                                                                             true_negatives + false_positives) > 0 else 0  # true negative rate
+    balanced_accuracy = (tpr + tnr) / 2
+
     return {
         'precision': precision,
         'recall': recall,
         'accuracy': accuracy,
+        'balanced_accuracy': balanced_accuracy,
         'n_significant': len(significant_df),
-        'n_total': len(results_df)
+        'n_total': len(results_df),
+        'n_significant_positive': sum(significant_positive),
+        'n_significant_negative': sum(significant_negative)
     }
 
 
@@ -166,23 +222,47 @@ def evaluate_ci_weighted_correlation(results_df):
     return weighted_corr
 
 
+def evaluate_rank_of_best_heuristic(results_df):
+    """
+    Find where the heuristic's top choice ranks in terms of empirical VOA.
+
+    Returns:
+        int: Rank of heuristic's best action in empirical VOA ordering (1-based)
+        float: The empirical VOA of heuristic's best action
+    """
+    # Find the action that heuristic thinks is best
+    best_heuristic_idx = results_df['heuristic_value'].idxmax()
+
+    # Sort by empirical VOA and find where this action ranks
+    empirical_ranking = results_df['empirical_voa'].rank(ascending=False)
+    rank_of_best = int(empirical_ranking[best_heuristic_idx])
+
+    # Get the empirical VOA of this action
+    voa_of_best = results_df.loc[best_heuristic_idx, 'empirical_voa']
+
+    return rank_of_best, voa_of_best
+
+
 def heuristic_metrics(results_df):
     """
     Comprehensive evaluation of heuristic performance
-
-    Args:
-        results_df: DataFrame with results from test_heuristic_on_problem_instance
-
-    Returns:
-        dict with all evaluation metrics
     """
+    rank_of_best, voa_of_best = evaluate_rank_of_best_heuristic(results_df)
+
     evaluation = {
         'top_1_accuracy': evaluate_top_k_accuracy(results_df, k=1),
-        'top_35_accuracy': evaluate_top_k_accuracy(results_df, k=5),
+        'top_5_accuracy': evaluate_top_k_accuracy(results_df, k=5),
         'rank_correlation': evaluate_rank_correlation(results_df)[0],
         'rank_correlation_pvalue': evaluate_rank_correlation(results_df)[1],
         'sign_agreement': evaluate_sign_agreement(results_df),
-        'ci_weighted_correlation': evaluate_ci_weighted_correlation(results_df)
+        'ci_weighted_correlation': evaluate_ci_weighted_correlation(results_df),
+        'rank_of_best_heuristic': rank_of_best,
+        'voa_of_best_heuristic': voa_of_best,
+        'mean_computation_time': results_df['computation_time'].mean(),
+        'std_computation_time': results_df['computation_time'].std(),
+        'max_computation_time': results_df['computation_time'].max(),
+        'min_computation_time': results_df['computation_time'].min()
     }
 
     return evaluation
+

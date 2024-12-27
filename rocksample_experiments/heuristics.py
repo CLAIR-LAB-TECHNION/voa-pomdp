@@ -33,24 +33,29 @@ def plan_one_step_and_get_tree_values(problem: RockSampleProblem, pomcp_params: 
     return action_values
 
 
-def first_step_planning_value(problem: RockSampleProblem,) -> float:
+def first_step_planning_value(problem: RockSampleProblem, n_sims, max_depth) -> float:
     action_prior = RSActionPrior(problem.n, problem.k, problem.rock_locs)
     pomcp_params = {"action_prior": action_prior,
-                    "rollout_policy": CustomRSPolicyModel(problem.n, problem.k, actions_prior=action_prior),}
+                    "rollout_policy": CustomRSPolicyModel(problem.n, problem.k, actions_prior=action_prior),
+                    "num_sims": n_sims,
+                    "max_depth": max_depth}
     action_values = plan_one_step_and_get_tree_values(problem, pomcp_params)
     action_values = action_values.values()
     return max(action_values)
 
 
-def h_first_step_planning_value_diff(problem: RockSampleProblem, help_config, n_trials=1) -> float:
+def h_first_step_planning_value_diff(problem: RockSampleProblem, help_config, n_sims=2000,
+                                     max_depth=20, n_trials=1) -> float:
     problem_helped = deepcopy(problem)
     problem_helped, _ = push_rocks(problem_helped, help_config)
 
     vdiffs = []
     for _ in range(n_trials):
-        vdiff = first_step_planning_value(problem_helped) - first_step_planning_value(problem)
+        vdiff = first_step_planning_value(problem_helped, n_sims=n_sims, max_depth=max_depth)\
+                - first_step_planning_value(problem, n_sims=n_sims, max_depth=max_depth)
         vdiffs.append(vdiff)
     return sum(vdiffs) / n_trials
+
 
 def h_rollout_policy_value(problem: RockSampleProblem, help_config) -> float:
     pass
