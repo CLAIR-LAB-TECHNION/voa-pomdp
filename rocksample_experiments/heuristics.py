@@ -51,14 +51,45 @@ def h_first_step_planning_value_diff(problem: RockSampleProblem, help_config, n_
 
     vdiffs = []
     for _ in range(n_trials):
-        vdiff = first_step_planning_value(problem_helped, n_sims=n_sims, max_depth=max_depth)\
+        vdiff = first_step_planning_value(problem_helped, n_sims=n_sims, max_depth=max_depth) \
                 - first_step_planning_value(problem, n_sims=n_sims, max_depth=max_depth)
         vdiffs.append(vdiff)
     return sum(vdiffs) / n_trials
 
 
-def h_rollout_policy_value(problem: RockSampleProblem, help_config) -> float:
-    pass
+def perform_rollout(problem: RockSampleProblem, rollout_policy: CustomRSPolicyModel, max_stpes: int,
+                    discount_factor) -> float:
+    problem = deepcopy(problem)
+
+    total_discounted_reward = 0
+    state = problem.env.state
+    history = []
+    for i in range(max_stpes):
+        action = rollout_policy.rollout(state, history)
+        reward = problem.env.state_transition(action, execute=True)
+        obs = problem.env.provide_observation(problem.agent.observation_model, action)
+
+        history.append((action, obs))
+        total_discounted_reward += reward * discount_factor ** i
+
+    return total_discounted_reward
+
+
+def h_rollout_policy_value(problem: RockSampleProblem, help_config, n_rollouts=10) -> float:
+    action_prior = RSActionPrior(problem.n, problem.k, problem.rock_locs)
+    rollout_policy = CustomRSPolicyModel(problem.n, problem.k, actions_prior=action_prior)
+
+    vdiffs = []
+
+    for i in range(n_rollouts):
+        problem_helped = deepcopy(problem)
+        problem_helped, _ = push_rocks(problem_helped, help_config)
+
+        vd = perform_rollout(problem_helped, rollout_policy, max_stpes=100, discount_factor=0.95) \
+             - perform_rollout(problem, rollout_policy, max_stpes=100, discount_factor=0.95)
+        vdiffs.append(vd)
+
+    return sum(vdiffs) / n_rollouts
 
 
 if __name__ == '__main__':
