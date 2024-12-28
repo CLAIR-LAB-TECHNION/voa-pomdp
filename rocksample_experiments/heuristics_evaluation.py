@@ -245,24 +245,62 @@ def evaluate_rank_of_best_heuristic(results_df):
 
 def heuristic_metrics(results_df):
     """
-    Comprehensive evaluation of heuristic performance
+    Comprehensive evaluation of heuristic performance with flat metrics structure
     """
     rank_of_best, voa_of_best = evaluate_rank_of_best_heuristic(results_df)
+    sign_metrics = evaluate_sign_agreement(results_df)
 
     evaluation = {
         'top_1_accuracy': evaluate_top_k_accuracy(results_df, k=1),
         'top_5_accuracy': evaluate_top_k_accuracy(results_df, k=5),
         'rank_correlation': evaluate_rank_correlation(results_df)[0],
         'rank_correlation_pvalue': evaluate_rank_correlation(results_df)[1],
-        'sign_agreement': evaluate_sign_agreement(results_df),
         'ci_weighted_correlation': evaluate_ci_weighted_correlation(results_df),
         'rank_of_best_heuristic': rank_of_best,
         'voa_of_best_heuristic': voa_of_best,
         'mean_computation_time': results_df['computation_time'].mean(),
         'std_computation_time': results_df['computation_time'].std(),
         'max_computation_time': results_df['computation_time'].max(),
-        'min_computation_time': results_df['computation_time'].min()
+        'min_computation_time': results_df['computation_time'].min(),
+        # Flatten sign agreement metrics
+        'sign_precision': sign_metrics['precision'],
+        'sign_recall': sign_metrics['recall'],
+        'sign_accuracy': sign_metrics['accuracy'],
+        'sign_balanced_accuracy': sign_metrics['balanced_accuracy'],
+        'sign_n_significant': sign_metrics['n_significant'],
+        'sign_n_total': sign_metrics['n_total'],
+        'sign_n_significant_positive': sign_metrics['n_significant_positive'],
+        'sign_n_significant_negative': sign_metrics['n_significant_negative']
     }
 
     return evaluation
+
+
+def calculate_mean_metrics(env_results_dict):
+    """
+    Calculate mean metrics across all environment instances
+
+    Args:
+        env_results_dict: dict of {env_id: DataFrame} as returned by test_heuristic_on_all_instances_parallel
+
+    Returns:
+        dict: Mean metrics across all environments
+    """
+    # Calculate metrics for each environment
+    all_metrics = {env_id: heuristic_metrics(df) for env_id, df in env_results_dict.items()}
+
+    # Simple mean calculation for all metrics
+    mean_metrics = {
+        key: np.mean([
+            metrics[key]
+            for metrics in all_metrics.values()
+            if metrics[key] is not None
+        ])
+        for key in all_metrics[next(iter(all_metrics))].keys()
+    }
+
+    # Add number of environments
+    mean_metrics['n_environments'] = len(env_results_dict)
+
+    return mean_metrics
 
