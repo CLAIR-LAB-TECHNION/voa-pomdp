@@ -7,6 +7,31 @@ from rocksample_experiments.preferred_actions import RSActionPrior, CustomRSPoli
 from rocksample_experiments.rocksample_problem import RockSampleProblem
 
 
+def h_vd_results(problem: RockSampleProblem, help_config, vd_table, n_states_to_use) -> float:
+    """
+    this one is for sanity checks and to see how many samples are enough. We use the already
+    made rollout with the actual policy. This is actually not heuristic but the same way we compute
+    empriical VOA, possibly with fewer samples
+    """
+    # take entries from vd table with same problem params and same help config:
+    rover_position_str = str(list(problem.env.state.position))
+    rock_locs = problem.rock_locs
+    rock_locs = {str(k): v for k, v in rock_locs.items()}
+    rock_locs_str = str(rock_locs)
+    help_config_str = {str(k): v for k, v in help_config.items()}
+    help_config_str = str(help_config_str)
+
+    vd_table_for_problem_help_pair = vd_table[vd_table['rover_position'] == rover_position_str]
+    vd_table_for_problem_help_pair = \
+        vd_table_for_problem_help_pair[vd_table_for_problem_help_pair['rock_locations'] == rock_locs_str]
+    vd_table_for_problem_help_pair = \
+        vd_table_for_problem_help_pair[vd_table_for_problem_help_pair['help_actions'] == help_config_str]
+    value_diffs = vd_table_for_problem_help_pair['value_diff'].values
+    value_diffs = value_diffs[:n_states_to_use]
+    return sum(value_diffs) / len(value_diffs)
+
+
+
 def plan_one_step_and_get_tree_values(problem: RockSampleProblem, pomcp_params: dict = None) -> dict:
     """
     Plan one step ahead and return the tree values for all actions.
