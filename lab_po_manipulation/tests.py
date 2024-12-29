@@ -1,7 +1,5 @@
 from dataclasses import dataclass
-
 import numpy as np
-
 from lab_po_manipulation.poman_motion_planner import POManMotionPlanner
 from lab_po_manipulation.prm import PRM
 from lab_ur_stack.manipulation.manipulation_controller_vg import ManipulationControllerVG
@@ -9,6 +7,7 @@ from lab_ur_stack.manipulation.utils import to_canonical_config
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
+from scipy.spatial.transform import Rotation as R
 
 
 @dataclass
@@ -20,7 +19,7 @@ class ItemPosition:
 
 
 item_positions = [
- ItemPosition("top_shelf_left", (-0.777, -0.189, 0.524), pick_start_offset=(0.15, 0, 0)),
+ ItemPosition("top_shelf_left", (-0.796, -0.189, 0.524), pick_start_offset=(0.15, 0, 0)),
  ItemPosition("top_shelf_right", (-0.796, 0.084, -0.524), pick_start_offset=(0.15, 0, 0)),
  ItemPosition("middle_shelf", (-0.781, -0.055, 0.287), pick_start_offset=(0.15, 0, 0)),
 ]
@@ -39,7 +38,8 @@ r2_controller.plan_and_move_home()
 r1_controller.release_grasp()
 
 # test picking up:
-item = ItemPosition("test_item", position=(0.35, -0.35, 0.2), pick_start_offset=(-0.15, 0, 0), pickup_ee_rz=np.pi/2)
+# item = ItemPosition("test_item", position=(0.35, -0.45, 0.6), pick_start_offset=(0, 0.05, 0.05), pickup_ee_rz=-np.pi)
+item = item_positions[0]
 
 # Compute approach vector (from offset to target)
 offset_position = np.array([
@@ -48,17 +48,23 @@ offset_position = np.array([
     item.position[2] + item.pick_start_offset[2]
 ])
 
-default_direciton = np.array([0, 0, 1])
+# default_direciton = np.array([0, 0, 1])
 approach_vector = -np.array(item.pick_start_offset)
 approach_vector /= np.linalg.norm(approach_vector)
-rotation_axis = np.cross(default_direciton, approach_vector)
-rotation_angle = np.arccos(np.dot(default_direciton, approach_vector))
-axis_angle = rotation_axis * rotation_angle
-axis_angle = axis_angle * item.pickup_ee_rz
+
+mat_z = approach_vector
+mat_x = np.array([1, 0, 0])
+if np.linalg.norm(np.cross(mat_z, mat_x)) < 1e-6:
+    mat_x = np.array([0, 1, 0])
+mat_y = np.cross(mat_z, mat_x)
+rotation_matrix = np.array([mat_x, mat_y, mat_z]).T
+# add rotation around z axis by item.pickup_ee_rz
+rotation_matrix = rotation_matrix @ R.from_euler("z", item.pickup_ee_rz).as_matrix()
+axis_angle = R.from_matrix(rotation_matrix).as_rotvec()
 
 pick_up_start_pose = offset_position.tolist() + axis_angle.tolist()
 
-pick_up_start_config = r1_controller.getInverseKinematics(pick_up_start_pose)
+pick_up_start_config = r1_controller.find_ik_solution(pick_up_start_pose, for_down_movement=False)
 pick_up_start_config = to_canonical_config(pick_up_start_config)
 r1_controller.plan_and_moveJ(pick_up_start_config, speed=0.5, acceleration=0.6)
 item_pose = np.concatenate((item.position, axis_angle))
