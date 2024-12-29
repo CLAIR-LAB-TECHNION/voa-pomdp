@@ -3,43 +3,60 @@ from klampt.plan import robotcspace
 from klampt.plan import cspace, robotplanning
 import numpy as np
 import time
-
+from typing import List, Tuple
 from klampt.plan.robotplanning import make_space
-
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
+from collections import deque
 
 
-class RoadmapBuilder:
-    def __init__(self, motion_planner, robot_name, n_samples=1000, k_neighbors=10, max_edge_distance=2.0, eps=1e-2):
+# all joints are 2 pi to each direction, but we limit shoulder because it has to go through the table to
+# reach the other side, and it creates sets of un connected components. Similarly, we limit the elbow because
+# it can't realy do more than pi to each direction. joint one before last is also limited to -pi pi because
+# it's also likely to create unconnected components.
+default_joint_limits_low = (-2 * np.pi, -3.5, -np.pi, -2 * np.pi, -np.pi, -2 * np.pi)
+default_joint_limits_high = (2 * np.pi, 0.5, np.pi, 2 * np.pi, np.pi, 2 * np.pi)
+
+class PRM:
+    def __init__(self, motion_planner, robot_name, n_samples=1000, k_neighbors=10, max_edge_distance=2.0, eps=1e-2,
+                 joint_limits_high=default_joint_limits_high, joint_limits_low=default_joint_limits_low):
         """
-        Build and manage PRM roadmap for a robot
+        Probabilistic Roadmap for robot motion planning
         Args:
             motion_planner: Instance of MotionPlanner class
             robot_name: Name of robot to build roadmap for
             n_samples: Number of random configurations to sample
             k_neighbors: Number of nearest neighbors to try connecting
             max_edge_distance: Maximum allowed distance between configs to attempt connection
+            eps: Resolution for collision checking
         """
         self.mp = motion_planner
         self.robot_name = robot_name
         self.robot = self.mp.robot_name_mapping[robot_name]
 
+        self.robot.setJointLimits(self.mp.config6d_to_klampt(joint_limits_low),
+                                  self.mp.config6d_to_klampt(joint_limits_high))
+
         self.space = make_space(self.mp.world, self.robot)
 
         # workaround to set space where visibility check works:
-        self.robot.setConfig(self.mp.config6d_to_klampt([0, -np.pi/2, 0, -np.pi/2, 0, 0]))
-        c = self.mp.config6d_to_klampt([-np.pi/3]*6)
-        planner = robotplanning.plan_to_config(self.mp.world, self.robot, c, **self.mp.settings)
+        self.robot.setConfig(self.mp.config6d_to_klampt([0, -np.pi / 2, 0, -np.pi / 2, 0, 0]))
+        c = self.mp.config6d_to_klampt([-np.pi / 3] * 6)
+        planner = robotplanning.plan_to_config(self.mp.world, self.robot, c, **self.mp.settings, edgeCheckResolution=eps)
         self.space_for_visibility = planner.space
-        self.space_for_visibility.eps = eps
+        # self.space_for_visibility.eps = eps
 
         self.n_samples = n_samples
         self.k_neighbors = k_neighbors
         self.max_edge_distance = max_edge_distance
 
         # Roadmap storage
-        self.vertices = []
-        self.edges = []
+        self.vertices = []  # List of configurations
+        self.edges = []  # List of (vertex_idx1, vertex_idx2)
+        self.vertex_id_to_edges = {}  # Maps vertex index to list of neighbor indices
+        self.vertex_to_id = {}  # Maps vertex tuple to its index
+
+        # Build time storage
+        self.build_times = None
 
     def sample_random_config(self):
         """Generate random 6D configuration using CSpace sampler"""
@@ -49,24 +66,33 @@ class RoadmapBuilder:
             if self.mp.is_config_feasible(self.robot_name, q):
                 return q
 
-    def build_roadmap(self):
+    def build_roadmap(self, add_shortcuts=False):
         """Build the PRM roadmap by sampling and connecting vertices"""
+        if self.vertices or self.edges:
+            raise ValueError("Roadmap already exists. Clear it before building a new one")
+
+        build_start_time = time.time()
+        sampling_time = 0
+        connection_time = 0
+
         print(f"Building roadmap with {self.n_samples} samples...")
 
         # Sample valid configurations
+        sampling_start = time.time()
         for i in range(self.n_samples):
             if i % 100 == 0:
-                # print on top of prev line
                 print(f"Sampling vertex {i}/{self.n_samples}".ljust(50), end="\r")
             config = self.sample_random_config()
             self.vertices.append(config)
+        sampling_time = time.time() - sampling_start
         print()
+
         print("Connecting vertices...")
+        connection_start = time.time()
 
         # Convert vertices list to numpy array for faster operations
         vertices_array = np.array(self.vertices)
 
-        print("Connecting vertices...")
         num_attempted = 0
         num_successful = 0
 
@@ -96,6 +122,49 @@ class RoadmapBuilder:
         print(f"Roadmap built with {len(self.vertices)} vertices and {len(self.edges)} edges")
         print(f"Attempted {num_attempted} connections, {num_successful} successful")
 
+        connection_time = time.time() - connection_start
+        total_time = time.time() - build_start_time
+
+        self.build_times = {
+            'sampling': sampling_time,
+            'connection': connection_time,
+            'total': total_time
+        }
+
+        self.post_process()
+
+    def add_vertex(self, config: List[float]) -> int:
+        """
+        Add a new vertex to the roadmap and connect it to k nearest neighbors
+        Returns the index of the new vertex
+        """
+        if not self.mp.is_config_feasible(self.robot_name, config):
+            raise ValueError("Invalid configuration provided")
+
+        # Add the vertex
+        new_idx = len(self.vertices)
+        self.vertices.append(config)
+
+        # Compute distances to all existing vertices
+        vertices_array = np.array(self.vertices)
+        diff = np.array(config) - vertices_array
+        distances = np.linalg.norm(diff, axis=1)
+        distances[new_idx] = float('inf')  # Exclude self
+
+        # Find k nearest neighbors
+        neighbor_indices = np.argpartition(distances, self.k_neighbors)[:self.k_neighbors]
+
+        for j in neighbor_indices:
+            if distances[j] > self.max_edge_distance:
+                continue
+
+            if self.check_edge_validity(config, self.vertices[j]):
+                self.edges.append((new_idx, j))
+                self.edges.append((j, new_idx))
+
+        self.build_neighbor_maps()  # Update the neighbor maps
+        return new_idx
+
     def check_edge_validity(self, config1, config2):
         """Check if direct path between two configs is valid using CSpace"""
         config1_klampt = self.mp.config6d_to_klampt(config1)
@@ -103,7 +172,150 @@ class RoadmapBuilder:
         result = self.space_for_visibility.isVisible(config1, config2)
         return result
 
-    def save_roadmap(self, filename):
+    def _dfs_components(self):
+        """Helper method for DFS to find connected components
+        Returns:
+            List[List[int]]: List of components, where each component is a list of vertex indices
+        """
+        visited = set()
+        components = []
+
+        def dfs(v):
+            component = []
+            stack = [v]
+            while stack:
+                vertex = stack.pop()
+                if vertex not in visited:
+                    visited.add(vertex)
+                    component.append(vertex)
+                    stack.extend(neighbor for neighbor in self.vertex_id_to_edges[vertex]
+                                 if neighbor not in visited)
+            return component
+
+        for v in range(len(self.vertices)):
+            if v not in visited:
+                components.append(dfs(v))
+
+        return components
+
+    def post_process(self, add_shortcuts=False, reduce_neighbors=False):
+        """
+        Run all post-processing steps
+        """
+        self.add_reverse_edges()
+        self.build_neighbor_maps()
+        self.remove_duplicate_edges()
+        if add_shortcuts:
+            self.add_shortcuts()
+        if reduce_neighbors:
+            self.reduce_to_k_neighbors()
+        self.check_connectivity()
+
+    def add_reverse_edges(self):
+        """Add reverse edges for each existing edge"""
+        new_edges = []
+        for i, j in self.edges:
+            if (j, i) not in self.edges:
+                new_edges.append((j, i))
+        self.edges.extend(new_edges)
+
+    def build_neighbor_maps(self):
+        """Build O(1) lookup structures"""
+        # Map vertices to their indices
+        self.vertex_to_id = {tuple(v): i for i, v in enumerate(self.vertices)}
+
+        # Build adjacency lists
+        self.vertex_id_to_edges = {i: [] for i in range(len(self.vertices))}
+        for i, j in self.edges:
+            self.vertex_id_to_edges[i].append(j)
+
+    def remove_duplicate_edges(self):
+        """Remove any duplicate edges"""
+        self.edges = list(set(self.edges))
+
+    def reduce_to_k_neighbors(self):
+        """
+        Post-processing step to reduce number of neighbors back to k_neighbors
+        for vertices that have more connections than k_neighbors.
+        Keeps the k closest neighbors based on configuration space distance.
+        """
+        vertices_array = np.array(self.vertices)
+        modified_edges = []
+        vertices_processed = 0
+
+        # Calculate pairwise distances once
+        diff = vertices_array[:, np.newaxis, :] - vertices_array[np.newaxis, :, :]
+        distances = np.linalg.norm(diff, axis=2)
+
+        for vertex_idx in range(len(self.vertices)):
+            neighbors = self.vertex_id_to_edges[vertex_idx]
+            if len(neighbors) <= self.k_neighbors:
+                # Keep all edges for this vertex
+                modified_edges.extend((vertex_idx, n) for n in neighbors)
+                continue
+
+            # Get distances to all neighbors
+            neighbor_distances = [(n, distances[vertex_idx][n]) for n in neighbors]
+            # Sort by distance and keep k closest
+            sorted_neighbors = sorted(neighbor_distances, key=lambda x: x[1])
+            kept_neighbors = sorted_neighbors[:self.k_neighbors]
+
+            # Add the kept edges
+            modified_edges.extend((vertex_idx, n) for n, _ in kept_neighbors)
+            vertices_processed += 1
+
+        # Update the roadmap
+        self.edges = modified_edges
+        self.build_neighbor_maps()
+
+        print(f"Processed {vertices_processed} vertices with more than {self.k_neighbors} neighbors")
+
+    def add_shortcuts(self, max_attempts=100):
+        """
+        Try to add shortcut edges to the roadmap.
+        For paths of length 2 (i->j->k), try to connect i directly to k.
+        """
+        print("Adding shortcuts...")
+        new_edges = []
+        attempts = 0
+
+        for i in range(len(self.vertices)):
+            if attempts >= max_attempts:
+                break
+
+            # Get neighbors of neighbors (2-hop neighbors)
+            for j in self.vertex_id_to_edges[i]:
+                for k in self.vertex_id_to_edges[j]:
+                    if k == i or (i, k) in self.edges:
+                        continue
+
+                    attempts += 1
+                    if self.check_edge_validity(self.vertices[i], self.vertices[k]):
+                        new_edges.append((i, k))
+                        new_edges.append((k, i))
+
+        self.edges.extend(new_edges)
+        print(f"Added {len(new_edges)} shortcuts")
+
+    def check_connectivity(self):
+        """Check and report connectivity statistics of the roadmap"""
+        components = self._dfs_components()
+        print(f"Roadmap has {len(components)} connected components")
+        print(f"Largest component size: {max(len(c) for c in components)}")
+
+    def get_neighbors(self, vertex_idx: int) -> List[int]:
+        """Get indices of all neighbors for a vertex"""
+        return self.vertex_id_to_edges[vertex_idx]
+
+    def get_vertex_id(self, config: List[float]) -> int:
+        """Get the ID of a configuration if it exists in the roadmap"""
+        return self.vertex_to_id.get(tuple(config))
+
+    def is_edge(self, i: int, j: int) -> bool:
+        """Check if edge exists between vertices i and j"""
+        return j in self.vertex_id_to_edges[i]
+
+    def save_roadmap(self, filename: str):
         """Save roadmap to file"""
         data = {
             'vertices': self.vertices,
@@ -117,13 +329,32 @@ class RoadmapBuilder:
         }
         np.save(filename, data)
 
-    def load_roadmap(self, filename):
-        """Load roadmap from file"""
+    @classmethod
+    def load_roadmap(cls, motion_planner, filename: str):
+        """Load roadmap from file and return new PRM instance
+
+        Args:
+            motion_planner: Instance of MotionPlanner class
+            filename: Path to saved roadmap file
+
+        Returns:
+            PRM: New instance with loaded roadmap
+        """
         data = np.load(filename, allow_pickle=True).item()
-        assert data['robot_name'] == self.robot_name, "Loaded roadmap is for a different robot"
-        self.vertices = data['vertices']
-        self.edges = data['edges']
-        print(f"Loaded roadmap with {len(self.vertices)} vertices and {len(self.edges)} edges")
+
+        # Create new PRM instance with saved parameters
+        prm = cls(motion_planner,
+                  robot_name=data['robot_name'],
+                  n_samples=data['params']['n_samples'],
+                  k_neighbors=data['params']['k_neighbors'],
+                  max_edge_distance=data['params']['max_edge_distance'])
+
+        prm.vertices = data['vertices']
+        prm.edges = data['edges']
+        print(f"Loaded roadmap with {len(prm.vertices)} vertices and {len(prm.edges)} edges")
+
+        prm.post_process()  # Build the neighbor maps and add reverse edges
+        return prm
 
     def visualize_roadmap(self):
         """Visualize the roadmap in Klampt viewer"""
@@ -133,30 +364,179 @@ class RoadmapBuilder:
             self.mp.vis_config(self.robot_name, config, vis_name=name, rgba=(0, 0, 1, 0.3))
 
     def visualize_roadmap_ee_poses(self):
-        """Visualize the roadmap in Klampt viewer"""
+        """Visualize the roadmap in Klampt viewer showing end effector positions"""
         # Visualize vertices
         for i, config in enumerate(self.vertices):
             name = f"vertex_{i}"
             ee_pose = self.mp.get_forward_kinematics(self.robot_name, config)
-            self.mp.show_point_vis(ee_pose[1], name = f"{i}")
+            self.mp.show_point_vis(ee_pose[1], name=f"{i}")
+
+    def get_statistics(self) -> dict:
+        """Get comprehensive statistics about the roadmap
+        Returns:
+            dict containing various statistics about the roadmap structure
+        """
+        stats = {}
+
+        # Basic counts
+        stats['num_vertices'] = len(self.vertices)
+        stats['num_edges'] = len(self.edges)
+        stats['average_degree'] = len(self.edges) / len(self.vertices)
+
+        # Edge distribution
+        degrees = [len(neighbors) for neighbors in self.vertex_id_to_edges.values()]
+        stats['max_vertex_degree'] = max(degrees)
+        stats['min_vertex_degree'] = min(degrees)
+        stats['vertices_exceeding_k'] = sum(1 for d in degrees if d > self.k_neighbors)
+
+        # Joint space coverage
+        vertices_array = np.array(self.vertices)
+        joint_min = np.min(vertices_array, axis=0)
+        joint_max = np.max(vertices_array, axis=0)
+        stats['joint_space_bounds'] = {
+            'min': joint_min.tolist(),
+            'max': joint_max.tolist()
+        }
+        stats['joint_space_volume'] = np.prod(joint_max - joint_min)
+
+        # Connected components and average shortest paths
+        components = self._dfs_components()
+        stats['num_components'] = len(components)
+        component_sizes = [len(c) for c in components]
+        stats['component_size_distribution'] = {size: component_sizes.count(size)
+                                                for size in set(component_sizes)}
+
+        stats['largest_component_size'] = max(component_sizes)
+        stats['smallest_component_size'] = min(component_sizes)
+        stats['average_component_size'] = sum(component_sizes) / len(component_sizes)
+        stats['isolated_vertices'] = sum(1 for d in degrees if d == 0)
+
+        def bfs_shortest_paths(start, component_vertices):
+            distances = {}
+            queue = deque([(start, 0)])
+            while queue:
+                vertex, dist = queue.popleft()
+                if vertex not in distances:
+                    distances[vertex] = dist
+                    for neighbor in self.vertex_id_to_edges[vertex]:
+                        if neighbor in component_vertices and neighbor not in distances:
+                            queue.append((neighbor, dist + 1))
+            return distances
+
+        total_paths = 0
+        total_length = 0
+        all_distances = []
+        for component in components:
+            component_set = set(component)
+            for v in component:
+                distances = bfs_shortest_paths(v, component_set)
+                all_distances.extend(distances.values())
+                total_length += sum(distances.values())
+                total_paths += len(distances) - 1  # exclude path to self
+
+        stats['average_shortest_path'] = total_length / total_paths if total_paths > 0 else float('inf')
+        stats['shortest_path_distribution'] = {dist: all_distances.count(dist) for dist in set(all_distances)}
+
+        # Build timing statistics if available
+        if hasattr(self, 'build_times'):
+            stats['build_times'] = self.build_times
+
+        # Path and distance analysis
+        vertices_array = np.array(self.vertices)
+        diff = vertices_array[:, np.newaxis, :] - vertices_array[np.newaxis, :, :]
+        distances = np.linalg.norm(diff, axis=2)
+        stats['max_edge_length'] = max(distances[i][j] for i, j in self.edges)
+        stats['min_edge_length'] = min(distances[i][j] for i, j in self.edges)
+        stats['average_edge_length'] = np.mean([distances[i][j] for i, j in self.edges])
+
+        # Coverage analysis (using end effector positions)
+        ee_positions = [self.mp.get_forward_kinematics(self.robot_name, v)[1] for v in self.vertices]
+        ee_positions = np.array(ee_positions)
+        ee_min = np.min(ee_positions, axis=0)
+        ee_max = np.max(ee_positions, axis=0)
+        stats['workspace_volume'] = np.prod(ee_max - ee_min)
+        stats['workspace_bounds'] = {
+            'min': ee_min.tolist(),
+            'max': ee_max.tolist()
+        }
+
+        # Bidirectional edge verification
+        num_unidirectional = sum(1 for i, j in self.edges if (j, i) not in self.edges)
+        stats['unidirectional_edges'] = num_unidirectional
+
+        return stats
+
+    def print_statistics(self):
+        """Print formatted statistics about the roadmap"""
+        stats = self.get_statistics()
+        print("\nRoadmap Statistics:")
+        print(f"Number of vertices: {stats['num_vertices']}")
+        print(f"Number of edges: {stats['num_edges']}")
+        print(f"Average degree: {stats['average_degree']:.2f}")
+
+        if 'build_times' in stats and stats['build_times'] is not None:
+            print(f"\nBuild Times:")
+            print(f"  Sampling time: {stats['build_times']['sampling']:.2f}s")
+            print(f"  Connection time: {stats['build_times']['connection']:.2f}s")
+            print(f"  Total time: {stats['build_times']['total']:.2f}s")
+
+        print(f"\nEdge Distribution:")
+        print(f"  Maximum vertex degree: {stats['max_vertex_degree']}")
+        print(f"  Minimum vertex degree: {stats['min_vertex_degree']}")
+        print(f"  Vertices exceeding k({self.k_neighbors}): {stats['vertices_exceeding_k']}")
+
+        print(f"\nConnected Components:")
+        print(f"  Number of components: {stats['num_components']}")
+        print(f"  Largest component size: {stats['largest_component_size']}")
+        print(f"  Smallest component size: {stats['smallest_component_size']}")
+        print(f"  Average component size: {stats['average_component_size']:.2f}")
+        print(f"  Isolated vertices: {stats['isolated_vertices']}")
+
+        print("\nComponent Size Distribution:")
+        for size, count in sorted(stats['component_size_distribution'].items()):
+            print(f"  Size {size}: {count} components")
+
+        print(f"\nPath Analysis:")
+        print(f"  Maximum edge length: {stats['max_edge_length']:.3f}")
+        print(f"  Minimum edge length: {stats['min_edge_length']:.3f}")
+        print(f"  Average edge length: {stats['average_edge_length']:.3f}")
+        print(f"  Average shortest path length (uniform cost): {stats['average_shortest_path']:.2f}")
+
+        print("\nShortest Path Distribution:")
+        for dist, count in sorted(stats['shortest_path_distribution'].items()):
+            print(f"  Length {dist}: {count} paths")
+
+        print(f"\nJoint Space Coverage:")
+        print(f"  Volume: {stats['joint_space_volume']:.3f}")
+        for i, (min_val, max_val) in enumerate(zip(stats['joint_space_bounds']['min'],
+                                                   stats['joint_space_bounds']['max'])):
+            print(f"  Joint {i}: [{min_val:.3f}, {max_val:.3f}]")
+
+        print(f"\nWorkspace Coverage:")
+        print(f"  Volume: {stats['workspace_volume']:.3f}")
+        print(f"  Bounds min: {[f'{x:.3f}' for x in stats['workspace_bounds']['min']]}")
+        print(f"  Bounds max: {[f'{x:.3f}' for x in stats['workspace_bounds']['max']]}")
+
+        print(f"\nEdge Properties:")
+        print(f"  Unidirectional edges: {stats['unidirectional_edges']}")
 
 
 if __name__ == "__main__":
     planner = MotionPlanner()
-    # planner.visualize()
+    #
+    prm = PRM(planner, "ur5e_1", n_samples=300, k_neighbors=10, max_edge_distance=10., eps=1e-1)
+    prm.build_roadmap()
+    prm.save_roadmap("roadmap_ur5e_1.npy")
 
-    builder = RoadmapBuilder(planner, "ur5e_1", n_samples=1000, k_neighbors=10, max_edge_distance=20.)
+    prm.print_statistics()
+    # Add some test configs
+    test_config = [0, -np.pi / 2, 0, -np.pi / 2, 0, 0]
+    idx = prm.add_vertex(test_config)
+    print(f"Added test config at index {idx}")
 
-    builder.build_roadmap()
+    prm.print_statistics()
 
-    builder.save_roadmap("roadmap_ur5e_1.npy")
-
-    # Visualize roadmap
-    # builder.visualize_roadmap()
-    builder.visualize_roadmap_ee_poses()
-    print("n_vertices:", len(builder.vertices))
-    print("n_edges:", len(builder.edges))
-
-    # Keep window open
-    time.sleep(300)
+    # prm = PRM.load_roadmap(planner, "roadmap_ur5e_1.npy")
+    # prm.print_statistics()
+    #
 
