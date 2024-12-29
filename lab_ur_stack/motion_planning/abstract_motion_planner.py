@@ -127,9 +127,9 @@ class AbstractMotionPlanner:
         vis.setColor("path", 1, 1, 1, 0.5)
         vis.setAttribute("path", "robot", robot_name)
 
-    def show_point_vis(self, point, name="point"):
+    def show_point_vis(self, point, name="point", rgba=(0, 1, 0, 0.5)):
         vis.add(name, point)
-        vis.setColor(name, 1, 0, 0, 0.5)
+        vis.setColor(name, *rgba)
 
     def show_ee_poses_vis(self):
         """

@@ -5,6 +5,8 @@ import numpy as np
 import time
 from typing import List, Tuple
 from klampt.plan.robotplanning import make_space
+
+from lab_po_manipulation.poman_motion_planner import POManMotionPlanner
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 from collections import deque
 
@@ -13,7 +15,7 @@ from collections import deque
 # reach the other side, and it creates sets of un connected components. Similarly, we limit the elbow because
 # it can't realy do more than pi to each direction. joint one before last is also limited to -pi pi because
 # it's also likely to create unconnected components.
-default_joint_limits_low = (-2 * np.pi, -3.5, -np.pi, -2 * np.pi, -np.pi, -2 * np.pi)
+default_joint_limits_low = (-2 * np.pi, -3.5, -np.pi, - 2 * np.pi, -np.pi, -2 * np.pi)
 default_joint_limits_high = (2 * np.pi, 0.5, np.pi, 2 * np.pi, np.pi, 2 * np.pi)
 
 class PRM:
@@ -164,6 +166,45 @@ class PRM:
 
         self.build_neighbor_maps()  # Update the neighbor maps
         return new_idx
+
+    def add_workspace_vertices(self, n_samples: int,
+                               xlims: Tuple[float, float],
+                               ylims: Tuple[float, float],
+                               zlims: Tuple[float, float]) -> List[int]:
+        """
+        Add vertices by sampling configurations that place the end effector
+        within specified workspace bounds.
+        """
+        added_vertices = []
+        attempts = 0
+        max_attempts = n_samples * 100  # Limit total attempts to avoid infinite loop
+
+        while len(added_vertices) < n_samples and attempts < max_attempts:
+            attempts += 1
+
+            # Sample random configuration
+            config = self.sample_random_config()
+
+            # Check if end effector position is within bounds
+            ee_pose = self.mp.get_forward_kinematics(self.robot_name, config)
+            ee_pos = ee_pose[1]
+
+            if (xlims[0] <= ee_pos[0] <= xlims[1] and
+                    ylims[0] <= ee_pos[1] <= ylims[1] and
+                    zlims[0] <= ee_pos[2] <= zlims[1]):
+
+                # Add vertex to roadmap
+                vertex_id = self.add_vertex(config)
+                added_vertices.append(vertex_id)
+
+                if len(added_vertices) % 10 == 0:
+                    print(f"Added {len(added_vertices)}/{n_samples} vertices".ljust(50), end="\r")
+
+        print(f"\nAdded {len(added_vertices)} vertices in {attempts} attempts")
+        if len(added_vertices) < n_samples:
+            print("Warning: Could not find enough valid configurations in the specified workspace region")
+
+        return added_vertices
 
     def check_edge_validity(self, config1, config2):
         """Check if direct path between two configs is valid using CSpace"""
@@ -371,6 +412,89 @@ class PRM:
             ee_pose = self.mp.get_forward_kinematics(self.robot_name, config)
             self.mp.show_point_vis(ee_pose[1], name=f"{i}")
 
+    def visualize_connected_components_ee_poses(self):
+        """
+        Visualize the roadmap's connected components in different colors, showing end effector positions.
+        Each connected component will be displayed in a distinct color using a preset color palette.
+        """
+        # Preset colors (RGB values)
+        colors = [
+            (1, 0, 0),  # Red
+            (0, 1, 0),  # Green
+            (0, 0, 1),  # Blue
+            (1, 1, 0),  # Yellow
+            (1, 0, 1),  # Magenta
+            (0, 1, 1),  # Cyan
+            (1, 0.5, 0),  # Orange
+            (0.5, 0, 1),  # Purple
+            (0, 0.5, 0),  # Dark Green
+            (0.5, 0.5, 1),  # Light Blue
+        ]
+
+        # Get connected components
+        components = self._dfs_components()
+
+        # Visualize each component
+        for component_idx, component in enumerate(components):
+            color = (*colors[component_idx % len(colors)], 0.7)  # Cycle through colors if more components than colors
+
+            for vertex_idx in component:
+                config = self.vertices[vertex_idx]
+                ee_pose = self.mp.get_forward_kinematics(self.robot_name, config)
+                self.mp.show_point_vis(ee_pose[1], name=f"cc{component_idx}", rgba=color)
+
+        print(f"Visualized {len(components)} connected components in different colors")
+
+    def find_path(self, start_config: List[float], goal_config: List[float]) -> List[List[float]]:
+        """
+        Find a path between start and goal configurations using the roadmap.
+        If start or goal configs are not in the roadmap, they will be added.
+        """
+        # Verify configurations are valid
+        if not self.mp.is_config_feasible(self.robot_name, start_config):
+            raise ValueError("Start configuration is invalid")
+        if not self.mp.is_config_feasible(self.robot_name, goal_config):
+            raise ValueError("Goal configuration is invalid")
+
+        # Convert configs to tuples for lookup
+        start_tuple = tuple(start_config)
+        goal_tuple = tuple(goal_config)
+
+        # Check if configs are already in roadmap
+        start_id = self.vertex_to_id.get(start_tuple)
+        goal_id = self.vertex_to_id.get(goal_tuple)
+
+        # Add start config if not in roadmap
+        if start_id is None:
+            start_id = self.add_vertex(start_config)
+
+        # Add goal config if not in roadmap
+        if goal_id is None:
+            goal_id = self.add_vertex(goal_config)
+
+        # Use BFS to find shortest path
+        visited = {start_id}
+        queue = deque([(start_id, [start_id])])
+        path_found = None
+
+        while queue and not path_found:
+            current_id, path = queue.popleft()
+
+            if current_id == goal_id:
+                path_found = path
+                break
+
+            for neighbor_id in self.vertex_id_to_edges[current_id]:
+                if neighbor_id not in visited:
+                    visited.add(neighbor_id)
+                    queue.append((neighbor_id, path + [neighbor_id]))
+
+        # Convert vertex IDs to configurations
+        if path_found:
+            return [self.vertices[i] for i in path_found]
+
+        return []
+
     def get_statistics(self) -> dict:
         """Get comprehensive statistics about the roadmap
         Returns:
@@ -522,11 +646,10 @@ class PRM:
 
 
 if __name__ == "__main__":
-    planner = MotionPlanner()
+    planner = POManMotionPlanner()
     #
-    prm = PRM(planner, "ur5e_1", n_samples=300, k_neighbors=10, max_edge_distance=10., eps=1e-1)
+    prm = PRM(planner, "ur5e_1", n_samples=150, k_neighbors=10, max_edge_distance=10., eps=1e-1)
     prm.build_roadmap()
-    prm.save_roadmap("roadmap_ur5e_1.npy")
 
     prm.print_statistics()
     # Add some test configs
@@ -536,6 +659,17 @@ if __name__ == "__main__":
 
     prm.print_statistics()
 
+    planner.visualize()
+    prm.visualize_connected_components_ee_poses()
+
+    # add more vertices near the obstacle area
+    xlims = (-1.5, 0)
+    ylims = (-0.5, 0.5)
+    zlims = (0, 0.8)
+    prm.add_workspace_vertices(100, xlims, ylims, zlims)
+
+    prm.save_roadmap("roadmap_ur5e_1.npy")
+    pass
     # prm = PRM.load_roadmap(planner, "roadmap_ur5e_1.npy")
     # prm.print_statistics()
     #
