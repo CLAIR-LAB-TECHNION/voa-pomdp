@@ -1,6 +1,6 @@
 from joblib import Parallel, delayed
 import pandas as pd
-from rocksample_experiments.utils import sample_problem_from_voa_row
+from rocksample_experiments.utils import sample_problem_from_voa_row, get_help_action_from_row
 import numpy as np
 from scipy import stats
 import time
@@ -21,7 +21,7 @@ def test_heuristic_on_problem_instance(voa_df, env_instance_id, heuristic_functi
         start_time = time.time()
 
         problem = sample_problem_from_voa_row(row, n=11)
-        help_config = eval(row['help_actions'])
+        help_config = get_help_action_from_row(row)
         heuristic_value = heuristic_function(problem, help_config, **heuristic_kwargs)
 
         computation_time = time.time() - start_time

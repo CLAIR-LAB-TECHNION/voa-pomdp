@@ -30,8 +30,16 @@ def get_problem_from_voa_row_and_state(row : pd.Series, n, rocktypes) -> RockSam
     return RockSampleProblem(n=n, k=k, rock_locs=rock_locs, init_state=init_state, init_belief=init_belief)
 
 
-def sample_problem_from_voa_row(row : pd.Series, n) -> RockSampleProblem:
+def sample_problem_from_voa_row(row : pd.Series, n, deterministic_rock_types=None) -> RockSampleProblem:
     k = len(eval(row['rock_locations']))
-    rocktypes = [RockType.random() for _ in range(k)]
+    if deterministic_rock_types:
+        rocktypes = deterministic_rock_types
+    else:
+        rocktypes = [RockType.random() for _ in range(k)]
 
     return get_problem_from_voa_row_and_state(row, n, rocktypes)
+
+
+def get_help_action_from_row(row : pd.Series) -> dict:
+    help_action = ast.literal_eval(row['help_actions'])
+    help_action = {int(k): v for k, v in help_action.items()}
