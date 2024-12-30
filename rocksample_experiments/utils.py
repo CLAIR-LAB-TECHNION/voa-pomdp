@@ -43,3 +43,4 @@ def sample_problem_from_voa_row(row : pd.Series, n, deterministic_rock_types=Non
 def get_help_action_from_row(row : pd.Series) -> dict:
     help_action = ast.literal_eval(row['help_actions'])
     help_action = {int(k): v for k, v in help_action.items()}
+    return help_action

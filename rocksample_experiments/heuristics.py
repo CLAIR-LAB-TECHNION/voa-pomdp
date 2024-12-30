@@ -1,10 +1,11 @@
-from copy import deepcopy
-
+from typing import Dict
 import pomdp_py
-
+from rocksample_experiments.full_info_planning import get_full_info_value
 from rocksample_experiments.help_actions import push_rocks
 from rocksample_experiments.preferred_actions import RSActionPrior, CustomRSPolicyModel
-from rocksample_experiments.rocksample_problem import RockSampleProblem
+from rocksample_experiments.rocksample_problem import RockSampleProblem, RockType
+from rocksample_experiments.full_info_planning import get_full_info_value, get_full_info_value_greedy
+from copy import deepcopy
 
 
 def h_vd_results(problem: RockSampleProblem, help_config, vd_table, n_states_to_use) -> float:
@@ -71,8 +72,7 @@ def first_step_planning_value(problem: RockSampleProblem, n_sims, max_depth) -> 
 
 def h_first_step_planning_value_diff(problem: RockSampleProblem, help_config, n_sims=2000,
                                      max_depth=20, n_trials=1) -> float:
-    problem_helped = deepcopy(problem)
-    problem_helped, _ = push_rocks(problem_helped, help_config)
+    problem_helped, _ = push_rocks(problem, help_config, deepcopy_belief=True)
 
     vdiffs = []
     for _ in range(n_trials):
@@ -84,15 +84,19 @@ def h_first_step_planning_value_diff(problem: RockSampleProblem, help_config, n_
 
 def perform_rollout(problem: RockSampleProblem, rollout_policy: CustomRSPolicyModel, max_stpes: int,
                     discount_factor) -> float:
-    problem = deepcopy(problem)
+    # create copy of the problem since we will be modifying it, dont use deepcopy since copying the belief
+    # takes time and we don't use it here
+    problem_cpy = RockSampleProblem(n=problem.n, k=problem.k, rock_locs=problem.rock_locs,
+                                init_state=deepcopy(problem.env.state), init_belief=problem.agent.init_belief,
+                                half_efficiency_dist=problem.agent.observation_model._half_efficiency_dist)
 
     total_discounted_reward = 0
-    state = problem.env.state
+    state = problem_cpy.env.state
     history = []
     for i in range(max_stpes):
         action = rollout_policy.rollout(state, history)
-        reward = problem.env.state_transition(action, execute=True)
-        obs = problem.env.provide_observation(problem.agent.observation_model, action)
+        reward = problem_cpy.env.state_transition(action, execute=True)
+        obs = problem_cpy.env.provide_observation(problem_cpy.agent.observation_model, action)
 
         history.append((action, obs))
         total_discounted_reward += reward * discount_factor ** i
@@ -107,8 +111,7 @@ def h_rollout_policy_value(problem: RockSampleProblem, help_config, n_rollouts=1
     vdiffs = []
 
     for i in range(n_rollouts):
-        problem_helped = deepcopy(problem)
-        problem_helped, _ = push_rocks(problem_helped, help_config)
+        problem_helped, _ = push_rocks(problem, help_config, deepcopy_belief=False)
 
         vd = perform_rollout(problem_helped, rollout_policy, max_stpes=100, discount_factor=0.95) \
              - perform_rollout(problem, rollout_policy, max_stpes=100, discount_factor=0.95)
@@ -117,8 +120,31 @@ def h_rollout_policy_value(problem: RockSampleProblem, help_config, n_rollouts=1
     return sum(vdiffs) / n_rollouts
 
 
+def h_full_info_planning_value_diff(problem: RockSampleProblem, help_config: Dict, n_states=1) -> float:
+    """
+    Compute VOA heuristic based on difference in full information planning values.
+    """
+
+    heuristic_function = get_full_info_value if problem.k <=9 else get_full_info_value_greedy
+
+    vd = []
+    for _ in range(n_states):
+        rocktypes = [RockType.random() for _ in range(problem.k)]
+        curr_init_state = deepcopy(problem.env.state)
+        curr_init_state.rocktypes = rocktypes
+        curr_problem = RockSampleProblem(n=problem.n, k=problem.k, rock_locs=problem.rock_locs,
+                                            init_state=curr_init_state, init_belief=problem.agent.init_belief)
+
+        curr_problem_helped, _ = push_rocks(curr_problem, help_config, deepcopy_belief=False)
+
+        value_without_help = heuristic_function(curr_problem)
+        value_with_help = heuristic_function(curr_problem_helped)
+        vd.append(value_with_help - value_without_help)
+    return sum(vd) / n_states
+
+
 if __name__ == '__main__':
-    from rocksample_experiments.utils import sample_problem_from_voa_row
+    from rocksample_experiments.utils import sample_problem_from_voa_row, get_help_action_from_row
     import pandas as pd
 
     row = pd.Series({
@@ -134,5 +160,7 @@ if __name__ == '__main__':
         'std_error': 1.025003
     })
 
-    problem = sample_problem_from_voa_row(row, 11)
-    first_step_planning_value(problem)
+    for i in range(20):
+        problem = sample_problem_from_voa_row(row, n=10)
+        help_config = get_help_action_from_row(row)
+        h = h_full_info_planning_value_diff(problem, help_config, n_states=10)

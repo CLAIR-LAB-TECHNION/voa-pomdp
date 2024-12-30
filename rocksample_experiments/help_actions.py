@@ -45,7 +45,7 @@ def is_legal_rock_push(problem: RockSampleProblem, rocks_to_push: dict) -> bool:
     return True
 
 
-def push_rocks(problem: RockSampleProblem, rocks_to_push: dict) -> (RockSampleProblem, int):
+def push_rocks(problem: RockSampleProblem, rocks_to_push: dict, deepcopy_belief=True) -> (RockSampleProblem, int):
     """
     Create new RockSample instance with rocks pushed according to rocks_to_push
 
@@ -77,17 +77,14 @@ def push_rocks(problem: RockSampleProblem, rocks_to_push: dict) -> (RockSamplePr
             new_pos = pos
         new_rock_locs[new_pos] = rock_id
 
+    init_belief = deepcopy(problem.agent.cur_belief) if deepcopy_belief else problem.agent.cur_belief
     # Create new instance with same parameters but updated rock locations
     new_problem = RockSampleProblem(
         n=problem.n,
         k=problem.k,
-        init_state=State(
-            position=problem.env.state.position,
-            rocktypes=problem.env.state.rocktypes,
-            terminal=problem.env.state.terminal
-        ),
+        init_state=deepcopy(problem.env.state),
         rock_locs=new_rock_locs,
-        init_belief=deepcopy(problem.agent.cur_belief),
+        init_belief=init_belief,
         half_efficiency_dist=problem.agent.observation_model._half_efficiency_dist
     )
 
