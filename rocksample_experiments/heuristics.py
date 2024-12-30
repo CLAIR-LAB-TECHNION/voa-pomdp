@@ -86,17 +86,13 @@ def perform_rollout(problem: RockSampleProblem, rollout_policy: CustomRSPolicyMo
                     discount_factor) -> float:
     # create copy of the problem since we will be modifying it, dont use deepcopy since copying the belief
     # takes time and we don't use it here
-    problem_cpy = RockSampleProblem(n=problem.n, k=problem.k, rock_locs=problem.rock_locs,
-                                init_state=deepcopy(problem.env.state), init_belief=problem.agent.init_belief,
-                                half_efficiency_dist=problem.agent.observation_model._half_efficiency_dist)
-
     total_discounted_reward = 0
-    state = problem_cpy.env.state
+    state = problem.env.state
     history = []
     for i in range(max_stpes):
         action = rollout_policy.rollout(state, history)
-        reward = problem_cpy.env.state_transition(action, execute=True)
-        obs = problem_cpy.env.provide_observation(problem_cpy.agent.observation_model, action)
+        reward = problem.env.state_transition(action, execute=True)
+        obs = problem.env.provide_observation(problem.agent.observation_model, action)
 
         history.append((action, obs))
         total_discounted_reward += reward * discount_factor ** i
@@ -111,10 +107,19 @@ def h_rollout_policy_value(problem: RockSampleProblem, help_config, n_rollouts=1
     vdiffs = []
 
     for i in range(n_rollouts):
-        problem_helped, _ = push_rocks(problem, help_config, deepcopy_belief=False)
+        # create new problem but sample rock types randomly
+        rocktypes = [RockType.random() for _ in range(problem.k)]
+        init_state = deepcopy(problem.env.state)
+        init_state.rocktypes = rocktypes
+        curr_problem = RockSampleProblem(n=problem.n, k=problem.k, rock_locs=problem.rock_locs,
+                                         init_state=init_state, init_belief=problem.agent.init_belief,
+                                         half_efficiency_dist=problem.agent.observation_model._half_efficiency_dist)
+
+
+        problem_helped, _ = push_rocks(curr_problem, help_config, deepcopy_belief=False)
 
         vd = perform_rollout(problem_helped, rollout_policy, max_stpes=100, discount_factor=0.95) \
-             - perform_rollout(problem, rollout_policy, max_stpes=100, discount_factor=0.95)
+             - perform_rollout(curr_problem, rollout_policy, max_stpes=100, discount_factor=0.95)
         vdiffs.append(vd)
 
     return sum(vdiffs) / n_rollouts
