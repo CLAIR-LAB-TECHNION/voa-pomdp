@@ -1,3 +1,4 @@
+from itertools import product
 from typing import Dict
 import pomdp_py
 from rocksample_experiments.full_info_planning import get_full_info_value
@@ -148,6 +149,32 @@ def h_full_info_planning_value_diff(problem: RockSampleProblem, help_config: Dic
     return sum(vd) / n_states
 
 
+def h_full_info_planning_value_all_states(problem: RockSampleProblem, help_config: Dict) -> float:
+    """
+    Compute VOA heuristic based on difference in full information planning values.
+    """
+
+    heuristic_function = get_full_info_value if problem.k <=9 else get_full_info_value_greedy
+
+    options = ['bad', 'good']
+    combinations = list(product(options, repeat=11))
+    all_rock_types = [list(combo) for combo in combinations]
+
+    vd = []
+    for rocktypes in all_rock_types:
+        curr_init_state = deepcopy(problem.env.state)
+        curr_init_state.rocktypes = rocktypes
+        curr_problem = RockSampleProblem(n=problem.n, k=problem.k, rock_locs=problem.rock_locs,
+                                            init_state=curr_init_state, init_belief=problem.agent.init_belief)
+
+        curr_problem_helped, _ = push_rocks(curr_problem, help_config, deepcopy_belief=False)
+
+        value_without_help = heuristic_function(curr_problem)
+        value_with_help = heuristic_function(curr_problem_helped)
+        vd.append(value_with_help - value_without_help)
+    return sum(vd) / len(vd)
+
+
 if __name__ == '__main__':
     from rocksample_experiments.utils import sample_problem_from_voa_row, get_help_action_from_row
     import pandas as pd
@@ -168,4 +195,4 @@ if __name__ == '__main__':
     for i in range(20):
         problem = sample_problem_from_voa_row(row, n=10)
         help_config = get_help_action_from_row(row)
-        h = h_full_info_planning_value_diff(problem, help_config, n_states=10)
+        h = h_rollout_policy_value(problem, help_config, n_rollouts=100)
