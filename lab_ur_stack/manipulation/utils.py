@@ -5,19 +5,6 @@ from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationCo
 import numpy as np
 
 
-def to_canonical_config(config):
-    """
-    change config to be between -pi and pi for all joints
-    """
-    for i in range(6):
-        while config[i] > np.pi:
-            config[i] -= 2 * np.pi
-        while config[i] < -np.pi:
-            config[i] += 2 * np.pi
-
-    return config
-
-
 def distribute_blocks_in_positions(block_positions,
                                    robot_controller: ManipulationController2FG,
                                    stack_position=stack_position_r2frame,

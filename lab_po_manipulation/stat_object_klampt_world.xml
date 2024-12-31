@@ -26,8 +26,8 @@
   </rigidObject>
 
 <!--we don't model the ur3 now, just keep away from it-->
-  <rigidObject name="keep_out_from_ur3_zone"  position="-0.66 0.325 0.50">
-     <geometry mesh="../lab_ur_stack/motion_planning/objects/cube.off" scale="0.25 0.25 1.0" translate="0 0 0" />
+  <rigidObject name="keep_out_from_ur3_zone"  position="-0.66 0.325 0.25">
+     <geometry mesh="../lab_ur_stack/motion_planning/objects/cube.off" scale="0.25 0.25 0.5" translate="0 0 0" />
   </rigidObject>
 
 <!--    same for third ur5e   -->

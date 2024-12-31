@@ -201,11 +201,11 @@ class TwoFG7():
         # if status != 0, then command not succesful. Perhaps there is no space to move the gripper
         return int(self._send_xml_rpc_request(xml_request))
 
-    def twofg_int_release(self, target_width: float = 40.00, speed: int = 1) -> int:
+    def twofg_int_release(self, target_width: float = 40.00, speed: int = 100) -> int:
         """
             speed is the range from 1 to 100. It represents the percentage of the maximum speed.
         """
-        target_force: int = 80
+        target_force: int = 80 # I think this is actually passed as width... need to further debug if relevant
 
         assert target_width <= self.max_int_width and target_width >= self.min_int_width, f'Target Width must be within the range [{self.min_int_width},{self.max_int_width}]'
         assert target_force <= self.max_force or target_force >= 20, f'Target force must be within the range [20,{self.max_force}]'

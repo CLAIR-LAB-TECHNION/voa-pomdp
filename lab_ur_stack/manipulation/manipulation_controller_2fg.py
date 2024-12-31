@@ -1,5 +1,7 @@
+from typing import Sequence
+from scipy.spatial.transform import Rotation as R
 import numpy as np
-from lab_ur_stack.manipulation.robot_with_motion_planning import RobotInterfaceWithMP
+from lab_ur_stack.manipulation.robot_with_motion_planning import RobotInterfaceWithMP, to_canonical_config
 from lab_ur_stack.robot_inteface.robot_interface import RobotInterfaceWithGripper, home_config
 from lab_ur_stack.motion_planning.motion_planner import MotionPlanner
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
@@ -35,24 +37,120 @@ class ManipulationController2FG(RobotInterfaceWithMP):
             logging.warning(f"Failed to set gripper ({self._ip}), width: {width}, force: {force}, speed: {speed}")
         time.sleep(wait_time)
 
-    def grasp(self, wait_time=0.5):
+    def grasp(self, wait_time=0.5, force=20, speed=100, width=None):
+        if width is None:
+            width = self.min_width
         logging.debug(f"Grasping ({self._ip}), min_width: {self.min_width}")
-        res = self.gripper.twofg_grip_external(self.min_width, 20, 100)
+        res = self.gripper.twofg_grip_external(width, force, speed)
         if res != 0:
             logging.warning(f"Failed to grasp ({self._ip})")
         time.sleep(wait_time)
 
-    def release_grasp(self, wait_time=0.5):
+    def release_grasp(self, wait_time=0.5, force=20, speed=100):
         logging.debug(f"Releasing grasp ({self._ip}), max_width: {self.max_width}")
-        res = self.gripper.twofg_grip_external(self.max_width, 20, 100)
+        res = self.gripper.twofg_int_release(self.gripper.max_int_width)
         if res != 0:
             logging.warning(f"Failed to release grasp ({self._ip})")
+            print("FAIL")
         time.sleep(wait_time)
 
     def is_object_gripped(self):
         return self.gripper.twofg_get_grip_detected()
 
+    #### Utils ####
+
+    def approach_vector_to_axis_angle(self, approach_vector, ee_rz):
+        # compute rotation matrix for ee facing the point:
+        mat_z_col = approach_vector
+        mat_x_col = np.array([0, 1, 0])  # that's one degree of freedom we are going to solve later
+        if np.linalg.norm(np.cross(mat_z_col, mat_x_col)) < 1e-6:
+            # x and z are parallel, initial rotation matrix will not be orthonormal
+            mat_x_col = np.array([1, 0, 0])
+        mat_y_col = np.cross(mat_z_col, mat_x_col)
+        rotation_matrix = np.array([mat_x_col, mat_y_col, mat_z_col]).T
+        # add rotation around z axis by ee_rz, to resolve the missing dof
+        rotation_matrix = rotation_matrix @ R.from_euler("z", ee_rz).as_matrix()
+        # convert to axis angle representation (as used in UR)
+        axis_angle = R.from_matrix(rotation_matrix).as_rotvec()
+        return axis_angle
+
+
     #### Pick and place functions ####
+
+    def pick_up_at_angle(self, point: Sequence[float], start_offset: Sequence[float], ee_rz=0,
+                         grasp_force=20, grasp_speed=100, grasp_width=None):
+        """
+        pick up by grasping object at point, by first arriving to the point + offset,
+        ee facing the point, rotated around z axis by ee_rz (z axis is ee forward).
+        The robot will move from the offset to the point using linear motion, then retract back to the offset.
+        If there's no z offset, there will be 1 cm z offset to avoid scratching the surface.
+        """
+        point = np.asarray(point)
+        start_offset = np.asarray(start_offset)
+
+        offset_position = point + start_offset
+
+        approach_vector = -start_offset
+        approach_vector =  approach_vector /np.linalg.norm(approach_vector)
+
+        axis_angle = self.approach_vector_to_axis_angle(approach_vector, ee_rz)
+
+        pick_up_start_pose = offset_position.tolist() + axis_angle.tolist()
+
+        pick_up_start_config = self.find_ik_solution(pick_up_start_pose, max_tries=50, for_down_movement=False)
+        if pick_up_start_config is None:
+            logging.error(f"{self.robot_name} Could not find IK solution for pick up start pose")
+            print("\033[93m Could not find IK solution, not moving. \033[0m")
+            chime.error()
+            return
+
+        pick_up_start_config = to_canonical_config(pick_up_start_config)
+
+        self.release_grasp()
+
+        self.plan_and_moveJ(pick_up_start_config)
+        self.moveL(point.tolist() + axis_angle.tolist(), speed=self.linear_speed,
+                   acceleration=self.linear_acceleration)
+        self.grasp(force=grasp_force, speed=grasp_speed, width=grasp_width)
+
+        if np.abs(start_offset[2]) <= 0.005:
+            # add 0.5 cm z offset to avoid scratching the surface
+            offset_position[2] += 0.01
+        self.moveL(offset_position.tolist() + axis_angle.tolist(), speed=0.05)
+
+    def put_down_at_angle(self, point: Sequence[float], start_offset: Sequence[float], ee_rz=0,):
+        """
+        put down by first arriving to the point + offset, ee facing the point, rotated around z axis by ee_rz.
+        The robot will move from the offset to the point using linear motion, then retract back to the offset.
+        if there's no z offset, there will be 1 cm z offset to avoid scratching the surface.
+        """
+        point = np.asarray(point)
+        start_offset = np.asarray(start_offset)
+
+        offset_position = point + start_offset
+        if np.abs(start_offset[2]) < 0.005:
+            offset_position[2] += 0.01
+
+        approach_vector = -start_offset
+        approach_vector = approach_vector / np.linalg.norm(approach_vector)
+
+        axis_angle = self.approach_vector_to_axis_angle(approach_vector, ee_rz)
+        put_down_start_pose = offset_position.tolist() + axis_angle.tolist()
+
+        put_down_start_config = self.find_ik_solution(put_down_start_pose, max_tries=50, for_down_movement=False)
+        if put_down_start_config is None:
+            logging.error(f"{self.robot_name} Could not find IK solution for put down start pose")
+            print("\033[93m Could not find IK solution, not moving. \033[0m")
+            chime.error()
+            return
+        put_down_start_config = to_canonical_config(put_down_start_config)
+
+        self.plan_and_moveJ(put_down_start_config)
+        self.moveL(point.tolist() + axis_angle.tolist(), speed=self.linear_speed,
+                   acceleration=self.linear_acceleration)
+        self.release_grasp()
+        self.moveL(offset_position.tolist() + axis_angle.tolist(), speed=0.05)
+
 
     def pick_up(self, x, y, rz, start_height=0.2, replan_from_home_if_failed=True):
         """

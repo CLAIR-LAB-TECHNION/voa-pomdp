@@ -8,7 +8,8 @@ from lab_ur_stack.robot_inteface.robots_metadata import ur5e_1, ur5e_2
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera
 from lab_ur_stack.vision.image_block_position_estimator import ImageBlockPositionEstimator
 from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_in_workspace_uniform, \
-    ur5e_2_collect_blocks_from_positions, to_canonical_config
+    ur5e_2_collect_blocks_from_positions
+from lab_ur_stack.manipulation.robot_with_motion_planning import to_canonical_config
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default)
 from lab_ur_stack.vision.utils import (lookat_verangle_distance_to_robot_config, detections_plots_no_depth_as_image,

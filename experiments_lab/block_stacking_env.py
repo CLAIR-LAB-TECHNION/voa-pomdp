@@ -3,7 +3,8 @@ from matplotlib import pyplot as plt
 from lab_ur_stack.camera.realsense_camera import RealsenseCamera
 from lab_ur_stack.manipulation.manipulation_controller_2fg import ManipulationController2FG
 from lab_ur_stack.manipulation.utils import ur5e_2_distribute_blocks_from_block_positions_dists, \
-    distribute_blocks_in_positions, to_canonical_config
+    distribute_blocks_in_positions
+from lab_ur_stack.manipulation.robot_with_motion_planning import to_canonical_config
 from lab_ur_stack.motion_planning.geometry_and_transforms import GeometryAndTransforms
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
                                                 workspace_y_lims_default, goal_tower_position)

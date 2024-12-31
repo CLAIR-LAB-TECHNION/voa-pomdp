@@ -196,3 +196,18 @@ class RobotInterfaceWithMP(RobotInterface):
         goal_config = self.find_ik_solution(target_pose_robot, max_tries=50, for_down_movement=for_down_movement,)
         return self.plan_and_moveJ(goal_config, speed, acceleration, visualise)
         # motion planner is automatically updated after movement
+
+
+def to_canonical_config(config, tol=0, ignore_joints=(False,) *6):
+    """
+    change config to be between -pi and pi for all joints with tolerance of tol
+    """
+    for i in range(6):
+        if ignore_joints[i]:
+            continue
+        while config[i] > np.pi + tol:
+            config[i] -= 2 * np.pi
+        while config[i] < -np.pi - tol:
+            config[i] += 2 * np.pi
+
+    return config

@@ -1,7 +1,7 @@
 import time
 import typer
 import numpy as np
-from lab_ur_stack.manipulation.utils import to_canonical_config
+from lab_ur_stack.manipulation.robot_with_motion_planning import to_canonical_config
 from lab_ur_stack.vision.utils import lookat_verangle_horangle_distance_to_robot_config, \
     detections_plots_with_depth_as_image
 from lab_ur_stack.utils.workspace_utils import (workspace_x_lims_default,
