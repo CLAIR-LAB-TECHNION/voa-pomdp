@@ -60,20 +60,22 @@ class ManipulationController2FG(RobotInterfaceWithMP):
     #### Utils ####
 
     def approach_vector_to_axis_angle(self, approach_vector, ee_rz):
-        # compute rotation matrix for ee facing the point:
         mat_z_col = approach_vector
-        mat_x_col = np.array([0, 1, 0])  # that's one degree of freedom we are going to solve later
-        if np.linalg.norm(np.cross(mat_z_col, mat_x_col)) < 1e-6:
-            # x and z are parallel, initial rotation matrix will not be orthonormal
-            mat_x_col = np.array([1, 0, 0])
-        mat_y_col = np.cross(mat_z_col, mat_x_col)
+        world_z = np.array([0, 0, 1])
+
+        # Project world Z onto plane perpendicular to approach vector
+        proj = world_z - (np.dot(world_z, mat_z_col) * mat_z_col)
+        if np.linalg.norm(proj) < 1e-5:
+            mat_y_col = np.array([0, -1, 0])
+        else:
+            mat_y_col = -proj / np.linalg.norm(proj)  # flip Y axis
+
+        mat_x_col = np.cross(mat_y_col, mat_z_col)
+
         rotation_matrix = np.array([mat_x_col, mat_y_col, mat_z_col]).T
-        # add rotation around z axis by ee_rz, to resolve the missing dof
         rotation_matrix = rotation_matrix @ R.from_euler("z", ee_rz).as_matrix()
-        # convert to axis angle representation (as used in UR)
         axis_angle = R.from_matrix(rotation_matrix).as_rotvec()
         return axis_angle
-
 
     #### Pick and place functions ####
 
@@ -126,15 +128,16 @@ class ManipulationController2FG(RobotInterfaceWithMP):
         """
         point = np.asarray(point)
         start_offset = np.asarray(start_offset)
+        add_z_offset = np.abs(start_offset[2]) < 0.005
 
         offset_position = point + start_offset
-        if np.abs(start_offset[2]) < 0.005:
-            offset_position[2] += 0.01
 
         approach_vector = -start_offset
         approach_vector = approach_vector / np.linalg.norm(approach_vector)
 
         axis_angle = self.approach_vector_to_axis_angle(approach_vector, ee_rz)
+
+        offset_position[2] += 0.01 * int(add_z_offset)
         put_down_start_pose = offset_position.tolist() + axis_angle.tolist()
 
         put_down_start_config = self.find_ik_solution(put_down_start_pose, max_tries=50, for_down_movement=False)
