@@ -36,16 +36,12 @@ if __name__ == "__main__":
     r1_controller.speed, r1_controller.acceleration = 0.75, .75
 
     grasp_configs = [
-        ([0.1, 0, 0], 0),
-        ([0.08, -0.04, 0], 0),
-        ([0.08, 0.04, 0], 0),
-        ([0.08, 0, 0.05], 0),
-        ([0.08, 0.04, 0.05], 0),
-        ([0.08, -0.04, 0.05], 0)
-
+        ([0.1, 0, 0.01], 0),
+        ([0.1, 0, 0.035], 0),
+        ([0.08, 0.025, 0.03], 0),
     ]
 
-    for offset, ee_rz in grasp_configs:
-        test_execution_grasp_config("middle_shelf", offset, ee_rz, r1_controller)
+    # for offset, ee_rz in grasp_configs:
+    #     test_execution_grasp_config("middle_shelf", offset, ee_rz, r1_controller)
 
-    # save_grasps_to_json(, grasp_configs)
+    save_grasps_to_json("middle_shelf", grasp_configs)
