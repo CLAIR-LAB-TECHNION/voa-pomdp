@@ -1,3 +1,5 @@
+import itertools
+
 from joblib import Parallel, delayed
 import pandas as pd
 from rocksample_experiments.utils import sample_problem_from_voa_row, get_help_action_from_row
@@ -243,12 +245,47 @@ def evaluate_rank_of_best_heuristic(results_df):
     return rank_of_best, voa_of_best
 
 
+def partial_ordering_agreement(results_df, ci_type='95'):
+    """
+    Compute agreement with partial ordering defined by confidence intervals.
+
+    Partial ordering rules:
+    - a > b if a's CI is strictly higher than b's CI (no overlap)
+    - a ~ b if CIs overlap (any ordering is acceptable) (this is not counted for this score)
+    """
+    ci_low = results_df[f'ci_low_{ci_type}']
+    ci_high = results_df[f'ci_high_{ci_type}']
+    heuristic = results_df['heuristic_value']
+
+    n = len(results_df)
+    pairs = list(itertools.combinations(range(n), 2))
+    n_total_pairs = len(pairs)
+    agreements = 0
+    strict_pairs = 0
+
+    for i, j in pairs:
+        if ci_low.iloc[i] > ci_high.iloc[j]:  # i strictly > j
+            strict_pairs += 1
+            agreements += int(heuristic.iloc[i] > heuristic.iloc[j])
+        elif ci_low.iloc[j] > ci_high.iloc[i]:  # j strictly > i
+            strict_pairs += 1
+            agreements += int(heuristic.iloc[j] > heuristic.iloc[i])
+
+    return {
+        'agreement': agreements / strict_pairs if strict_pairs > 0 else None,
+        'strict_pairs_ratio': strict_pairs / n_total_pairs,
+        'n_strict_pairs': strict_pairs,
+        'n_total_pairs': n_total_pairs
+    }
+
+
 def heuristic_metrics(results_df):
     """
     Comprehensive evaluation of heuristic performance with flat metrics structure
     """
     rank_of_best, voa_of_best = evaluate_rank_of_best_heuristic(results_df)
     sign_metrics = evaluate_sign_agreement(results_df)
+    partial_ordering = partial_ordering_agreement(results_df)
 
     evaluation = {
         'top_1_accuracy': evaluate_top_k_accuracy(results_df, k=1),
@@ -258,10 +295,6 @@ def heuristic_metrics(results_df):
         'ci_weighted_correlation': evaluate_ci_weighted_correlation(results_df),
         'rank_of_best_heuristic': rank_of_best,
         'voa_of_best_heuristic': voa_of_best,
-        'mean_computation_time': results_df['computation_time'].mean(),
-        'std_computation_time': results_df['computation_time'].std(),
-        'max_computation_time': results_df['computation_time'].max(),
-        'min_computation_time': results_df['computation_time'].min(),
         # Flatten sign agreement metrics
         'sign_precision': sign_metrics['precision'],
         'sign_recall': sign_metrics['recall'],
@@ -270,7 +303,17 @@ def heuristic_metrics(results_df):
         'sign_n_significant': sign_metrics['n_significant'],
         'sign_n_total': sign_metrics['n_total'],
         'sign_n_significant_positive': sign_metrics['n_significant_positive'],
-        'sign_n_significant_negative': sign_metrics['n_significant_negative']
+        'sign_n_significant_negative': sign_metrics['n_significant_negative'],
+        # Partial ordering agreement metrics
+        'partial_ordering_agreement': partial_ordering['agreement'],
+        'partial_ordering_strict_pairs_ratio': partial_ordering['strict_pairs_ratio'],
+        'partial_ordering_n_strict_pairs': partial_ordering['n_strict_pairs'],
+        'partial_ordering_n_total_pairs': partial_ordering['n_total_pairs'],
+        ###
+        'mean_computation_time': results_df['computation_time'].mean(),
+        'std_computation_time': results_df['computation_time'].std(),
+        'max_computation_time': results_df['computation_time'].max(),
+        'min_computation_time': results_df['computation_time'].min(),
     }
 
     return evaluation
